@@ -5,7 +5,7 @@
 [![Google ADK](https://img.shields.io/badge/Google%20ADK-latest-orange.svg)](https://github.com/google/adk-python)
 [![MCP](https://img.shields.io/badge/MCP-enabled-green.svg)](https://modelcontextprotocol.io/)
 [![A2A Protocol](https://img.shields.io/badge/A2A-protocol-violet.svg)](https://github.com/google/A2A)
-[![License: EL2](https://img.shields.io/badge/License-Elastic%20v2-blue.svg)](https://www.elastic.co/licensing/elastic-license)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 **繁體中文** | [English](./README.md)
 
@@ -56,13 +56,7 @@ graph TD
 
     Bot_TG & Bot_DC & Bot_LN <--> MateclawAgent[Mateclaw Agent\nGoogle ADK]
 
-    MateclawAgent <-->|A2A| CodingAgent[Coding Agent]
-    MateclawAgent <-->|A2A| VizAgent[Viz Report Agent]
-    MateclawAgent <-->|A2A| AnyAgent[任意 A2A Agent ...]
-
-    MateclawAgent <--> MCP_Core[核心 MCP — mateclaw]
-    CodingAgent <--> MCP_Coding[MCP — coding]
-    VizAgent <--> MCP_Viz[MCP — viz-report]
+    MateclawAgent <--> MCP_Core[核心 MCP]
     MateclawAgent <--> MCP_Ext[外部 MCP\nStreamable HTTP / SSE]
 
     MCP_Core <--> DB[(PostgreSQL / SQLite)]
@@ -72,7 +66,7 @@ graph TD
 
     Dashboard[Web 儀表板] <--> API[FastAPI 後端]
     API <--> DB
-    API -->|重啟| MateclawAgent & CodingAgent & VizAgent
+    API -->|重啟| MateclawAgent
 ```
 
 ---
@@ -237,4 +231,6 @@ mateclaw dashboard
 
 ## 授權
 
-本專案採用 MIT 授權條款。詳見 `LICENSE`。
+本專案採用 **AGPL v3 + 商業授權**雙授權模式。詳見 `LICENSE`。
+
+如需商業授權洽詢，請聯絡：simonliuyuwei@gmail.com

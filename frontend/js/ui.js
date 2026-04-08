@@ -56,48 +56,6 @@ const UI = {
         }
     },
 
-    // --- Coding Agent Toggle ---
-    _codingAgentEnabled: false,
-
-    async initCodingAgentToggle() {
-        try {
-            const conf = await API.fetch('/api/config');
-            this._codingAgentEnabled = !!conf.coding_agent_enabled;
-        } catch(e) {
-            this._codingAgentEnabled = false;
-        }
-        this._renderCodingAgentToggle();
-    },
-    _renderCodingAgentToggle() {
-        const btn = document.getElementById('coding-agent-toggle-btn');
-        const knob = document.getElementById('coding-agent-toggle-knob');
-        const text = document.getElementById('coding-agent-status-text');
-        if (!btn) return;
-        if (this._codingAgentEnabled) {
-            btn.className = "relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none bg-violet-500 cursor-pointer";
-            knob.className = "inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform translate-x-8";
-            text.textContent = "已啟用，需重啟服務生效";
-        } else {
-            btn.className = "relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none bg-slate-300 cursor-pointer";
-            knob.className = "inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform translate-x-1";
-            text.textContent = "已停用";
-        }
-        btn.onclick = () => UI.toggleCodingAgent();
-    },
-    async toggleCodingAgent() {
-        this._codingAgentEnabled = !this._codingAgentEnabled;
-        this._renderCodingAgentToggle();
-        try {
-            await API.fetch('/api/config/coding-agent', {
-                method: 'POST',
-                body: JSON.stringify({ enabled: this._codingAgentEnabled })
-            });
-        } catch(e) {
-            this._codingAgentEnabled = !this._codingAgentEnabled;
-            this._renderCodingAgentToggle();
-        }
-    },
-
     // --- Theme Management ---
     loadTheme() {
         const theme = localStorage.getItem('mate_theme') || 'light';
