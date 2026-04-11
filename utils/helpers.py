@@ -145,20 +145,27 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
                 ]
         services_fragment[ext_svc] = svc_def
 
-    # Volumes: use costaff_data (external) for data dirs; declare others as local
+    # Volumes: map agent-specific data volumes to the global costaff_data volume
     volumes_fragment = {}
-    for svc_def in services_fragment.values():
+    for svc_name, svc_def in services_fragment.items():
+        new_vols = []
         for vol in svc_def.get("volumes", []):
-            vol_name = vol.split(":")[0] if ":" in str(vol) else None
-            if vol_name and not vol_name.startswith("/") and vol_name not in volumes_fragment:
-                volumes_fragment[vol_name] = None  # local volume
+            if ":" in str(vol):
+                local_part, container_part = vol.split(":", 1)
+                # If it's a named volume (not a path) and maps to /app/data
+                if not local_part.startswith("/") and not local_part.startswith("./"):
+                    if container_part.startswith("/app/data"):
+                        # Force use the global shared volume
+                        new_vols.append(f"costaff_data:{container_part}")
+                        continue
+            new_vols.append(vol)
+        svc_def["volumes"] = new_vols
 
     fragment = {
         "services": services_fragment,
         "networks": {"costaff_default": {"external": True}},
+        "volumes": {"costaff_data": {"external": True}},
     }
-    if volumes_fragment:
-        fragment["volumes"] = volumes_fragment
     fragment_path = os.path.join(fragment_dir, "compose-fragment.yaml")
     with open(fragment_path, "w") as f:
         _yaml.dump(fragment, f, default_flow_style=False, allow_unicode=True)
