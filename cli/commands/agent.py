@@ -204,10 +204,8 @@ def agent_restart(name: str = typer.Argument(..., help="Agent name to restart"))
 
 GEMINI_MODELS = [
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-exp-1206",
+    "gemini-3-flash-preview",
+    "gemini-3.1-pro-preview",
 ]
 
 # core agent env var (not in config.json external_agents)
