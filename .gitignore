@@ -60,7 +60,7 @@ costaff_cli.egg-info/
 # License tools (internal, never commit — lives in costaff-license repo)
 tools/
 
-# Landing page (separate repo: AICoStaff/CoStaffAI.github.io)
+# Landing page (separate repo: costaff-ai/CoStaffAI.github.io)
 landing/
 
 # License files (customer-specific, never commit)
