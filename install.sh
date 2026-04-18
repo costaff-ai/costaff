@@ -8,7 +8,7 @@ set -e
 # =============================================================================
 
 REPO_URL="${COSTAFF_REPO_URL:-https://github.com/costaff-ai/costaff.git}"
-COSTAFF_DIR="$HOME/.costaff-agent"
+COSTAFF_DIR="$HOME/.costaff"
 VENV_DIR="$COSTAFF_DIR/.venv"
 PYTHON_VERSION="3.11"
 
