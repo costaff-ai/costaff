@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 from typing import Optional
 from dotenv import set_key
 
-# Resolve project root: prefer CWD if it looks like the project (has costaff.py or setup.py),
-# otherwise fall back to the directory containing this file (works for editable installs).
+# Resolve project root.
+# Priority: COSTAFF_HOME env var > package directory (editable install) > CWD fallback.
+# CWD is intentionally NOT preferred so that running `costaff` from inside a source
+# checkout doesn't accidentally redirect all data to that directory.
 def _find_project_root() -> str:
-    cwd = Path.cwd()
-    if (cwd / "setup.py").exists() or (cwd / "costaff.py").exists():
-        return str(cwd)
+    if os.environ.get("COSTAFF_HOME"):
+        return os.environ["COSTAFF_HOME"]
     return str(Path(__file__).resolve().parent.parent)
 
 _project_root = _find_project_root()
