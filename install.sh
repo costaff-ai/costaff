@@ -154,11 +154,20 @@ install_ubuntu() {
 install_costaff() {
     # Clone repo
     step "Downloading CoStaff Agent..."
+    GITHUB_URL="https://github.com/costaff-ai/costaff.git"
     if [ -d "$COSTAFF_DIR/.git" ]; then
         warn "CoStaff Agent already exists at $COSTAFF_DIR — pulling latest changes..."
+        # Always ensure remote points to GitHub (not a local dev path)
+        git -C "$COSTAFF_DIR" remote set-url origin "$GITHUB_URL" 2>/dev/null || true
         git -C "$COSTAFF_DIR" pull --ff-only
     else
         git clone "$REPO_URL" "$COSTAFF_DIR"
+        # If cloned from a local path, add GitHub as the canonical remote
+        current_remote=$(git -C "$COSTAFF_DIR" remote get-url origin 2>/dev/null || true)
+        if [[ "$current_remote" != http* && "$current_remote" != git@* ]]; then
+            git -C "$COSTAFF_DIR" remote set-url origin "$GITHUB_URL"
+            success "Remote set to GitHub."
+        fi
     fi
     success "CoStaff Agent downloaded to $COSTAFF_DIR"
 
