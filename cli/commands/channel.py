@@ -181,7 +181,7 @@ def channel_rebuild(
     console.print(f"Starting rebuilt channel containers for [bold]{name}[/bold]...")
     up_result = subprocess.run(
         DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path,
-                                   "up", "-d", "--force-recreate"] + container_names,
+                                   "up", "-d", "--force-recreate", "--remove-orphans"] + container_names,
         cwd=_project_root,
     )
     if up_result.returncode == 0:
