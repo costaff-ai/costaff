@@ -3,7 +3,7 @@ import typer
 from utils.helpers import VERSION
 from cli.commands.services import start, stop, status, logs, restart
 from cli.commands.onboard import onboard
-from cli.commands.dashboard import dashboard, chat
+from cli.commands.dashboard import dashboard, chat, invoke
 from cli.commands.license_cmd import license
 from cli.commands.agent import agent_app
 from cli.commands.channel import channel_app
@@ -22,6 +22,7 @@ app.command()(status)
 app.command()(logs)
 app.command()(dashboard)
 app.command()(chat)
+app.command()(invoke)
 app.command()(license)
 
 # Register subgroups

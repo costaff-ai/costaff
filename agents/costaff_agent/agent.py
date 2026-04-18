@@ -2,6 +2,8 @@ import os
 import json
 import sys
 import logging
+import httpx
+import time
 from datetime import datetime
 
 # Configure logging
@@ -86,9 +88,11 @@ else:
 # Metadata is fetched from each agent's own agent card at startup.
 def _fetch_agent_card_metadata(a2a_url: str, agent_name: str) -> dict:
     """Fetch metadata from agent card. Tries multiple well-known paths and includes retries."""
-    import httpx
-    import time
-    metadata = {"description": f"Sub-agent: {agent_name}", "display_name": agent_name}
+    metadata = {
+        "description": f"Sub-agent: {agent_name}", 
+        "display_name": agent_name,
+        "skills": []
+    }
     
     # Paths to try
     paths = ["/.well-known/agent.json", "/.well-known/agent-card.json"]
@@ -103,6 +107,12 @@ def _fetch_agent_card_metadata(a2a_url: str, agent_name: str) -> dict:
                     card = resp.json()
                     desc = card.get("description", "").strip()
                     if desc: metadata["description"] = desc
+                    
+                    # Extract Skills
+                    skills = card.get("skills", [])
+                    if skills:
+                        metadata["skills"] = [s.get("name") if isinstance(s, dict) else str(s) for s in skills]
+
                     # Check for display_name in capabilities
                     display_name = card.get("capabilities", {}).get("display_name", "").strip()
                     if display_name:
@@ -121,7 +131,7 @@ def _fetch_agent_card_metadata(a2a_url: str, agent_name: str) -> dict:
     return metadata
 
 sub_agents = []
-agent_display_mappings = []
+agent_meta_cache = {} 
 raw_agents = os.getenv("EXTERNAL_AGENTS_CONFIG", "").strip()
 if raw_agents:
     try:
@@ -130,23 +140,24 @@ if raw_agents:
         for agent_name, agent_cfg in agents_config.items():
             a2a_url = agent_cfg.get("a2a_url", "").strip()
             if not a2a_url:
-                logger.warning(f"Skipping agent '{agent_name}': no a2a_url")
                 continue
             try:
                 meta = _fetch_agent_card_metadata(a2a_url, agent_name)
+                a2a_name = agent_name.replace("-", "_")
+                agent_meta_cache[a2a_name] = meta
+                
                 remote_agent = RemoteA2aAgent(
-                    name=agent_name.replace("-", "_"),
+                    name=a2a_name,
                     description=meta["description"],
                     agent_card=f"{a2a_url}{AGENT_CARD_WELL_KNOWN_PATH}",
                     use_legacy=False,
                 )
                 sub_agents.append(remote_agent)
-                agent_display_mappings.append(f"- `{(agent_name.replace('-', '_'))}` → <b>{meta['display_name']}</b>")
                 logger.info(f"Registered sub-agent '{agent_name}': {a2a_url}")
             except Exception as e:
                 logger.warning(f"Failed to load agent '{agent_name}': {e}")
-    except json.JSONDecodeError as e:
-        logger.error(f"EXTERNAL_AGENTS_CONFIG is not valid JSON: {e}")
+    except Exception as e:
+        logger.error(f"EXTERNAL_AGENTS_CONFIG load error: {e}")
 
 # Construct dynamic instruction
 import re
@@ -158,13 +169,14 @@ if sub_agents:
         "當你收到任務時，請優先核對此名冊。你具備以下所有專家的擴展能力：",
         ""
     ]
-    for agent_name, agent_cfg in agents_config.items():
-        a2a_name = agent_name.replace("-", "_")
-        desc = next((a.description for a in sub_agents if a.name == a2a_name), "特殊任務專家")
+    for a2a_name, meta in agent_meta_cache.items():
         roster_lines.append(f"### 🤖 專家 ID: `{a2a_name}`")
-        roster_lines.append(f"- **職責描述**: {desc}")
+        roster_lines.append(f"- **職責描述**: {meta['description']}")
         
-        # Add explicit logic for common agents to break LLM's "I cannot" bias
+        if meta.get("skills"):
+            skill_list = ", ".join([f"`{s}`" for s in meta["skills"]])
+            roster_lines.append(f"- **具備技能**: {skill_list}")
+        
         if "coding" in a2a_name:
             roster_lines.append("- **核心能力**: [CRITICAL] 這是你唯一具備編寫程式、處理檔案、修復 CSV 與執行數學運算的能力來源。")
         if "ba_agent" in a2a_name or "business" in a2a_name:
@@ -185,16 +197,12 @@ else:
         AGENT_INSTRUCTION,
         flags=re.DOTALL,
     )
-    # Explicit negative assertion to prevent hallucination when user asks about sub-agents.
+    # Explicit negative assertion
     no_subs_guard = (
         "\n# NO SUB-AGENTS (CRITICAL)\n"
         "You currently have **NO registered sub-agents**. You work alone.\n"
         "- If the user asks about team members, specialists, coding assistants, or any named agent "
-        "(e.g. coding_agent, data_agent, etc.), answer truthfully: **no such sub-agent is registered**.\n"
-        "- Never invent sub-agent names. Never claim to delegate tasks to any sub-agent.\n"
-        "- You may still answer coding, analysis, or writing questions yourself using your own capabilities.\n"
-        "- If a capability genuinely requires a sub-agent that does not exist, tell the user the capability "
-        "is not currently registered and suggest they add one.\n\n---\n"
+        "answer truthfully: **no such sub-agent is registered**.\n\n---\n"
     )
     instruction_body = no_subs_guard + instruction_body
 
@@ -206,17 +214,11 @@ instruction = (
 
 # Define the root agent
 description_parts = [
-    "CoStaff Agent: a personal AI assistant for scheduling, reminders, profile management, "
-    "and general knowledge.",
-    "Responsible for: answering questions with general knowledge; managing user profile and identity; "
-    "creating and managing reminders and scheduled messages; managing Kanban tasks for recurring "
-    "automated work; calling user-registered external APIs; discovering and invoking registered Skills.",
+    "CoStaff Agent: a personal AI assistant.",
+    "Responsible for: scheduling, reminders, profile management, and general knowledge.",
 ]
 if sub_agents:
-    description_parts.append(
-        "Also orchestrates registered sub-agents for specialised tasks."
-    )
-description_parts.append("Communicates with users via Telegram, Discord, or Line.")
+    description_parts.append("Orchestrates registered sub-agents for specialised tasks.")
 
 root_agent = LlmAgent(
     model=selected_model,

@@ -22,35 +22,94 @@ def dashboard(port: int = 8501):
     uvicorn.run(server, host="0.0.0.0", port=port, log_level="error")
 
 
-def chat(app_name: str = typer.Option(None)):
-    """Interactive CLI Chat."""
+def chat(app_name: str = "costaff_agent"):
+    """Interactive CLI Chat with sub-agent activity logging."""
+    from dotenv import dotenv_values
+    from utils.helpers import PATHS
+    env = dotenv_values(PATHS["env"])
+    
+    # Try to find a real user_id from DB or fallback
+    uid = "cli_tester_888"
+    sid = f"chat_{secrets.token_hex(3)}"
+    
+    console.print(f"💬 [bold cyan]CoStaff CLI Chat[/bold cyan] (App: {app_name}, Session: {sid})")
+    
+    # 1. Ensure Session
     try:
-        apps = httpx.get("http://localhost:18080/list-apps").json()
-    except Exception:
-        return console.print("CoStaff Agent not running.")
-    app_name = app_name or questionary.select("Select App:", choices=apps).ask()
-    sid = f"cli-{secrets.token_hex(4)}"
-    console.print(f"Chatting with {app_name} (Session: {sid})")
-    try:
-        httpx.post(f"http://localhost:18080/apps/{app_name}/users/cli-user/sessions/{sid}", json={"state": {}})
-    except Exception:
-        pass
+        httpx.post(f"http://localhost:18080/apps/{app_name}/users/{uid}/sessions", 
+                   json={"sessionId": sid, "state": {}}, timeout=5.0)
+    except Exception as e:
+        console.print(f"[red]Failed to connect to agent: {e}[/red]")
+        return
+
     while True:
-        q = questionary.text("You:").ask()
-        if not q or q.lower() in ["exit", "quit"]:
+        prompt = questionary.text("User:").ask()
+        if not prompt or prompt.lower() in ["exit", "quit", "q"]:
             break
-        try:
-            with httpx.stream("POST", "http://localhost:18080/run_sse", json={"app_name": app_name, "user_id": "cli-user", "session_id": sid, "new_message": {"role": "user", "parts": [{"text": q}]}, "streaming": True}, timeout=None) as r:
-                console.print("Agent: ", end="")
-                for line in r.iter_lines():
-                    if line.startswith("data: "):
-                        try:
-                            data = json.loads(line[6:])
-                            for p in data.get("content", {}).get("parts", []):
-                                if t := p.get("text"):
-                                    console.print(t, end="")
-                        except Exception:
-                            pass
-                console.print("\n")
-        except Exception:
-            break
+            
+        _run_request(app_name, uid, sid, prompt)
+
+
+def invoke(prompt: str = typer.Argument(..., help="The message to send"), 
+           app_name: str = typer.Option("costaff_agent", "--app")):
+    """Quickly send a single message to the agent and see the response (plus sub-agent logs)."""
+    uid = "cli_tester_888"
+    sid = f"invoke_{secrets.token_hex(3)}"
+    
+    # 1. Ensure Session
+    try:
+        httpx.post(f"http://localhost:18080/apps/{app_name}/users/{uid}/sessions", 
+                   json={"sessionId": sid, "state": {}}, timeout=5.0)
+    except Exception:
+        pass # Might already exist
+        
+    _run_request(app_name, uid, sid, prompt)
+
+
+def _run_request(app_name, uid, sid, prompt):
+    """Helper to stream response and show activity."""
+    url = "http://localhost:18080/run"
+    payload = {
+        "appName": app_name,
+        "userId": uid,
+        "sessionId": sid,
+        "newMessage": {"role": "user", "parts": [{"text": f"(Context ID: {uid}) {prompt}"}]}
+    }
+    
+    try:
+        console.print("[dim]Thinking...[/dim]")
+        with httpx.Client(timeout=None) as client:
+            resp = client.post(url, json=payload)
+            if resp.status_code != 200:
+                console.print(f"[red]Error {resp.status_code}: {resp.text}[/red]")
+                return
+
+            events = resp.json()
+            for ev in events:
+                author = ev.get("author", "unknown")
+                content = ev.get("content", {})
+                parts = content.get("parts", [])
+                
+                # Filter out boring internal initialization
+                if any(p.get("functionCall", {}).get("name") == "get_apis" for p in parts):
+                    continue
+                
+                # Show A2A Delegation
+                if "transferToAgent" in ev.get("actions", {}):
+                    target = ev["actions"]["transferToAgent"]
+                    console.print(f"📢 [bold yellow]>>> Delegating to: {target}[/bold yellow]")
+                
+                # Show Tool Calls
+                for p in parts:
+                    if "functionCall" in p:
+                        fn = p["functionCall"]
+                        console.print(f"🛠  [dim]Calling Tool: {fn['name']}({fn.get('args', {})})[/dim]")
+                    if "functionResponse" in p:
+                        # console.print(f"✅ [dim]Tool returned result.[/dim]")
+                        pass
+                    if "text" in p:
+                        color = "green" if author != "user" else "white"
+                        role_label = f"[bold {color}]{author.upper()}[/bold {color}]: "
+                        console.print(f"{role_label}{p['text']}")
+    except Exception as e:
+        console.print(f"[red]Request failed: {e}[/red]")
