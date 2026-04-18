@@ -95,11 +95,11 @@ async def execute_project_task(task_id: str):
             if channel and recipient:
                 await _send_notification(channel, recipient, result_text, task_session_id)
 
-            # Trigger next queued task for this agent
+            # Advance queue and wake up dependents
             if task.assigned_agent:
-                asyncio.create_task(_advance_agent_queue(task.assigned_agent, task.user_id))
+                asyncio.create_task(_advance_agent_queue(task.assigned_agent, task.user_id, finished_task_id=task_id))
 
-        except Exception as e:
+            except Exception as e:
             logger.error(f"ProjectTask execution failed {task_id}: {e}")
             task.status = "failed"
             task.updated_at = datetime.utcnow()
@@ -124,16 +124,36 @@ async def execute_project_task(task_id: str):
 
             # Still advance the queue even on failure so remaining tasks are not blocked
             if task.assigned_agent:
-                asyncio.create_task(_advance_agent_queue(task.assigned_agent, task.user_id))
+                asyncio.create_task(_advance_agent_queue(task.assigned_agent, task.user_id, finished_task_id=task_id))
+
 
     finally:
         db.close()
 
 
-async def _advance_agent_queue(agent_id: str, user_id: str):
-    """Pick up the next queued task for an agent after current one finishes."""
+async def _advance_agent_queue(agent_id: str, user_id: str, finished_task_id: str = None):
+    """
+    1. Pick up the next already-queued task for this specific agent.
+    2. [NEW] Wake up any dependent tasks (from ANY agent) that were waiting for this finished task.
+    """
     db = SessionLocal()
     try:
+        # 1. Trigger dependent tasks across the whole project
+        if finished_task_id:
+            dependents = (
+                db.query(models.ProjectTask)
+                .filter(models.ProjectTask.depends_on == finished_task_id)
+                .all()
+            )
+            for dep_task in dependents:
+                if dep_task.status == "backlog":
+                    logger.info(f"Dependency met! Queuing dependent task: {dep_task.id} (Agent: {dep_task.assigned_agent})")
+                    dep_task.status = "queued"
+                    dep_task.updated_at = datetime.utcnow()
+                    db.commit() # Commit each change immediately to avoid race
+                    asyncio.create_task(execute_project_task(dep_task.id))
+
+        # 2. Advance the original agent's own queue (existing logic)
         next_task = (
             db.query(models.ProjectTask)
             .filter(
