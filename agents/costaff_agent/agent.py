@@ -148,11 +148,25 @@ if raw_agents:
         logger.error(f"EXTERNAL_AGENTS_CONFIG is not valid JSON: {e}")
 
 # Construct dynamic instruction
-display_names_block = "\n".join(agent_display_mappings) if agent_display_mappings else "- (No external agents registered)"
+import re
 preferred_lang = os.getenv("COSTAFF_PREFERRED_LANGUAGE", "Traditional Chinese (繁體中文)")
 
+if sub_agents:
+    display_names_block = "\n".join(agent_display_mappings)
+    # Keep content, strip only the marker comments.
+    instruction_body = re.sub(r"<!--\s*(BEGIN|END)_SUB_AGENTS\s*-->", "", AGENT_INSTRUCTION)
+else:
+    display_names_block = ""
+    # Remove entire sub-agent blocks including markers (DOTALL so . matches newlines).
+    instruction_body = re.sub(
+        r"<!--\s*BEGIN_SUB_AGENTS\s*-->.*?<!--\s*END_SUB_AGENTS\s*-->",
+        "",
+        AGENT_INSTRUCTION,
+        flags=re.DOTALL,
+    )
+
 instruction = (
-    AGENT_INSTRUCTION
+    instruction_body
     .replace("{SUB_AGENT_DISPLAY_NAMES}", display_names_block)
     .replace("{PREFERRED_LANGUAGE}", preferred_lang)
 )
