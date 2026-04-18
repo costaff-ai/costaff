@@ -8,25 +8,21 @@ from datetime import datetime, timezone
 from typing import Optional
 from dotenv import set_key
 
-# Resolve project root.
-# Priority: COSTAFF_HOME env var > package directory (editable install) > CWD fallback.
-# CWD is intentionally NOT preferred so that running `costaff` from inside a source
-# checkout doesn't accidentally redirect all data to that directory.
-def _find_project_root() -> str:
-    if os.environ.get("COSTAFF_HOME"):
-        return os.environ["COSTAFF_HOME"]
-    return str(Path(__file__).resolve().parent.parent)
-
-_project_root = _find_project_root()
+# _project_root  — source code directory (git clone at ~/.costaff-src)
+# _runtime_root  — runtime data directory (~/.costaff by default)
+#   Override _runtime_root via COSTAFF_HOME env var.
+_project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
+
+_runtime_root: str = os.environ.get("COSTAFF_HOME") or str(Path.home() / ".costaff")
 
 # --- Constants ---
 VERSION = "0.2.4"
 PATHS = {
-    "env": os.path.join(_project_root, ".costaff", ".env"),
-    "config": os.path.join(_project_root, ".costaff", "config.json"),
-    "auth": os.path.join(_project_root, ".costaff", "auth.json"),
+    "env":      os.path.join(_runtime_root, ".env"),
+    "config":   os.path.join(_runtime_root, "config.json"),
+    "auth":     os.path.join(_runtime_root, "auth.json"),
     "frontend": os.path.join(_project_root, "frontend"),
 }
 
@@ -227,7 +223,7 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
     description = manifest.get("description", "")
 
     public_port = _next_available_channel_port(conf)
-    fragment_dir = os.path.join(_project_root, ".costaff", "dynamic-channels", name)
+    fragment_dir = os.path.join(_runtime_root, "dynamic-channels", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
     plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
@@ -288,7 +284,7 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
 
     from rich.console import Console
     console = Console()
-    main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     ext_services = list(services_fragment.keys())
     import subprocess
     if build_only:
@@ -335,7 +331,7 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
     version = manifest.get("version", "")
 
     public_port = _next_available_port(conf)
-    fragment_dir = os.path.join(_project_root, ".costaff", "external-agents", name)
+    fragment_dir = os.path.join(_runtime_root, "external-agents", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
     plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
@@ -416,7 +412,7 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
     import httpx
     from rich.console import Console
     console = Console()
-    main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     ext_services = list(services_fragment.keys())
     cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--build"] + ext_services
     console.print(f"Building and starting {name}...")

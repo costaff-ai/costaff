@@ -17,7 +17,7 @@ from managers.config import ConfigManager
 from managers.docker import DockerManager
 from managers.database import DatabaseManager
 from models.requests import ServiceActionRequest
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 
 router = APIRouter()
 
@@ -37,7 +37,7 @@ def get_os_stats(auth: bool = Depends(AuthManager.verify_token)):
 def get_license(auth: bool = Depends(AuthManager.verify_token)):
     sys.path.insert(0, _project_root)
     from src.core.license import LicenseManager, OSS_LIMITS
-    costaff_dir = os.path.join(_project_root, ".costaff")
+    costaff_dir = _runtime_root
     license_path = os.path.join(costaff_dir, "costaff-license.yaml")
 
     def _monthly_used() -> int:
@@ -149,7 +149,7 @@ def service_action(service: str, req: ServiceActionRequest, auth: bool = Depends
 @router.post("/api/config/require-approval")
 def set_require_approval(req: dict, auth: bool = Depends(AuthManager.verify_token)):
     # Approval gate is an Enterprise-only feature
-    costaff_dir = os.path.join(_project_root, ".costaff")
+    costaff_dir = _runtime_root
     license_path = os.path.join(costaff_dir, "costaff-license.yaml")
     if not os.path.exists(license_path):
         raise HTTPException(status_code=403, detail="User approval gate is an Enterprise feature. OSS installations cannot enable this setting.")

@@ -10,7 +10,7 @@ from rich.panel import Panel
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 
 console = Console()
 
@@ -19,7 +19,7 @@ def onboard():
     """Run configuration wizard."""
     os.makedirs(os.path.dirname(PATHS["env"]), exist_ok=True)
     if not os.path.exists(PATHS["env"]):
-        template_path = ".env.template"
+        template_path = os.path.join(_project_root, ".env.template")
         if os.path.exists(template_path):
             shutil.copy(template_path, PATHS["env"])
             console.print(f"[bold green]Created {PATHS['env']} from template.[/bold green]")
@@ -114,7 +114,7 @@ def onboard():
     # because channel deploy runs `docker compose -f <this file>` immediately.
     base_compose_file = "docker-compose.yaml"
     src_compose = os.path.join(_project_root, base_compose_file)
-    costaff_dir = os.path.join(_project_root, ".costaff")
+    costaff_dir = _runtime_root
     dest_compose = os.path.join(costaff_dir, base_compose_file)
 
     with open(src_compose, "r") as f:
@@ -165,7 +165,7 @@ def onboard():
                 
                 # Auto-deploy via GitHub
                 repo_url = OFFICIAL_CHANNELS[p]
-                target_src = os.path.join(_project_root, ".costaff", "src", "channels", p)
+                target_src = os.path.join(_runtime_root, "src", "channels", p)
                 
                 if not os.path.exists(target_src):
                     os.makedirs(os.path.dirname(target_src), exist_ok=True)

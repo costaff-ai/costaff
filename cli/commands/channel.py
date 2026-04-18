@@ -14,7 +14,7 @@ from rich.table import Table
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 from utils.helpers import _deploy_local_channel  # We'll create this
 
 console = Console()
@@ -67,7 +67,7 @@ def channel_add(
                 predefined_envs[k.strip()] = v.strip()
 
     if github:
-        target_src = os.path.join(_project_root, ".costaff", "src", "channels", name)
+        target_src = os.path.join(_runtime_root, "src", "channels", name)
         if os.path.exists(target_src):
             if not questionary.confirm(f"Source directory {target_src} already exists. Overwrite?").ask():
                 raise typer.Exit(0)
@@ -146,7 +146,7 @@ def channel_rebuild(
     fragment_path = chan_conf["fragment_path"]
     container_names = chan_conf.get("container_names", [f"costaff-chan-{name}"])
     source_path = chan_conf.get("source_path", "(unknown)")
-    main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
 
     console.print(f"Building channel [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")

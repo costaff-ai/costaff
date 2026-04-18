@@ -10,7 +10,7 @@ from managers.auth import AuthManager
 from managers.config import ConfigManager
 from managers.docker import DockerManager
 from models.requests import GatewayUpdateRequest, AddMCPRequest, AgentMCPConfigRequest
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 
 router = APIRouter()
 
@@ -233,7 +233,7 @@ def update_agent_mcp_config(req: AgentMCPConfigRequest, auth: bool = Depends(Aut
 
     if ext_agent_conf and ext_agent_conf.get("type") == "github" and ext_agent_conf.get("fragment_path"):
         # Restart using the compose fragment so service definition is available
-        main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+        main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
         fragment_path = ext_agent_conf["fragment_path"]
         primary_service = ext_agent_conf.get("container_names", [ext_name])[0]
         def _restart_ext_agent():

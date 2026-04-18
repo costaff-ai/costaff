@@ -8,7 +8,8 @@ set -e
 # =============================================================================
 
 REPO_URL="${COSTAFF_REPO_URL:-https://github.com/costaff-ai/costaff.git}"
-COSTAFF_DIR="$HOME/.costaff"
+COSTAFF_DIR="$HOME/.costaff-src"   # source code (git clone)
+RUNTIME_DIR="$HOME/.costaff"       # runtime data (.env, config, docker-compose)
 VENV_DIR="$COSTAFF_DIR/.venv"
 PYTHON_VERSION="3.11"
 
@@ -171,6 +172,9 @@ install_costaff() {
     fi
     success "CoStaff Agent downloaded to $COSTAFF_DIR"
 
+    # Create runtime directory
+    mkdir -p "$RUNTIME_DIR"
+
     # Create venv & install CLI
     step "Installing CoStaff CLI..."
     $PYTHON_BIN -m venv "$VENV_DIR"
@@ -178,19 +182,22 @@ install_costaff() {
     "$VENV_DIR/bin/pip" install -e "$COSTAFF_DIR" -q
     success "CoStaff CLI installed."
 
-    # Add to PATH
+    # Add to PATH and export COSTAFF_HOME
     step "Configuring PATH..."
-    EXPORT_LINE="export PATH=\"$VENV_DIR/bin:\$PATH\""
+    EXPORT_PATH="export PATH=\"$VENV_DIR/bin:\$PATH\""
+    EXPORT_HOME="export COSTAFF_HOME=\"$RUNTIME_DIR\""
     if ! grep -qF "$VENV_DIR/bin" "$SHELL_RC" 2>/dev/null; then
         echo "" >> "$SHELL_RC"
         echo "# CoStaff Agent CLI" >> "$SHELL_RC"
-        echo "$EXPORT_LINE" >> "$SHELL_RC"
+        echo "$EXPORT_PATH" >> "$SHELL_RC"
+        echo "$EXPORT_HOME" >> "$SHELL_RC"
         success "Added costaff to PATH in $SHELL_RC"
     else
         success "PATH already configured."
     fi
 
     export PATH="$VENV_DIR/bin:$PATH"
+    export COSTAFF_HOME="$RUNTIME_DIR"
 }
 
 # =============================================================================

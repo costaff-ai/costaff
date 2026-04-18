@@ -14,7 +14,7 @@ from rich.table import Table
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 from utils.helpers import _deploy_local_agent
 
 console = Console()
@@ -55,7 +55,7 @@ def agent_add(
                 predefined_envs[k.strip()] = v.strip()
 
     if github:
-        target_src = os.path.join(_project_root, ".costaff", "src", name)
+        target_src = os.path.join(_runtime_root, "src", name)
         if os.path.exists(target_src):
             if not questionary.confirm(f"Source directory {target_src} already exists. Overwrite?").ask():
                 raise typer.Exit(0)
@@ -179,7 +179,7 @@ def agent_restart(name: str = typer.Argument(..., help="Agent name to restart"))
 
     fragment_path = agent_conf["fragment_path"]
     container_names = agent_conf.get("container_names", [f"costaff-ext-{name}"])
-    main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
 
     console.print(f"Stopping agent [bold]{name}[/bold]...")
@@ -388,7 +388,7 @@ def agent_rebuild(
     fragment_path = agent_conf["fragment_path"]
     container_names = agent_conf.get("container_names", [f"costaff-ext-{name}"])
     source_path = agent_conf.get("source_path", "(unknown)")
-    main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
 
     console.print(f"Building [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")

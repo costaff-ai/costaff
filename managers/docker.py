@@ -2,7 +2,7 @@ import subprocess
 from dotenv import load_dotenv
 from rich.console import Console
 
-from utils.helpers import PATHS, _project_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
 from managers.config import ConfigManager
 
 console = Console()
@@ -23,7 +23,7 @@ class DockerManager:
     @staticmethod
     def get_compose_cwd(compose_file: str) -> str:
         import os
-        costaff_dir = os.path.join(_project_root, ".costaff")
+        costaff_dir = _runtime_root
         if os.path.exists(os.path.join(costaff_dir, compose_file)):
             return costaff_dir
         return _project_root
