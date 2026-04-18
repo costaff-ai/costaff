@@ -8,8 +8,8 @@ set -e
 # =============================================================================
 
 REPO_URL="${COSTAFF_REPO_URL:-https://github.com/costaff-ai/costaff.git}"
-COSTAFF_DIR="$HOME/.costaff-src"   # source code (git clone)
-RUNTIME_DIR="$HOME/.costaff"       # runtime data (.env, config, docker-compose)
+COSTAFF_DIR="$HOME/.costaff"       # source code + runtime data (git repo)
+RUNTIME_DIR="$HOME/.costaff"       # same directory
 VENV_DIR="$COSTAFF_DIR/.venv"
 PYTHON_VERSION="3.11"
 
@@ -153,6 +153,13 @@ install_ubuntu() {
 # Common: Clone & Install CLI
 # =============================================================================
 install_costaff() {
+    # Migrate from old .costaff-src layout
+    if [ -d "$HOME/.costaff-src/.git" ] && [ ! -d "$COSTAFF_DIR/.git" ]; then
+        warn "Found old installation at ~/.costaff-src — migrating to ~/.costaff..."
+        mv "$HOME/.costaff-src" "$COSTAFF_DIR"
+        success "Migrated source to ~/.costaff"
+    fi
+
     # Clone repo
     step "Downloading CoStaff Agent..."
     GITHUB_URL="https://github.com/costaff-ai/costaff.git"
@@ -170,10 +177,7 @@ install_costaff() {
             success "Remote set to GitHub."
         fi
     fi
-    success "CoStaff Agent downloaded to $COSTAFF_DIR"
-
-    # Create runtime directory
-    mkdir -p "$RUNTIME_DIR"
+    success "CoStaff Agent at $COSTAFF_DIR"
 
     # Create venv & install CLI
     step "Installing CoStaff CLI..."
@@ -182,22 +186,19 @@ install_costaff() {
     "$VENV_DIR/bin/pip" install -e "$COSTAFF_DIR" -q
     success "CoStaff CLI installed."
 
-    # Add to PATH and export COSTAFF_HOME
+    # Add to PATH
     step "Configuring PATH..."
     EXPORT_PATH="export PATH=\"$VENV_DIR/bin:\$PATH\""
-    EXPORT_HOME="export COSTAFF_HOME=\"$RUNTIME_DIR\""
     if ! grep -qF "$VENV_DIR/bin" "$SHELL_RC" 2>/dev/null; then
         echo "" >> "$SHELL_RC"
         echo "# CoStaff Agent CLI" >> "$SHELL_RC"
         echo "$EXPORT_PATH" >> "$SHELL_RC"
-        echo "$EXPORT_HOME" >> "$SHELL_RC"
         success "Added costaff to PATH in $SHELL_RC"
     else
         success "PATH already configured."
     fi
 
     export PATH="$VENV_DIR/bin:$PATH"
-    export COSTAFF_HOME="$RUNTIME_DIR"
 }
 
 # =============================================================================

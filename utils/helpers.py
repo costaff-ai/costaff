@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from dotenv import set_key
 
-# _project_root  — source code directory (git clone at ~/.costaff-src)
-# _runtime_root  — runtime data directory (~/.costaff by default)
+# _project_root  — source code directory (git clone at ~/.costaff)
+# _runtime_root  — runtime data directory (~/.costaff, same as _project_root)
 #   Override _runtime_root via COSTAFF_HOME env var.
 _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:

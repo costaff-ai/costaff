@@ -119,28 +119,10 @@ def onboard():
         set_key(PATHS["env"], "API_HEADERS_KEY", secrets.token_hex(32))
         console.print("[green]Generated API_HEADERS_KEY[/green]")
 
-    # Generate .costaff/docker-compose.yaml BEFORE deploying channels,
-    # because channel deploy runs `docker compose -f <this file>` immediately.
-    base_compose_file = "docker-compose.yaml"
-    src_compose = os.path.join(_project_root, base_compose_file)
+    # docker-compose.yaml lives in _project_root (= _runtime_root = ~/.costaff)
+    # No copy or path-rewriting needed.
     costaff_dir = _runtime_root
-    dest_compose = os.path.join(costaff_dir, base_compose_file)
-
-    with open(src_compose, "r") as f:
-        compose_content = f.read()
-
-    compose_content = compose_content.replace(
-        "build: .", "build: .."
-    ).replace(
-        "context: .", "context: .."
-    ).replace(
-        "- ./src", "- ../src"
-    ).replace(
-        "- ./mcp_servers", "- ../mcp_servers"
-    )
-
-    with open(dest_compose, "w") as f:
-        f.write(compose_content)
+    dest_compose = os.path.join(costaff_dir, "docker-compose.yaml")
 
     conf = ConfigManager.get_config()
     conf.setdefault("dynamic_channels", {})
