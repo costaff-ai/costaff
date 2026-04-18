@@ -249,6 +249,14 @@ main() {
     install_costaff
     print_manual_steps
     run_onboard
+
+    echo ""
+    echo -e "${BOLD}============================================${RESET}"
+    echo -e "  Next steps:"
+    echo -e "    ${BOLD}source $SHELL_RC${RESET}"
+    echo -e "    ${GREEN}${BOLD}costaff start${RESET}"
+    echo -e "${BOLD}============================================${RESET}"
+    echo ""
 }
 
 main

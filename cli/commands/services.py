@@ -27,6 +27,23 @@ def start(build: bool = typer.Option(True, "--build/--no-build")):
 
     console.print("Starting CoStaff...")
     subprocess.run(cmd, check=True, cwd=compose_cwd)
+
+    # Start dynamic channels (each has its own compose fragment)
+    for name, entry in conf.get("dynamic_channels", {}).items():
+        if not entry.get("enabled"):
+            continue
+        fragment_path = entry.get("fragment_path")
+        container_names = entry.get("container_names", [])
+        if not fragment_path or not container_names:
+            continue
+        main_compose = str(__import__("pathlib").Path(compose_cwd) / "docker-compose.yaml")
+        ch_cmd = DockerManager.get_cmd() + [
+            "-f", main_compose, "-f", fragment_path,
+            "up", "-d",
+        ] + container_names
+        console.print(f"Starting channel {name}...")
+        subprocess.run(ch_cmd, cwd=compose_cwd)
+
     console.print("[bold green]SUCCESS: CoStaff started![/bold green]")
 
 

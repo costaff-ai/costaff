@@ -172,7 +172,7 @@ def onboard():
                     subprocess.run(["git", "clone", "--depth", "1", repo_url, target_src], check=True)
                 
                 try:
-                    entry = _deploy_local_channel(p, target_src, conf, predefined_envs=envs)
+                    entry = _deploy_local_channel(p, target_src, conf, predefined_envs=envs, build_only=True)
                     conf["dynamic_channels"][p] = entry
                 except Exception as e:
                     console.print(f"[red]Failed to deploy {p}: {e}[/red]")

@@ -199,8 +199,8 @@ def _prompt_and_write_plugin_env(manifest: dict, fragment_dir: str, predefined_e
     return plugin_env_path
 
 
-def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None) -> dict:
-    """Build and start a local-path communication channel following CoStaff Convention."""
+def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None, build_only: bool = False) -> dict:
+    """Build (and optionally start) a local-path communication channel following CoStaff Convention."""
     import yaml as _yaml
     from dotenv import load_dotenv, set_key
     from managers.docker import DockerManager
@@ -289,9 +289,13 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
     console = Console()
     main_compose = os.path.join(_project_root, ".costaff", "docker-compose.yaml")
     ext_services = list(services_fragment.keys())
-    cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--build"] + ext_services
-    console.print(f"Building and starting channel {name}...")
     import subprocess
+    if build_only:
+        cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"] + ext_services
+        console.print(f"Building channel {name}...")
+    else:
+        cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--build"] + ext_services
+        console.print(f"Building and starting channel {name}...")
     subprocess.run(cmd, cwd=_project_root)
 
     return {
