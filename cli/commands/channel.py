@@ -14,8 +14,8 @@ from rich.table import Table
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
-from utils.helpers import _deploy_local_channel  # We'll create this
+from utils.helpers import PATHS, _project_root, _runtime_root
+from utils.helpers import _deploy_local_channel, _write_channel_fragment
 
 console = Console()
 
@@ -153,6 +153,19 @@ def channel_rebuild(
     if pull and os.path.isdir(os.path.join(source_path, ".git")):
         console.print(f"Pulling latest code for [bold]{name}[/bold]...")
         subprocess.run(["git", "pull", "--ff-only"], cwd=source_path)
+
+    # Regenerate compose-fragment.yaml from source so any docker-compose.yaml
+    # changes (env vars, volumes, etc.) are picked up on rebuild.
+    console.print(f"Regenerating compose fragment for [bold]{name}[/bold]...")
+    plugin_env_path = os.path.join(_runtime_root, "dynamic-channels", name, ".env")
+    public_port = chan_conf.get("public_port")
+    try:
+        fragment_path, ext_services, _ = _write_channel_fragment(
+            name, source_path, public_port, plugin_env_path
+        )
+        container_names = ext_services
+    except Exception as e:
+        console.print(f"[yellow]Fragment regenerate failed ({e}); using existing fragment.[/yellow]")
 
     console.print(f"Building channel [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
     build_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"]

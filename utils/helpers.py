@@ -196,18 +196,13 @@ def _prompt_and_write_plugin_env(manifest: dict, fragment_dir: str, predefined_e
     return plugin_env_path
 
 
-def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None, build_only: bool = False) -> dict:
-    """Build (and optionally start) a local-path communication channel following CoStaff Convention."""
+def _write_channel_fragment(name: str, source_path: str, public_port: int, plugin_env_path: str) -> tuple[str, list, dict]:
+    """Generate compose-fragment.yaml from the source docker-compose.yaml. Returns (fragment_path, ext_services, manifest)."""
     import yaml as _yaml
-    from dotenv import load_dotenv, set_key
-    from managers.docker import DockerManager
 
-    source_path = os.path.abspath(source_path)
     manifest_path = os.path.join(source_path, "costaff.channel.json")
     if not os.path.exists(manifest_path):
-        # Fallback to agent manifest if channel manifest not found
         manifest_path = os.path.join(source_path, "costaff.agent.json")
-
     compose_path = os.path.join(source_path, "docker-compose.yaml")
 
     if not os.path.exists(manifest_path):
@@ -217,45 +212,34 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
 
     with open(manifest_path) as f:
         manifest = json.load(f)
-
     a2a_service = manifest.get("a2a_service", name)
     port = manifest.get("port", 80)
-    description = manifest.get("description", "")
-
-    public_port = _next_available_channel_port(conf)
-    fragment_dir = os.path.join(_runtime_root, "dynamic-channels", name)
-    os.makedirs(fragment_dir, exist_ok=True)
-
-    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
-    load_dotenv(PATHS["env"], override=True)
 
     with open(compose_path) as f:
         src_compose = _yaml.safe_load(f)
-    service_names = list(src_compose.get("services", {}).keys())
 
     SHARED_VOLUME = "costaff_costaff_data"
     services_fragment = {}
-    for svc in service_names:
+    for svc, svc_def in src_compose.get("services", {}).items():
         ext_svc = f"costaff-chan-{name}-{svc}" if svc != a2a_service else f"costaff-chan-{name}"
-        svc_def = src_compose["services"][svc].copy()
+        svc_def = svc_def.copy()
         if "build" in svc_def:
             build = svc_def["build"]
             if isinstance(build, str):
                 svc_def["build"] = os.path.join(source_path, build)
             elif isinstance(build, dict) and "context" in build:
                 svc_def["build"]["context"] = os.path.join(source_path, build["context"])
-        
+
         svc_def.pop("ports", None)
         svc_def.setdefault("networks", [])
         if "costaff_default" not in svc_def["networks"]:
             svc_def["networks"].append("costaff_default")
-        
+
         if svc == a2a_service:
             svc_def.setdefault("environment", [])
             svc_def["environment"] += [f"PORT={port}"]
             svc_def["ports"] = [f"0.0.0.0:{public_port}:{port}"]
-        
-        # Shared volume logic
+
         new_vols = []
         for vol in svc_def.get("volumes", []):
             if ":" in str(vol):
@@ -266,26 +250,50 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
                         continue
             new_vols.append(vol)
         svc_def["volumes"] = new_vols
+        svc_def["env_file"] = [PATHS["env"], plugin_env_path]
         services_fragment[ext_svc] = svc_def
-
-    # Inject env_file into all services
-    core_env_path = PATHS["env"]
-    for svc_def in services_fragment.values():
-        svc_def["env_file"] = [core_env_path, plugin_env_path]
 
     fragment = {
         "services": services_fragment,
         "networks": {"costaff_default": {"external": True}},
         "volumes": {SHARED_VOLUME: {"external": True}},
     }
+    fragment_dir = os.path.dirname(plugin_env_path)
     fragment_path = os.path.join(fragment_dir, "compose-fragment.yaml")
     with open(fragment_path, "w") as f:
         _yaml.dump(fragment, f, default_flow_style=False, allow_unicode=True)
 
+    return fragment_path, list(services_fragment.keys()), manifest
+
+
+def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None, build_only: bool = False) -> dict:
+    """Build (and optionally start) a local-path communication channel following CoStaff Convention."""
+    from dotenv import load_dotenv
+    from managers.docker import DockerManager
+
+    source_path = os.path.abspath(source_path)
+    manifest_path = os.path.join(source_path, "costaff.channel.json")
+    if not os.path.exists(manifest_path):
+        manifest_path = os.path.join(source_path, "costaff.agent.json")
+    if not os.path.exists(manifest_path):
+        raise FileNotFoundError(f"Manifest not found in {source_path}")
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    description = manifest.get("description", "")
+
+    public_port = _next_available_channel_port(conf)
+    fragment_dir = os.path.join(_runtime_root, "dynamic-channels", name)
+    os.makedirs(fragment_dir, exist_ok=True)
+
+    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
+    load_dotenv(PATHS["env"], override=True)
+
+    fragment_path, ext_services, _ = _write_channel_fragment(name, source_path, public_port, plugin_env_path)
+
     from rich.console import Console
     console = Console()
     main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
-    ext_services = list(services_fragment.keys())
     import subprocess
     if build_only:
         cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"] + ext_services
