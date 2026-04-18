@@ -159,13 +159,18 @@ if sub_agents:
         ""
     ]
     for agent_name, agent_cfg in agents_config.items():
-        # Use the name formatted for A2A transfer
         a2a_name = agent_name.replace("-", "_")
-        # Find the meta we fetched earlier
         desc = next((a.description for a in sub_agents if a.name == a2a_name), "特殊任務專家")
         roster_lines.append(f"### 🤖 專家 ID: `{a2a_name}`")
         roster_lines.append(f"- **職責描述**: {desc}")
-        roster_lines.append(f"- **調用方法**: 使用 `transfer_to_agent(agent_name='{a2a_name}')` 並在 spec 中說明任務。")
+        
+        # Add explicit logic for common agents to break LLM's "I cannot" bias
+        if "coding" in a2a_name:
+            roster_lines.append("- **核心能力**: [CRITICAL] 這是你唯一具備編寫程式、處理檔案、修復 CSV 與執行數學運算的能力來源。")
+        if "ba_agent" in a2a_name or "business" in a2a_name:
+            roster_lines.append("- **核心能力**: [CRITICAL] 這是你唯一具備生成視覺化圖表與 BI 報告的能力來源。")
+            
+        roster_lines.append(f"- **調用指令**: 只要任務涉及上述能力，你「必須」立即呼叫 `transfer_to_agent(agent_name='{a2a_name}')`。")
         roster_lines.append("")
     
     display_names_block = "\n".join(roster_lines)
