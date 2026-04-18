@@ -36,12 +36,15 @@ def license(
                 shutil.copy(path, dest)
                 console.print(Panel.fit(
                     f"[green]✔ License applied successfully[/green]\n\n"
-                    f"  Plan       : [bold]{info.plan.upper()}[/bold]\n"
-                    f"  Issued to  : {info.issued_to}\n"
-                    f"  Expires    : {info.expires_at or 'Never'}\n"
-                    f"  extra_mcp  : {info.extra_mcp}\n"
-                    f"  backlog    : {info.backlog_tasks}\n"
-                    f"  reminders  : {info.reminders}",
+                    f"  Plan              : [bold]{info.plan.upper()}[/bold]\n"
+                    f"  Issued to         : {info.issued_to}\n"
+                    f"  Expires           : {info.expires_at or 'Never'}\n"
+                    f"  extra_mcp         : {info.extra_mcp}\n"
+                    f"  monthly_executions: {info.monthly_executions}\n"
+                    f"  max_users         : {info.max_users}\n"
+                    f"  enabled_channels  : {info.enabled_channels}\n"
+                    f"  max_apis          : {info.max_apis}\n"
+                    f"  max_skills        : {info.max_skills}",
                     title="CoStaff License"
                 ))
         except ValueError as e:
@@ -63,22 +66,28 @@ def license(
                 info = LicenseManager.load(dest)
                 expired_note = " [red](EXPIRED)[/red]" if info and info.is_expired else ""
                 console.print(Panel.fit(
-                    f"  Plan       : [bold]{info.plan.upper()}[/bold]{expired_note}\n"
-                    f"  Issued to  : {info.issued_to}\n"
-                    f"  Expires    : {info.expires_at or 'Never'}\n"
-                    f"  extra_mcp  : {info.extra_mcp}\n"
-                    f"  backlog    : {info.backlog_tasks}\n"
-                    f"  reminders  : {info.reminders}",
+                    f"  Plan              : [bold]{info.plan.upper()}[/bold]{expired_note}\n"
+                    f"  Issued to         : {info.issued_to}\n"
+                    f"  Expires           : {info.expires_at or 'Never'}\n"
+                    f"  extra_mcp         : {info.extra_mcp}\n"
+                    f"  monthly_executions: {info.monthly_executions}\n"
+                    f"  max_users         : {info.max_users}\n"
+                    f"  enabled_channels  : {info.enabled_channels}\n"
+                    f"  max_apis          : {info.max_apis}\n"
+                    f"  max_skills        : {info.max_skills}",
                     title="CoStaff License"
                 ))
             except ValueError as e:
                 console.print(f"[red]License invalid: {e}[/red]")
         else:
             console.print(Panel.fit(
-                f"  Plan       : [bold]OSS[/bold]\n"
-                f"  extra_mcp  : {OSS_LIMITS['extra_mcp']}\n"
-                f"  backlog    : {OSS_LIMITS['backlog_tasks']}\n"
-                f"  reminders  : {OSS_LIMITS['reminders']}\n\n"
+                f"  Plan              : [bold]OSS[/bold]\n"
+                f"  extra_mcp         : {OSS_LIMITS['extra_mcp']}\n"
+                f"  monthly_executions: {OSS_LIMITS['monthly_executions']}\n"
+                f"  max_users         : {OSS_LIMITS['max_users']}\n"
+                f"  enabled_channels  : {OSS_LIMITS['enabled_channels']}\n"
+                f"  max_apis          : {OSS_LIMITS['max_apis']}\n"
+                f"  max_skills        : {OSS_LIMITS['max_skills']}\n\n"
                 f"  To upgrade, contact: simonliuyuwei@gmail.com",
                 title="CoStaff License"
             ))
