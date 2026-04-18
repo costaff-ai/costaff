@@ -24,14 +24,26 @@ class ConfigManager:
                     conf.setdefault("require_approval", True)
                     conf.setdefault("coding_agent_enabled", False)
                     conf.setdefault("external_agents", {})
-                    # Migrate legacy coding_agent_enabled → external_agents once
                     migrated = ConfigManager._migrate_coding_agent(conf)
+                    migrated |= ConfigManager._migrate_channel_container_names(conf)
                     if migrated:
                         ConfigManager.save_config(conf)
                     return conf
             except Exception:
                 pass
         return {"channels": [], "mcp": ["costaff"], "external_mcp": {}, "gateways_config": {}, "require_approval": True, "coding_agent_enabled": False, "external_agents": {}}
+
+    @staticmethod
+    def _migrate_channel_container_names(conf: Dict) -> bool:
+        """Rename legacy 'costaff-chan-*' container names to 'costaff-channel-*'."""
+        changed = False
+        for name, entry in conf.get("dynamic_channels", {}).items():
+            names = entry.get("container_names") or []
+            new_names = [n.replace("costaff-chan-", "costaff-channel-") for n in names]
+            if new_names != names:
+                entry["container_names"] = new_names
+                changed = True
+        return changed
 
     @staticmethod
     def _migrate_coding_agent(conf: Dict) -> bool:

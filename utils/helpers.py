@@ -221,8 +221,12 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
     SHARED_VOLUME = "costaff_costaff_data"
     services_fragment = {}
     for svc, svc_def in src_compose.get("services", {}).items():
-        ext_svc = f"costaff-chan-{name}-{svc}" if svc != a2a_service else f"costaff-chan-{name}"
+        ext_svc = f"costaff-channel-{name}-{svc}" if svc != a2a_service else f"costaff-channel-{name}"
         svc_def = svc_def.copy()
+        # Force the container_name to match the service key so downstream tooling
+        # (doctor, rebuild, logs) can find containers by the names stored in config.json,
+        # regardless of what the source repo's docker-compose.yaml specifies.
+        svc_def["container_name"] = ext_svc
         if "build" in svc_def:
             build = svc_def["build"]
             if isinstance(build, str):

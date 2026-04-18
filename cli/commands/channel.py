@@ -145,7 +145,7 @@ def channel_rebuild(
 
     chan_conf = conf["dynamic_channels"][name]
     fragment_path = chan_conf["fragment_path"]
-    container_names = chan_conf.get("container_names", [f"costaff-chan-{name}"])
+    container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
     source_path = chan_conf.get("source_path", "(unknown)")
     main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
