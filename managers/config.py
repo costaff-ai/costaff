@@ -78,7 +78,7 @@ class ConfigManager:
                     pass
 
             default_port = 8081 if m == "costaff" else 8080
-            urls[m] = custom_url or f"http://mcp-{m}:{default_port}/sse"
+            urls[m] = custom_url or f"http://mcp-{m}:{default_port}/mcp"
 
         # external_mcp supports both legacy string URLs and Dive-format objects
         for name, val in conf.get("external_mcp", {}).items():

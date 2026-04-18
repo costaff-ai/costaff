@@ -113,7 +113,7 @@ def add_mcp(req: AddMCPRequest, auth: bool = Depends(AuthManager.verify_token)):
                 raise HTTPException(status_code=400, detail="External URL missing.")
             conf["external_mcp"][req.name] = {
                 "url":       url,
-                "transport": "sse" if "/sse" in url else "streamable",
+                "transport": "sse" if "/mcp" in url else "streamable",
                 "enabled":   True,
                 "headers":   {},
             }
@@ -143,7 +143,7 @@ def get_mcp_config(name: str, auth: bool = Depends(AuthManager.verify_token)):
     if name in conf.get("external_mcp", {}):
         val = conf["external_mcp"][name]
         if isinstance(val, str):
-            return {"url": val, "transport": "sse" if "/sse" in val else "streamable", "enabled": True, "headers": {}}
+            return {"url": val, "transport": "sse" if "/mcp" in val else "streamable", "enabled": True, "headers": {}}
         return val
     # Built-in MCP: return server.json (only costaff core MCP has a local config)
     if name == "costaff":
@@ -161,7 +161,7 @@ async def update_mcp_config(name: str, request: Request, auth: bool = Depends(Au
     if name in conf.get("external_mcp", {}):
         existing = conf["external_mcp"][name]
         if isinstance(existing, str):
-            existing = {"url": existing, "transport": "sse" if "/sse" in existing else "streamable", "enabled": True, "headers": {}}
+            existing = {"url": existing, "transport": "sse" if "/mcp" in existing else "streamable", "enabled": True, "headers": {}}
         existing.update({k: v for k, v in body.items() if k in ("url", "transport", "enabled", "headers", "description")})
         conf["external_mcp"][name] = existing
         ConfigManager.save_config(conf)
