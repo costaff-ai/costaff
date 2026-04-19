@@ -88,7 +88,8 @@ def channel_add(
             entry = _deploy_local_channel(name, local, conf, predefined_envs=predefined_envs)
             conf["dynamic_channels"][name] = entry
             ConfigManager.save_config(conf)
-            ConfigManager.update_external_agents_env() # This updates all fragments
+            ConfigManager.update_external_agents_env()
+            ConfigManager.update_mcp_urls()
             console.print(f"[green]Channel '{name}' deployed and registered.[/green]")
         except Exception as e:
             console.print(f"[red]Deploy failed: {e}[/red]")
