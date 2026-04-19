@@ -42,31 +42,11 @@ def set_coding_agent(req: dict, auth: bool = Depends(AuthManager.verify_token)):
             "type": "github",
             "a2a_url": coding_a2a_url,
             "description": "寫程式並執行來解決需要計算、資料處理或程式邏輯的問題，回傳執行結果與產生的檔案路徑。",
-            "container_names": ["coding-agent", "mcp-coding"],
+            "container_names": ["costaff-agent-coding", "costaff-mcp-coding"],
         })["enabled"] = enabled
         conf["external_agents"]["coding-agent"]["a2a_url"] = coding_a2a_url
     ConfigManager.save_config(conf)
     ConfigManager.update_external_agents_env()
-
-    if enabled_changed:
-        enabled = conf["coding_agent_enabled"]
-        def _apply_docker():
-            load_dotenv(PATHS["env"], override=True)
-            compose_file = "docker-compose.yaml"
-            compose_cwd = DockerManager.get_compose_cwd(compose_file)
-            cmd_base = DockerManager.get_cmd() + ["-f", compose_file]
-            if enabled:
-                subprocess.run(
-                    cmd_base + ["--profile", "coding", "up", "-d", "mcp-coding", "coding-agent"],
-                    check=False, cwd=compose_cwd
-                )
-            else:
-                subprocess.run(
-                    cmd_base + ["stop", "coding-agent", "mcp-coding"],
-                    check=False, cwd=compose_cwd
-                )
-            DockerManager.run_action("costaff-agent-costaff", "restart")
-        threading.Thread(target=_apply_docker, daemon=True).start()
 
     return {"status": "ok", "coding_agent_enabled": conf["coding_agent_enabled"]}
 
@@ -246,7 +226,7 @@ def update_agent_mcp_config(req: AgentMCPConfigRequest, auth: bool = Depends(Aut
         threading.Thread(target=_restart_ext_agent, daemon=True).start()
     else:
         # Internal agent (costaff-agent, coding-agent legacy, etc.)
-        docker_name_map = {"costaff_agent": "costaff-agent-costaff", "coding_agent": "coding-agent"}
+        docker_name_map = {"costaff_agent": "costaff-agent-costaff", "coding_agent": "costaff-agent-coding"}
         docker_service = docker_name_map.get(req.agent_id)
         if docker_service:
             threading.Thread(target=DockerManager.run_action, args=(docker_service, "restart"), daemon=True).start()

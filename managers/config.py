@@ -59,7 +59,7 @@ class ConfigManager:
             "a2a_url": a2a_url,
             "description": "寫程式並執行來解決需要計算、資料處理或程式邏輯的問題，回傳執行結果與產生的檔案路徑。",
             "enabled": bool(conf.get("coding_agent_enabled", False)),
-            "container_names": ["coding-agent", "mcp-coding"],
+            "container_names": ["costaff-agent-coding", "costaff-mcp-coding"],
         }
         return True
 
@@ -93,7 +93,7 @@ class ConfigManager:
                     pass
 
             default_port = 8081 if m == "costaff" else 8080
-            url = custom_url or f"http://mcp-{m}:{default_port}/mcp"
+            url = custom_url or f"http://costaff-mcp-{m}:{default_port}/mcp"
             # Internal MCPs require Bearer auth. Emit Dive-format dict so agent sends header.
             if mcp_secret:
                 urls[m] = {
