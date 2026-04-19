@@ -22,6 +22,7 @@ def start(build: bool = typer.Option(True, "--build/--no-build")):
         cmd.append("--build")
     cmd.extend(services)
 
+    ConfigManager.update_mcp_urls()
     console.print("Starting CoStaff...")
     subprocess.run(cmd, check=True, cwd=compose_cwd)
 

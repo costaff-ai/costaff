@@ -184,6 +184,7 @@ def onboard():
         conf["mcp"] = ["costaff"]
     ConfigManager.save_config(conf)
     ConfigManager.update_external_agents_env()
+    ConfigManager.update_mcp_urls()
 
     console.print(Panel.fit("🤖 [bold blue]Docker Setup[/bold blue]"))
 
