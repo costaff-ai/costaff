@@ -1,4 +1,6 @@
 import subprocess
+import time
+import httpx
 
 import typer
 from rich.console import Console
@@ -10,39 +12,88 @@ from utils.helpers import PATHS
 console = Console()
 
 
+def _wait_for_containers(container_names: list, timeout: int = 30):
+    """Wait for containers to be healthy or at least running."""
+    if not container_names:
+        return
+    console.print(f"Waiting for {len(container_names)} services to initialize...")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        all_running = True
+        try:
+            # Check if containers are running using docker inspect
+            cmd = DockerManager.get_cmd() + ["inspect", "-f", "{{.State.Running}}"] + container_names
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                states = result.stdout.strip().split("\n")
+                if all(s == "true" for s in states):
+                    # Brief extra sleep to allow internal app startup
+                    time.sleep(5)
+                    return
+            all_running = False
+        except Exception:
+            all_running = False
+        
+        if not all_running:
+            time.sleep(2)
+    console.print("[yellow]Warning: Some services may still be initializing.[/yellow]")
+
+
 def start(build: bool = typer.Option(True, "--build/--no-build")):
-    """Start CoStaff services."""
+    """Start CoStaff services with correct tiered sequence."""
     conf = ConfigManager.get_config()
-    services = ["costaff-agent-costaff", "postgres"]
-    for p in conf.get("channels", []):
-        services.append(f"bot-{'telegram' if p=='tg' else 'discord' if p=='dc' else 'line'}")
     compose_cwd = DockerManager.get_compose_cwd("docker-compose.yaml")
-    cmd = DockerManager.get_cmd() + ["-f", "docker-compose.yaml", "up", "-d", "--remove-orphans"]
-    if build:
-        cmd.append("--build")
-    cmd.extend(services)
-
+    main_compose = str(__import__("pathlib").Path(compose_cwd) / "docker-compose.yaml")
+    
     ConfigManager.update_mcp_urls()
-    console.print("Starting CoStaff...")
-    subprocess.run(cmd, check=True, cwd=compose_cwd)
+    
+    # Tier 1: Infrastructure (Postgres)
+    console.print("🚀 [bold]Step 1: Starting Infrastructure...[/bold]")
+    infra_cmd = DockerManager.get_cmd() + ["-f", "docker-compose.yaml", "up", "-d", "postgres"]
+    subprocess.run(infra_cmd, check=True, cwd=compose_cwd)
 
-    # Start dynamic channels (each has its own compose fragment)
-    for name, entry in conf.get("dynamic_channels", {}).items():
-        if not entry.get("enabled"):
-            continue
+    # Tier 2: External Agents & Channels (The Employees)
+    employee_containers = []
+    
+    # External Agents
+    for name, entry in conf.get("external_agents", {}).items():
+        if not entry.get("enabled"): continue
         fragment_path = entry.get("fragment_path")
         container_names = entry.get("container_names", [])
-        if not fragment_path or not container_names:
-            continue
-        main_compose = str(__import__("pathlib").Path(compose_cwd) / "docker-compose.yaml")
-        ch_cmd = DockerManager.get_cmd() + [
-            "-f", main_compose, "-f", fragment_path,
-            "up", "-d",
-        ] + container_names
-        console.print(f"Starting channel {name}...")
-        subprocess.run(ch_cmd, cwd=compose_cwd)
+        if fragment_path and container_names:
+            console.print(f"🚀 [bold]Step 2: Starting Agent {name}...[/bold]")
+            agent_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d"]
+            if build: agent_cmd.append("--build")
+            agent_cmd.extend(container_names)
+            subprocess.run(agent_cmd, cwd=compose_cwd)
+            employee_containers.extend(container_names)
 
-    console.print("[bold green]SUCCESS: CoStaff started![/bold green]")
+    # Dynamic Channels
+    for name, entry in conf.get("dynamic_channels", {}).items():
+        if not entry.get("enabled"): continue
+        fragment_path = entry.get("fragment_path")
+        container_names = entry.get("container_names", [])
+        if fragment_path and container_names:
+            console.print(f"🚀 [bold]Step 2: Starting Channel {name}...[/bold]")
+            ch_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d"]
+            if build: ch_cmd.append("--build")
+            ch_cmd.extend(container_names)
+            subprocess.run(ch_cmd, cwd=compose_cwd)
+            employee_containers.extend(container_names)
+
+    # Wait for Tier 2 to be ready
+    if employee_containers:
+        _wait_for_containers(employee_containers)
+
+    # Tier 3: Core Agent (The Manager)
+    console.print("🚀 [bold]Step 3: Starting CoStaff Manager...[/bold]")
+    core_services = ["costaff-agent-costaff", "costaff-mcp-costaff"]
+    core_cmd = DockerManager.get_cmd() + ["-f", "docker-compose.yaml", "up", "-d", "--remove-orphans"]
+    if build: core_cmd.append("--build")
+    core_cmd.extend(core_services)
+    subprocess.run(core_cmd, check=True, cwd=compose_cwd)
+
+    console.print("[bold green]SUCCESS: CoStaff started in correct sequence![/bold green]")
 
 
 def stop():
@@ -61,28 +112,11 @@ def stop():
 
 
 def restart():
-    """Restart all services."""
-    console.print("Restarting CoStaff services...")
-    compose_cwd = DockerManager.get_compose_cwd("docker-compose.yaml")
-    # 1. Restart core stack
-    subprocess.run(DockerManager.get_cmd() + ["-f", "docker-compose.yaml", "restart"], check=True, cwd=compose_cwd)
-    
-    # 2. Restart dynamic channels
-    conf = ConfigManager.get_config()
-    for name, entry in conf.get("dynamic_channels", {}).items():
-        if not entry.get("enabled"):
-            continue
-        fragment_path = entry.get("fragment_path")
-        container_names = entry.get("container_names", [])
-        if fragment_path and container_names:
-            main_compose = str(__import__("pathlib").Path(compose_cwd) / "docker-compose.yaml")
-            ch_cmd = DockerManager.get_cmd() + [
-                "-f", main_compose, "-f", fragment_path, "restart"
-            ] + container_names
-            console.print(f"Restarting channel {name}...")
-            subprocess.run(ch_cmd, cwd=compose_cwd)
-    
-    console.print("[bold green]SUCCESS: CoStaff restarted![/bold green]")
+    """Restart CoStaff services with tiered sequence."""
+    console.print("Restarting CoStaff services in sequence...")
+    stop()
+    start(build=False)
+    console.print("[bold green]SUCCESS: CoStaff restarted in correct sequence![/bold green]")
 
 
 def status():
