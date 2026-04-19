@@ -463,7 +463,7 @@ def get_service_logs(service: str, tail: int = 100, auth: bool = Depends(AuthMan
                 actual_service = matches[0]
 
     # Validate resolved name to prevent command injection
-    allowed_prefixes = ("costaff", "mcp-", "bot-", "postgres", "gpt-vis")
+    allowed_prefixes = ("costaff", "bot-", "postgres", "gpt-vis")
     ext_containers = {c for a in ext_agents.values() for c in a.get("container_names", [])}
     if not any(actual_service.startswith(p) for p in allowed_prefixes) and actual_service not in ext_containers:
         raise HTTPException(status_code=400, detail="Invalid service name.")
