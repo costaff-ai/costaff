@@ -142,6 +142,7 @@ if raw_agents:
             if not a2a_url:
                 continue
             try:
+                logger.info(f"Registering sub-agent '{agent_name}' with URL: {a2a_url}")
                 meta = _fetch_agent_card_metadata(a2a_url, agent_name)
                 a2a_name = agent_name.replace("-", "_")
                 agent_meta_cache[a2a_name] = meta
@@ -149,13 +150,13 @@ if raw_agents:
                 remote_agent = RemoteA2aAgent(
                     name=a2a_name,
                     description=meta["description"],
-                    agent_card=f"{a2a_url}{AGENT_CARD_WELL_KNOWN_PATH}",
+                    agent_card=f"{a2a_url.rstrip('/')}{AGENT_CARD_WELL_KNOWN_PATH}",
                     use_legacy=False,
                 )
                 sub_agents.append(remote_agent)
-                logger.info(f"Registered sub-agent '{agent_name}': {a2a_url}")
+                logger.info(f"Successfully registered sub-agent '{a2a_name}' (from {agent_name})")
             except Exception as e:
-                logger.warning(f"Failed to load agent '{agent_name}': {e}")
+                logger.error(f"CRITICAL: Failed to load sub-agent '{agent_name}': {e}", exc_info=True)
     except Exception as e:
         logger.error(f"EXTERNAL_AGENTS_CONFIG load error: {e}")
 
