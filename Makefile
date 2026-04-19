@@ -30,13 +30,13 @@ logs:
 	docker-compose -f docker-compose.local.yaml logs -f
 
 logs-agent:
-	docker-compose -f docker-compose.local.yaml logs -f costaff-agent
+	docker-compose -f docker-compose.local.yaml logs -f costaff-agent-costaff
 
 logs-reminder:
-	docker-compose -f docker-compose.local.yaml logs -f mcp-reminder
+	docker-compose -f docker-compose.local.yaml logs -f costaff-mcp-reminder
 
 logs-privai:
-	docker-compose -f docker-compose.local.yaml logs -f mcp-privai
+	docker-compose -f docker-compose.local.yaml logs -f costaff-mcp-privai
 
 restart:
 	docker-compose -f docker-compose.local.yaml up -d --build
