@@ -218,7 +218,7 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
     with open(compose_path) as f:
         src_compose = _yaml.safe_load(f)
 
-    SHARED_VOLUME = "costaff_costaff_data"
+    SHARED_VOLUME = "costaff_data"
     services_fragment = {}
     for svc, svc_def in src_compose.get("services", {}).items():
         ext_svc = f"costaff-channel-{name}-{svc}" if svc != a2a_service else f"costaff-channel-{name}"
@@ -399,7 +399,7 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
         services_fragment[ext_svc] = svc_def
 
     # Volumes: map agent-specific data volumes to the global costaff_data volume
-    SHARED_VOLUME = "costaff_costaff_data"
+    SHARED_VOLUME = "costaff_data"
     
     for svc_name, svc_def in services_fragment.items():
         new_vols = []
