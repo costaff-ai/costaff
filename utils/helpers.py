@@ -415,15 +415,18 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
         svc_def.setdefault("environment", [])
         updated_envs = []
         
-        # 1. Update existing legacy workspace-related variables (if any)
-        # WORKSPACE_DIR now points to /app/data to allow cross-agent access.
-        # Specific folders like REPORTS_DIR can still point to the agent-specific path.
+        # 1. Update existing workspace-related variables (if any)
+        # WORKSPACE_DIR points to /app/data (global access).
+        # Specific keys like REPORTS_DIR or AGENT_XXX_WORKSPACE_DIR point to /app/data/agent-{name}.
         for env in svc_def["environment"]:
-            if "WORKSPACE_DIR=" in env or "DATA_DIR=" in env:
-                key = env.split("=")[0]
+            if "=" not in env:
+                updated_envs.append(env)
+                continue
+                
+            key, val = env.split("=", 1)
+            if key in ("WORKSPACE_DIR", "DATA_DIR"):
                 updated_envs.append(f"{key}={GLOBAL_WORKSPACE}")
-            elif "REPORTS_DIR=" in env:
-                key = env.split("=")[0]
+            elif key == "REPORTS_DIR" or key == UNIQUE_ENV_KEY or key.endswith("_WORKSPACE_DIR"):
                 updated_envs.append(f"{key}={AGENT_SPECIFIC_WORKSPACE}")
             else:
                 updated_envs.append(env)
