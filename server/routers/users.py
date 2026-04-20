@@ -45,14 +45,29 @@ def get_identities(auth: bool = Depends(AuthManager.verify_token)):
         return []
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text("""
-                SELECT i.session_id, i.hashed_id, i.real_id, i.is_approved, i.created_at,
-                       COALESCE(u.chinese_name, u.english_name, w.username) AS name
-                FROM identity_maps i
-                LEFT JOIN user_contacts u ON u.user_id = i.hashed_id
-                LEFT JOIN webchat_users w ON i.session_id LIKE 'web_%' AND w.email = i.real_id
-                ORDER BY i.created_at DESC
-            """))
+            # Check if webchat_users table exists
+            check_table = conn.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'webchat_users')"))
+            has_webchat = check_table.scalar()
+
+            if has_webchat:
+                sql = """
+                    SELECT i.session_id, i.hashed_id, i.real_id, i.is_approved, i.created_at,
+                           COALESCE(u.chinese_name, u.english_name, w.username) AS name
+                    FROM identity_maps i
+                    LEFT JOIN user_contacts u ON u.user_id = i.hashed_id
+                    LEFT JOIN webchat_users w ON i.session_id LIKE 'web_%%' AND w.email = i.real_id
+                    ORDER BY i.created_at DESC
+                """
+            else:
+                sql = """
+                    SELECT i.session_id, i.hashed_id, i.real_id, i.is_approved, i.created_at,
+                           COALESCE(u.chinese_name, u.english_name) AS name
+                    FROM identity_maps i
+                    LEFT JOIN user_contacts u ON u.user_id = i.hashed_id
+                    ORDER BY i.created_at DESC
+                """
+            
+            rows = conn.execute(text(sql))
             result = []
             for row in rows:
                 d = dict(row._mapping)
