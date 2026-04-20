@@ -25,6 +25,16 @@ async def send_message_now(
     if "tg" in chan or "telegram" in chan: chan = "telegram"
     elif "dc" in chan or "discord" in chan: chan = "discord"
     elif "line" in chan: chan = "line"
+    elif "web" in chan: chan = "webchat"
+    elif chan == "default" or not chan:
+        if session_id:
+            if session_id.startswith("tg_"): chan = "telegram"
+            elif session_id.startswith("dc_"): chan = "discord"
+            elif session_id.startswith("line_"): chan = "line"
+            elif session_id.startswith("web_"): chan = "webchat"
+            else: chan = "telegram"  # fallback
+        else:
+            chan = "telegram" # fallback
 
     db = SessionLocal()
     try:
@@ -42,6 +52,10 @@ async def send_message_now(
     if chan == "telegram": success = send_telegram_notification(target_id, body, session_id=session_id)
     elif chan == "discord": success = send_discord_notification(target_id, body, session_id=session_id)
     elif chan == "line": success = await send_line_notification(target_id, body)
+    elif chan == "webchat": 
+        # Webchat uses the regular notification flow (events)
+        # Here we just mark as success if we found a valid session
+        success = True if session_id else False
 
     # Log as a completed reminder
     db = SessionLocal()

@@ -403,7 +403,9 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
 
     # Volumes: map agent-specific data volumes to the global costaff_data volume
     SHARED_VOLUME = "costaff_data"
-    AGENT_WORKSPACE = f"/app/data/agent-{name}"
+    AGENT_SPECIFIC_WORKSPACE = f"/app/data/agent-{name}"
+    GLOBAL_WORKSPACE = "/app/data"
+    
     # Generate a unique environment variable key for this agent
     # e.g., agent-coding -> AGENT_CODING_WORKSPACE_DIR
     UNIQUE_ENV_KEY = f"AGENT_{name.upper().replace('-', '_')}_WORKSPACE_DIR"
@@ -414,21 +416,29 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
         updated_envs = []
         
         # 1. Update existing legacy workspace-related variables (if any)
-        # We redirect them to the new standard path for backward compatibility
+        # WORKSPACE_DIR now points to /app/data to allow cross-agent access.
+        # Specific folders like REPORTS_DIR can still point to the agent-specific path.
         for env in svc_def["environment"]:
-            if any(k in env for k in ["WORKSPACE_DIR", "REPORTS_DIR", "DATA_DIR"]):
+            if "WORKSPACE_DIR=" in env or "DATA_DIR=" in env:
                 key = env.split("=")[0]
-                updated_envs.append(f"{key}={AGENT_WORKSPACE}")
+                updated_envs.append(f"{key}={GLOBAL_WORKSPACE}")
+            elif "REPORTS_DIR=" in env:
+                key = env.split("=")[0]
+                updated_envs.append(f"{key}={AGENT_SPECIFIC_WORKSPACE}")
             else:
                 updated_envs.append(env)
         
         # 2. Inject the UNIQUE standard AGENT_{NAME}_WORKSPACE_DIR
         if not any(f"{UNIQUE_ENV_KEY}=" in e for e in updated_envs):
-            updated_envs.append(f"{UNIQUE_ENV_KEY}={AGENT_WORKSPACE}")
+            updated_envs.append(f"{UNIQUE_ENV_KEY}={AGENT_SPECIFIC_WORKSPACE}")
             
-        # 3. Also inject a generic AGENT_WORKSPACE_DIR for internal agent code usage
+        # 3. Also inject a generic AGENT_WORKSPACE_DIR for internal agent code usage (pointing to specific)
         if not any("AGENT_WORKSPACE_DIR=" in e for e in updated_envs):
-            updated_envs.append(f"AGENT_WORKSPACE_DIR={AGENT_WORKSPACE}")
+            updated_envs.append(f"AGENT_WORKSPACE_DIR={AGENT_SPECIFIC_WORKSPACE}")
+        
+        # 4. Ensure WORKSPACE_DIR is present if not already added
+        if not any("WORKSPACE_DIR=" in e for e in updated_envs):
+            updated_envs.append(f"WORKSPACE_DIR={GLOBAL_WORKSPACE}")
         
         svc_def["environment"] = updated_envs
 
