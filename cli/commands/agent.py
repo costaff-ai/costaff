@@ -14,7 +14,7 @@ from rich.table import Table
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
+from utils.helpers import PATHS, _project_root, _runtime_root
 from utils.helpers import _deploy_local_agent
 
 console = Console()

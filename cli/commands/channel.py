@@ -107,10 +107,18 @@ def channel_list():
     table = Table(title="Dynamic Channels")
     table.add_column("Name", style="cyan")
     table.add_column("Port", justify="center")
-    table.add_column("Status", justify="center")
+    table.add_column("Health", justify="center")
+    table.add_column("Enabled", justify="center")
     for name, info in channels.items():
-        port = info.get("public_port", "N/A")
-        table.add_row(name, str(port), "[green]Active[/green]")
+        port = info.get("public_port")
+        health = "—"
+        if port and info.get("enabled"):
+            try:
+                r = httpx.get(f"http://localhost:{port}/.well-known/agent.json", timeout=3.0)
+                health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
+            except Exception:
+                health = "[red]●[/red]"
+        table.add_row(name, str(port) if port else "N/A", health, "✓" if info.get("enabled") else "✗")
     console.print(table)
 
 
@@ -124,12 +132,27 @@ def channel_remove(name: str = typer.Argument(...)):
     
     if not questionary.confirm(f"Remove channel '{name}'?").ask():
         return
-    
-    # Logic to stop containers would go here
+
+    chan_conf = conf["dynamic_channels"][name]
+    fragment_path = chan_conf.get("fragment_path")
+    container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
+    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
+
+    if fragment_path and os.path.exists(fragment_path):
+        console.print(f"Stopping containers for channel [bold]{name}[/bold]...")
+        stop_cmd = DockerManager.get_cmd() + [
+            "-f", main_compose, "-f", fragment_path, "down", "--remove-orphans"
+        ]
+        subprocess.run(stop_cmd, check=False, cwd=_project_root)
+    elif container_names:
+        for c in container_names:
+            subprocess.run(["docker", "stop", c], capture_output=True)
+            subprocess.run(["docker", "rm", c], capture_output=True)
+
     del conf["dynamic_channels"][name]
     ConfigManager.save_config(conf)
     ConfigManager.update_external_agents_env()
-    console.print(f"[green]Channel '{name}' removed. Restart costaff to apply clean up.[/green]")
+    console.print(f"[green]Channel '{name}' stopped and removed.[/green]")
 
 
 @channel_app.command("rebuild")
