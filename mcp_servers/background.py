@@ -29,7 +29,7 @@ async def sync_database_tasks():
                 if job_id not in scheduled_job_ids:
                     from apscheduler.triggers.date import DateTrigger
                     try:
-                        run_time = r.run_at.replace(tzinfo=tz) if r.run_at.tzinfo is None else r.run_at
+                        run_time = tz.localize(r.run_at) if r.run_at.tzinfo is None else r.run_at
                         scheduler.add_job(
                             execute_reminder, DateTrigger(run_date=run_time),
                             args=[r.id], id=job_id, replace_existing=True
