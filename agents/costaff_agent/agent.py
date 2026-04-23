@@ -135,17 +135,19 @@ agent_meta_cache = {}
 raw_agents = os.getenv("EXTERNAL_AGENTS_CONFIG", "").strip()
 if raw_agents:
     try:
-        from google.adk.agents.remote_a2a_agent import RemoteA2aAgent, AGENT_CARD_WELL_KNOWN_PATH
+        from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
+        # Standard path if not importable
+        AGENT_CARD_WELL_KNOWN_PATH = "/.well-known/agent.json"
+        
         agents_config = json.loads(raw_agents)
         for agent_name, agent_cfg in agents_config.items():
             a2a_url = agent_cfg.get("a2a_url", "").strip()
             if not a2a_url:
                 continue
+            
+            try:
                 logger.info(f"Registering sub-agent '{agent_name}' with URL: {a2a_url}")
-                # We try to fetch metadata but DO NOT block registration if it fails.
-                # This ensures sub-agents are available even if they are slow to boot.
                 meta = _fetch_agent_card_metadata(a2a_url, agent_name)
-                
                 a2a_name = agent_name.replace("-", "_")
                 agent_meta_cache[a2a_name] = meta
                 
@@ -156,9 +158,11 @@ if raw_agents:
                     use_legacy=False,
                 )
                 sub_agents.append(remote_agent)
-                logger.info(f"Successfully registered sub-agent '{a2a_name}' (from {agent_name})")
+                logger.info(f"Successfully registered sub-agent '{a2a_name}'")
+            except Exception as e:
+                logger.error(f"Failed to load sub-agent '{agent_name}': {e}")
     except Exception as e:
-        logger.error(f"EXTERNAL_AGENTS_CONFIG load error: {e}")
+        logger.error(f"EXTERNAL_AGENTS_CONFIG load error (A2A SDK issue): {e}")
 
 # Construct dynamic instruction
 import re
