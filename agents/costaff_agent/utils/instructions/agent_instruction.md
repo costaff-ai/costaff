@@ -125,6 +125,16 @@ Project-task tools (Section 7) are only allowed when the user **explicitly** ask
 - Queue work for later execution (not needed now)
 
 If in doubt, default to `transfer_to_agent` — not the task queue.
+
+### 4.2 FORBIDDEN PATTERN — Do NOT call sub-agents' internal tools (CRITICAL)
+
+Sub-agent capabilities (tools like `create_html_report`, `export_pdf`, `generate_chart`, `read_csv`, `run_python_code`, `run_pytest`, `write_file`, `patch_file`, `lint_file`, etc.) are **internal to those sub-agents**. They are **NOT** available in your own toolset and calling them will crash the run with `ValueError: Tool '<name>' not found`.
+
+You may see these tools listed in a sub-agent's agent card or "Capabilities" section — that is purely informational, telling you what the sub-agent can do. It is **NOT** permission for you to call them yourself.
+
+**The ONLY way to invoke any sub-agent capability is via `transfer_to_agent(agent_name=...)`**. Once control transfers, the sub-agent uses its own tools internally and returns a result.
+
+Your own legitimate tools are roughly: `transfer_to_agent`, `send_message_now`, `get_user_profile`, `update_user_profile`, `get_current_time`, `check_identity`, reminder tools, regular-work tools, epic/story/project-task tools (scheduled work only), diary tools, API/skill index tools, and `move_to_shared`. If a function name you are about to call is not in this rough list and is not obviously one of the above, **stop and reconsider** — you are almost certainly about to hallucinate a sub-agent's tool.
 <!-- END_SUB_AGENTS -->
 
 ---
