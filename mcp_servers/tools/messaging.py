@@ -1,13 +1,29 @@
+import re
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from src.core import models
 from src.core.database import SessionLocal
-from src.core.notifiers.telegram import send_telegram_notification
+from src.core.notifiers.telegram import send_telegram_notification, send_telegram_document
 from src.core.notifiers.line_notifier import send_line_notification
 from src.core.notifiers.discord import send_discord_notification
 from mcp_servers.core import mcp, tz
+
+_FILE_EXTS = r"pdf|docx|md|txt|html|htm|png|jpg|jpeg|gif|csv|json|xlsx|xls|zip"
+_ABS_PATH_RE = re.compile(r"(/app/data/[\w./-]+\.(?:" + _FILE_EXTS + r"))", re.IGNORECASE)
+
+
+def _extract_file_paths(text: str) -> list[str]:
+    """Extract /app/data/... file paths from a message body."""
+    seen = set()
+    result = []
+    for p in _ABS_PATH_RE.findall(text):
+        if p not in seen and os.path.isfile(p):
+            seen.add(p)
+            result.append(p)
+    return result
 
 
 @mcp.tool()
@@ -49,10 +65,13 @@ async def send_message_now(
         db.close()
 
     success = False
-    if chan == "telegram": success = send_telegram_notification(target_id, body, session_id=session_id)
+    if chan == "telegram":
+        success = send_telegram_notification(target_id, body, session_id=session_id)
+        for fp in _extract_file_paths(body):
+            send_telegram_document(target_id, fp)
     elif chan == "discord": success = send_discord_notification(target_id, body, session_id=session_id)
     elif chan == "line": success = await send_line_notification(target_id, body)
-    elif chan == "webchat": 
+    elif chan == "webchat":
         # Webchat uses the regular notification flow (events)
         # Here we just mark as success if we found a valid session
         success = True if session_id else False
