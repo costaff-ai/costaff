@@ -77,24 +77,31 @@ class ConfigManager:
         load_dotenv(PATHS["env"], override=True)
         mcp_secret = os.getenv("MCP_SECRET_KEY", "").strip()
 
+        # 1. Gather all MCP servers
+        # Core MCP
         for m in conf.get("mcp", []):
+            custom_url = None
             if m == "costaff":
                 path = os.path.join("mcp_servers", "server.json")
-            else:
-                path = None
-
-            custom_url = None
-            if path and os.path.exists(path):
-                try:
-                    with open(path, "r") as f:
-                        pkg = json.load(f).get("packages", [{}])[0]
-                        custom_url = pkg.get("transport", {}).get("url")
-                except Exception:
-                    pass
-
+                if os.path.exists(path):
+                    try:
+                        with open(path, "r") as f:
+                            pkg = json.load(f).get("packages", [{}])[0]
+                            custom_url = pkg.get("transport", {}).get("url")
+                    except Exception:
+                        pass
+            
+            # Check if this MCP belongs to an external agent to get its custom port
+            ext_agent = conf.get("external_agents", {}).get(m)
             default_port = 8081 if m == "costaff" else 8080
+            if ext_agent and "mcp_port" in ext_agent:
+                default_port = ext_agent["mcp_port"]
+            # Known official agents fallback ports
+            elif m == "coding": default_port = 8082
+            elif m == "business-analysis": default_port = 8083
+
             url = custom_url or f"http://costaff-mcp-{m}:{default_port}/mcp"
-            # Internal MCPs require Bearer auth. Emit Dive-format dict so agent sends header.
+            
             if mcp_secret:
                 urls[m] = {
                     "url": url,
@@ -104,34 +111,39 @@ class ConfigManager:
             else:
                 urls[m] = url
 
-        # external_mcp supports both legacy string URLs and Dive-format objects
+        # External MCPs from config
         for name, val in conf.get("external_mcp", {}).items():
             if isinstance(val, str):
                 urls[name] = val
             elif isinstance(val, dict) and val.get("enabled", True):
                 if url := val.get("url"):
-                    # Pass full Dive object so agent receives headers, transport etc.
                     urls[name] = {k: v for k, v in val.items() if k not in ("enabled", "description")}
 
         os.makedirs(os.path.dirname(PATHS["env"]), exist_ok=True)
         set_key(PATHS["env"], "MCP_SERVER_URLS", json.dumps(urls))
 
-        # Per-agent MCP URLs
+        # 2. Map MCPs to Agents
         agent_mcps = conf.get("agent_mcps", {})
 
-        # costaff_agent: defaults to all configured MCPs
-        costaff_names = agent_mcps.get("costaff_agent", list(urls.keys()))
+        # costaff_agent: defaults to all if not specified
+        costaff_names = agent_mcps.get("costaff_agent")
+        if costaff_names is None: # Use all if field is missing
+            costaff_names = list(urls.keys())
         costaff_urls = {k: v for k, v in urls.items() if k in costaff_names}
         set_key(PATHS["env"], "COSTAFF_AGENT_MCP_URLS", json.dumps(costaff_urls))
 
-        # External agents with mcp_configurable: write their extra MCP env vars
+        # External agents
         for ext_name, ext_agent in conf.get("external_agents", {}).items():
             if not ext_agent.get("mcp_configurable"):
                 continue
             agent_key = ext_name.replace("-", "_")
-            # Use mcp_env_var from manifest if available, else derive from name
             env_var = ext_agent.get("mcp_env_var") or (agent_key.upper() + "_MCP_URLS")
-            selected = agent_mcps.get(agent_key, [])
+            
+            selected = agent_mcps.get(agent_key)
+            if selected is None:
+                # Default: Specialist can see itself + Root Tools
+                selected = ["costaff", ext_name]
+            
             extra_urls = {k: v for k, v in urls.items() if k in selected}
             set_key(PATHS["env"], env_var, json.dumps(extra_urls))
             print(f"[MCP] Wrote {env_var}: {list(extra_urls.keys())}")

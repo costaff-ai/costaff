@@ -81,6 +81,27 @@ def agent_add(
         entry = {"type": "url", "a2a_url": url, "description": description, "enabled": True}
 
     conf.setdefault("external_agents", {})[name] = entry
+    
+    # Auto-register MCP if configurable
+    if entry.get("mcp_configurable"):
+        # 1. Add to master MCP list if not there
+        if name not in conf.get("mcp", []):
+            conf.setdefault("mcp", []).append(name)
+        
+        # 2. Setup default agent_mcps mapping
+        agent_key = name.replace("-", "_")
+        am = conf.setdefault("agent_mcps", {})
+        
+        # Ensure Root Agent can see this new specialist's tools
+        if "costaff_agent" not in am:
+            am["costaff_agent"] = ["costaff"]
+        if name not in am["costaff_agent"]:
+            am["costaff_agent"].append(name)
+        
+        # Ensure Specialist can see its own tools + core tools
+        if agent_key not in am:
+            am[agent_key] = ["costaff", name]
+
     ConfigManager.save_config(conf)
     ConfigManager.update_external_agents_env()
     ConfigManager.update_mcp_urls()
