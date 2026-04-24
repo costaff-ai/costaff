@@ -17,7 +17,7 @@ from managers.config import ConfigManager
 from managers.docker import DockerManager
 from managers.database import DatabaseManager
 from models.requests import ServiceActionRequest
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
+from utils.helpers import PATHS, _project_root, _runtime_root
 
 router = APIRouter()
 

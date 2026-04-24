@@ -2,7 +2,7 @@ import subprocess
 from dotenv import load_dotenv
 from rich.console import Console
 
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
+from utils.helpers import PATHS, _project_root, _runtime_root
 from managers.config import ConfigManager
 
 console = Console()

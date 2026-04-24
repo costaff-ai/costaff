@@ -11,7 +11,7 @@ from rich.panel import Panel
 
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
+from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
 
 console = Console()
 
@@ -163,8 +163,8 @@ def onboard():
                 
                 # Auto-deploy via GitHub
                 repo_url = OFFICIAL_CHANNELS[p]
-                target_src = os.path.join(_runtime_root, "src", "channels", p)
-                
+                target_src = os.path.join(_base_dir, "costaff-channel", p, "src")
+
                 if not os.path.exists(target_src):
                     os.makedirs(os.path.dirname(target_src), exist_ok=True)
                     subprocess.run(["git", "clone", "--depth", "1", repo_url, target_src], check=True)

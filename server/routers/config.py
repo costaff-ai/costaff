@@ -10,7 +10,7 @@ from managers.auth import AuthManager
 from managers.config import ConfigManager
 from managers.docker import DockerManager
 from models.requests import GatewayUpdateRequest, AddMCPRequest, AgentMCPConfigRequest
-from utils.helpers import PATHS, _project_root, _runtime_root, _runtime_root
+from utils.helpers import PATHS, _project_root, _runtime_root
 
 router = APIRouter()
 
