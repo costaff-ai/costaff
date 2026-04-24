@@ -412,7 +412,7 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
         
         # Trigger immediate execution for the first task in queue
         if first_task_id:
-            from executors.task_executor import execute_project_task
+            from executors.project_task import execute_project_task
             asyncio.create_task(execute_project_task(first_task_id))
             
         return f"Queue updated for agent '{assigned_agent}': {updated_count} tasks marked as queued. Execution triggered."
