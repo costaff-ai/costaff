@@ -134,11 +134,14 @@ If no relevant epic exists, create the project structure before executing:
 1. `create_epic(user_id, title, description)` — one epic per topic/project
 2. `create_story(epic_id, user_id, title, priority)` — one story per major phase (e.g., "後端 API 開發", "資料分析", "報告生成")
 3. `create_project_task(epic_id, user_id, title, spec, story_id, assigned_agent, priority)` — one task per concrete unit of work
+4. `update_task_status(task_id, "doing")` — **immediately after creating each task you are about to execute**, mark it as `doing` so the dashboard reflects real-time progress
 
 Then confirm to the user in one short line: e.g., "已建立專案記錄，開始執行…" — and proceed to execute via `transfer_to_agent`.
 
 **Step 3 — After completion:**
-Mark completed tasks via `add_task_comment(task_id, type="result", content="...")` and update status so the Epic reflects reality.
+1. `update_task_status(task_id, "done")` — mark each completed task as done
+2. `add_task_comment(task_id, type="result", content="...")` — record the output path or key result
+3. If all tasks in a story are done → `update_story(story_id, status="done")`
 
 **When to SKIP this section** (go directly to ACT):
 - Pure conversation, greetings, or time queries
