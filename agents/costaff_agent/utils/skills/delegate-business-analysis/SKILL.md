@@ -45,6 +45,11 @@ transfer_to_agent(
 - Language requirement (e.g. "Report should be in Traditional Chinese")
 - Any specific sections to include (e.g. "Include methodology, results table, and analysis")
 
+**What to NEVER include in the message (CRITICAL):**
+- ❌ Any mention of other agents or chaining: "then notify the user", "transfer results to X"
+- ❌ Any orchestration instruction: "use transfer_to_agent"
+- `transfer_to_agent` is an ADK mechanism available **only to you (the Manager)**. Including it in the message causes the sub-agent to attempt the call and fail.
+
 ## CRITICAL — Tools You Must NEVER Call Directly
 
 The following are **internal tools of the business analysis agent**. They do NOT exist in your toolset. Calling them will crash the run with `ValueError: Tool '<name>' not found`:

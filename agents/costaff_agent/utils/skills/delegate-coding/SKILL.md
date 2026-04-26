@@ -41,6 +41,12 @@ transfer_to_agent(
 - The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine_svm_results.json`")
 - Any specific libraries to use
 
+**What to NEVER include in the message (CRITICAL):**
+- ❌ Any mention of other agents: "then pass results to business_analysis", "after this, transfer to BA agent"
+- ❌ Any orchestration instruction: "use transfer_to_agent", "call the reporting expert"
+- `transfer_to_agent` is an ADK mechanism available **only to you (the Manager)**. If you mention it in the message to coding, the coding agent's LLM will attempt to call it and fail with `Tool 'transfer_to_agent' not found`, breaking the task.
+- The coding agent's only job is: **do the work, save the file, report back**. Chaining to the next agent is your responsibility after it finishes.
+
 ## What the Coding Agent Returns
 
 The coding agent's **completion signal** contains at least one of:
