@@ -142,7 +142,7 @@ def agent_list():
         health = "—"
         if agent.get("a2a_url") and agent.get("enabled"):
             try:
-                r = httpx.get(f"{agent['a2a_url']}/.well-known/agent.json", timeout=3.0)
+                r = httpx.get(f"{agent['a2a_url']}/.well-known/agent-card.json", timeout=3.0)
                 health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
             except Exception:
                 health = "[red]●[/red]"

@@ -497,7 +497,7 @@ def _deploy_local_agent(name: str, source_path: str, conf: dict, predefined_envs
         raise RuntimeError("docker compose up failed")
 
     # Health check (30s)
-    health_url = f"http://localhost:{public_port}/.well-known/agent.json"
+    health_url = f"http://localhost:{public_port}/.well-known/agent-card.json"
     console.print(f"Waiting for health check at {health_url}...")
     for _ in range(10):
         time.sleep(3)

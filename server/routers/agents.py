@@ -38,9 +38,9 @@ def list_external_agents(auth: bool = Depends(AuthManager.verify_token)):
             # URL agents: use a2a_url directly
             health_url = None
             if agent.get("type") == "github" and agent.get("public_port"):
-                health_url = f"http://localhost:{agent['public_port']}/.well-known/agent.json"
+                health_url = f"http://localhost:{agent['public_port']}/.well-known/agent-card.json"
             elif agent.get("type") == "url" and agent.get("a2a_url"):
-                health_url = f"{agent['a2a_url']}/.well-known/agent.json"
+                health_url = f"{agent['a2a_url']}/.well-known/agent-card.json"
             if health_url:
                 try:
                     with httpx.Client(timeout=3.0) as client:

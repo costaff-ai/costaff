@@ -114,7 +114,7 @@ def channel_list():
         health = "—"
         if port and info.get("enabled"):
             try:
-                r = httpx.get(f"http://localhost:{port}/.well-known/agent.json", timeout=3.0)
+                r = httpx.get(f"http://localhost:{port}/.well-known/agent-card.json", timeout=3.0)
                 health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
             except Exception:
                 health = "[red]●[/red]"
