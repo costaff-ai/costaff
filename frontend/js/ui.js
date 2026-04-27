@@ -600,11 +600,12 @@ const UI = {
         }
     },
 
-    renderChatSessions(sessions) {
+    renderChatSessions(sessions, adminOnly = true) {
         const list = document.getElementById('chat-session-list');
         if (!list) return;
-        // Show only web sessions (channels have their own history)
-        const webSessions = sessions.filter(s => s.user_id === 'admin-user' || s.id.startsWith('admin-'));
+        const webSessions = adminOnly
+            ? sessions.filter(s => s.user_id === 'admin-user' || s.id.startsWith('admin-'))
+            : sessions;
         if (webSessions.length === 0) {
             list.innerHTML = `<div class="p-10 text-center text-slate-400 text-xs italic opacity-60">No conversations yet</div>`;
             return;
@@ -787,7 +788,7 @@ const UI = {
         App.state.activeSession = sid; this.chatState.session = sid;
         const label = document.getElementById('chat-session-label');
         if (label) label.innerText = `Session: ${sid}`;
-        this.renderChatSessions(await API.fetch('/api/chat/sessions'));
+        this.renderChatSessions(await API.fetch('/api/chat/sessions'), App.state.activeTab === 'chat');
         const history = await API.fetch(`/api/chat/history/${sid}`); 
         const container = document.getElementById('chat-messages'); if (!container) return;
         container.innerHTML = '';

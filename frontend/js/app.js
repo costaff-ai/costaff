@@ -231,7 +231,7 @@ const App = {
             if (tab === 'sessions') {
                 if (this.state.subTabs.sessions === 'explorer') {
                     const sessions = await API.fetch('/api/chat/sessions');
-                    UI.renderChatSessions(sessions);
+                    UI.renderChatSessions(sessions, false);
                 } else if (this.state.subTabs.sessions === 'history') {
                     const data = await API.fetch('/api/db/events');
                     UI.drawTable('sessions-thead', 'sessions-tbody', 'events', data);
