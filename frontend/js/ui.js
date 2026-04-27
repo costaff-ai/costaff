@@ -1,6 +1,6 @@
 const UI = {
     lastLogs: "",
-    chatState: { app: null, session: null, user: 'web-user' },
+    chatState: { app: null, session: null, user: 'admin-user' },
     _requireApproval: true,
 
     // --- Approval Toggle ---
@@ -492,7 +492,7 @@ const UI = {
         if (lastUpdateEl) lastUpdateEl.innerText = `SYNC: ${new Date().toLocaleTimeString()}`;
 
         const table = document.getElementById('status-table');
-        if (table) table.innerHTML = [...svcs].sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+        if (table) table.innerHTML = [...svcs].filter(s => s.name.toLowerCase().startsWith('costaff-')).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
             const isActive = s.status.includes('Up');
             return `
             <tr class="group hover:bg-slate-50 transition-all">
@@ -604,7 +604,7 @@ const UI = {
         const list = document.getElementById('chat-session-list');
         if (!list) return;
         // Show only web sessions (channels have their own history)
-        const webSessions = sessions.filter(s => s.user_id === 'web-user' || s.id.startsWith('web-'));
+        const webSessions = sessions.filter(s => s.user_id === 'admin-user' || s.id.startsWith('admin-'));
         if (webSessions.length === 0) {
             list.innerHTML = `<div class="p-10 text-center text-slate-400 text-xs italic opacity-60">No conversations yet</div>`;
             return;
@@ -638,7 +638,7 @@ const UI = {
         this.renderChatSessions(sessions);
 
         // Auto-load the most recent web session that has messages
-        const webSessions = sessions.filter(s => s.user_id === 'web-user' || s.id.startsWith('web-'));
+        const webSessions = sessions.filter(s => s.user_id === 'admin-user' || s.id.startsWith('admin-'));
         if (webSessions.length > 0) {
             await this.loadChatHistory(webSessions[0].id);
         }
@@ -682,7 +682,7 @@ const UI = {
     },
 
     async startNewChat() {
-        this.chatState.session = 'web-' + Math.random().toString(36).substring(2, 10);
+        this.chatState.session = 'admin-' + Math.random().toString(36).substring(2, 10);
         App.state.activeSession = null;
         const label = document.getElementById('chat-session-label');
         if (label) label.innerText = `Session: ${this.chatState.session}`;
@@ -799,7 +799,7 @@ const UI = {
             let event = item.event_data;
             if (typeof event === 'string') { try { event = JSON.parse(event); } catch(e) { return; } }
             if (!event || !event.content) return;
-            const isUser = event.content.role === 'user' || event.author === 'web-user' || event.author === 'user';
+            const isUser = event.content.role === 'user' || event.author === 'admin-user' || event.author === 'user';
             const author = isUser ? 'user' : 'agent';
             const timestamp = new Date(item.timestamp * 1000).toLocaleTimeString();
             (event.content.parts || []).forEach(p => {
