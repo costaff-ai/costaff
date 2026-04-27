@@ -1,7 +1,7 @@
 <div class="flex gap-6 h-[calc(100vh-160px)]">
 
     <!-- Left: Epic Sidebar -->
-    <div class="w-72 flex flex-col bg-white border border-slate-100 rounded-[2rem] shadow-xl overflow-hidden shrink-0">
+    <div id="epic-sidebar" class="w-72 flex flex-col bg-white border border-slate-100 rounded-[2rem] shadow-xl overflow-hidden shrink-0">
         <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div>
                 <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Projects</span>
@@ -33,6 +33,10 @@
                     <p id="epic-panel-desc" class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">—</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
+                    <button id="kanban-fullscreen-btn" onclick="Projects.toggleKanbanFullscreen()" title="Toggle fullscreen kanban"
+                        class="hidden w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all">
+                        <i class="fas fa-expand text-[10px]"></i>
+                    </button>
                     <div class="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
                         <button id="view-toggle-list" onclick="Projects.switchView('list')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all">
                             <i class="fas fa-list mr-1"></i>List

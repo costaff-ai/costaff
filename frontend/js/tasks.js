@@ -347,18 +347,44 @@ const Projects = {
 
     switchView(mode) {
         this.viewMode = mode;
-        if (mode === 'list') this.filters = { stories: [], agents: [], date: '' };
+        if (mode === 'list') {
+            this.filters = { stories: [], agents: [], date: '' };
+            // Restore sidebar if it was hidden in fullscreen kanban
+            const sidebar = document.getElementById('epic-sidebar');
+            if (sidebar) sidebar.classList.remove('hidden');
+        }
         // Update toggle button styles
         ['list', 'kanban'].forEach(m => {
             const btn = document.getElementById(`view-toggle-${m}`);
             if (!btn) return;
-            if (m === mode) {
-                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all';
-            } else {
-                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 transition-all';
-            }
+            btn.className = m === mode
+                ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all'
+                : 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 transition-all';
         });
+        // Fullscreen button: show only in kanban mode, reset icon
+        const fsBtn = document.getElementById('kanban-fullscreen-btn');
+        if (fsBtn) {
+            fsBtn.classList.toggle('hidden', mode !== 'kanban');
+            fsBtn.innerHTML = '<i class="fas fa-expand text-[10px]"></i>';
+            fsBtn.title = 'Expand kanban';
+        }
         if (this.currentEpicId) this.loadStories(this.currentEpicId);
+    },
+
+    toggleKanbanFullscreen() {
+        const sidebar = document.getElementById('epic-sidebar');
+        const btn = document.getElementById('kanban-fullscreen-btn');
+        if (!sidebar || !btn) return;
+        const isExpanded = sidebar.classList.contains('hidden');
+        if (isExpanded) {
+            sidebar.classList.remove('hidden');
+            btn.innerHTML = '<i class="fas fa-expand text-[10px]"></i>';
+            btn.title = 'Expand kanban';
+        } else {
+            sidebar.classList.add('hidden');
+            btn.innerHTML = '<i class="fas fa-compress text-[10px]"></i>';
+            btn.title = 'Restore sidebar';
+        }
     },
 
     // ---- Task Detail ----
