@@ -154,7 +154,7 @@ const App = {
         // Layout fix: Toggle overflow on parent based on tab needs
         const contentArea = document.getElementById('content-area');
         if (contentArea) {
-            const internalScrollTabs = ['chat', 'agents', 'mcps', 'gateways', 'users', 'diary'];
+            const internalScrollTabs = ['chat', 'agents', 'mcps', 'gateways', 'users', 'diary', 'tasks'];
             if (internalScrollTabs.includes(tabId)) {
                 contentArea.classList.add('overflow-hidden');
                 contentArea.classList.remove('overflow-y-auto');

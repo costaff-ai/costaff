@@ -1,54 +1,61 @@
-<div class="h-full flex flex-col gap-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-        <div>
-            <p class="text-slate-500 font-medium text-sm">AI team project board — Epics, Stories, and Tasks.</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <button id="back-to-epics" onclick="Projects.showEpicBoard()" class="hidden px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all flex items-center gap-2">
-                <i class="fas fa-arrow-left text-xs"></i> All Epics
-            </button>
-            <button id="add-btn" onclick="Projects.openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95">
-                <i class="fas fa-plus"></i> <span id="add-btn-label">NEW EPIC</span>
-            </button>
-        </div>
-    </div>
+<div class="flex gap-6 h-[calc(100vh-160px)]">
 
-    <!-- Epic Board -->
-    <div id="epic-board" class="flex-1 overflow-y-auto custom-scrollbar">
-        <div id="epic-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            <div class="col-span-3 flex items-center justify-center h-40 text-slate-300 text-xs font-bold uppercase tracking-widest">Loading...</div>
-        </div>
-    </div>
-
-    <!-- Story / Task View (hidden initially) -->
-    <div id="story-board" class="hidden flex-1 flex flex-col gap-5 overflow-hidden">
-        <div class="flex items-center gap-4 pb-4 border-b border-slate-100">
+    <!-- Left: Epic Sidebar -->
+    <div class="w-72 flex flex-col bg-white border border-slate-100 rounded-[2rem] shadow-xl overflow-hidden shrink-0">
+        <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div>
-                <h3 id="epic-view-title" class="text-xl font-bold text-slate-900"></h3>
-                <p id="epic-view-desc" class="text-slate-400 text-sm mt-0.5"></p>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Projects</span>
+                <p id="epic-count" class="text-[10px] text-slate-400 font-medium mt-0.5">— epics</p>
             </div>
-            <div class="ml-auto flex items-center gap-3">
-                <!-- View toggle -->
-                <div class="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
-                    <button id="view-toggle-list" onclick="Projects.switchView('list')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all">
-                        <i class="fas fa-list mr-1"></i>List
+            <button onclick="Projects.openAddModal()" class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-lg shadow-blue-200">
+                <i class="fas fa-plus text-[10px]"></i>
+            </button>
+        </div>
+        <div id="epic-sidebar-list" class="flex-1 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
+            <div class="flex items-center justify-center h-20 text-slate-300 text-[10px] font-bold uppercase tracking-widest">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Right: Story / Task Panel -->
+    <div class="flex-1 flex flex-col bg-white border border-slate-100 rounded-[2rem] shadow-xl overflow-hidden">
+
+        <!-- Placeholder -->
+        <div id="story-placeholder" class="flex-1 flex flex-col items-center justify-center opacity-20 uppercase tracking-[0.5em] font-headline text-slate-400">
+            <i class="fas fa-project-diagram text-6xl mb-8"></i>
+            <p>Select a Project</p>
+        </div>
+
+        <!-- Story Panel -->
+        <div id="story-panel" class="hidden flex-1 flex-col overflow-hidden">
+            <div class="px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0 flex items-center gap-4">
+                <div class="min-w-0 flex-1">
+                    <h2 id="epic-panel-title" class="text-2xl font-headline font-bold text-slate-900 tracking-tighter uppercase truncate">—</h2>
+                    <p id="epic-panel-desc" class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">—</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                        <button id="view-toggle-list" onclick="Projects.switchView('list')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition-all">
+                            <i class="fas fa-list mr-1"></i>List
+                        </button>
+                        <button id="view-toggle-kanban" onclick="Projects.switchView('kanban')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 transition-all">
+                            <i class="fas fa-th-large mr-1"></i>Kanban
+                        </button>
+                    </div>
+                    <button onclick="Projects.openAddStoryModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all flex items-center gap-2">
+                        <i class="fas fa-plus text-[10px]"></i> Story
                     </button>
-                    <button id="view-toggle-kanban" onclick="Projects.switchView('kanban')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 transition-all">
-                        <i class="fas fa-th-large mr-1"></i>Kanban
+                    <button onclick="Projects.openAddTaskPrompt()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-blue-100 active:scale-95">
+                        <i class="fas fa-robot text-[10px]"></i> Task
                     </button>
                 </div>
-                <button onclick="Projects.openAddStoryModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all flex items-center gap-2">
-                    <i class="fas fa-plus"></i> Add Story
-                </button>
             </div>
-        </div>
-        <div id="story-list" class="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+            <div id="story-list" class="flex-1 overflow-y-auto custom-scrollbar">
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Epic / Story / Task Add Modal -->
+<!-- Epic / Story Add Modal -->
 <div id="project-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-6">
     <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">

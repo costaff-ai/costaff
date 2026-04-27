@@ -8,15 +8,16 @@ const Projects = {
     currentTasks: {},   // taskId -> task object cache
     viewMode: 'list',   // 'list' | 'kanban'
     filters: { stories: [], agents: [], date: '' },  // kanban filter state
+    _epics: [],         // cached epic list for active-state re-render
 
     async init() {
         this.bindForm();
-        await this.showEpicBoard();
+        await this.loadEpics();
         this.refreshTimer = setInterval(() => {
             const el = document.getElementById('view-tasks');
             if (el && !el.classList.contains('hidden')) {
+                this.loadEpics();
                 if (this.currentEpicId) this.loadStories(this.currentEpicId);
-                else this.loadEpics();
             }
         }, 15000);
     },
@@ -49,85 +50,80 @@ const Projects = {
         };
     },
 
-    // ---- Epic Board ----
-
-    async showEpicBoard() {
-        this.currentEpicId = null;
-        const _q = id => document.getElementById(id);
-        if (_q('epic-board'))    _q('epic-board').classList.remove('hidden');
-        if (_q('story-board'))   _q('story-board').classList.add('hidden');
-        if (_q('back-to-epics')) _q('back-to-epics').classList.add('hidden');
-        if (_q('add-btn-label')) _q('add-btn-label').textContent = 'NEW EPIC';
-        if (_q('add-btn'))       _q('add-btn').onclick = () => this.openAddModal();
-        await this.loadEpics();
-    },
+    // ---- Epic Sidebar ----
 
     async loadEpics() {
         try {
             const epics = await API.fetch('/api/epics');
-            this.renderEpics(Array.isArray(epics) ? epics : []);
+            this._epics = Array.isArray(epics) ? epics : [];
+            this.renderEpics(this._epics);
         } catch (err) {
             console.error('Failed to load epics:', err);
         }
     },
 
     renderEpics(epics) {
-        const list = document.getElementById('epic-list');
+        const list = document.getElementById('epic-sidebar-list');
+        const countEl = document.getElementById('epic-count');
         if (!list) return;
+
+        if (countEl) countEl.textContent = `${epics.length} epic${epics.length !== 1 ? 's' : ''}`;
+
         if (epics.length === 0) {
-            list.innerHTML = `<div class="col-span-3 flex flex-col items-center justify-center h-48 text-slate-300 gap-3">
-                <i class="fas fa-project-diagram text-4xl"></i>
-                <span class="text-xs font-bold uppercase tracking-widest">No projects yet — create your first Epic</span>
+            list.innerHTML = `<div class="flex flex-col items-center justify-center h-40 text-slate-300 gap-3">
+                <i class="fas fa-project-diagram text-3xl"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">No projects yet</span>
             </div>`;
             return;
         }
+
         list.innerHTML = epics.map(epic => {
             const counts = epic.task_counts || {};
             const total = Object.values(counts).reduce((a, b) => a + b, 0);
             const done = counts.done || 0;
-            const doing = counts.doing || 0;
-            const failed = counts.failed || 0;
             const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+            const isActive = this.currentEpicId === epic.id;
             const statusColor = { active: 'bg-blue-100 text-blue-600', completed: 'bg-green-100 text-green-600', archived: 'bg-slate-100 text-slate-500' };
             const sc = statusColor[epic.status] || 'bg-slate-100 text-slate-500';
-            return `
-            <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="Projects.openEpic('${epic.id}', ${JSON.stringify(epic.title).replace(/"/g,"&quot;")})">
-                <div class="flex justify-between items-start mb-3">
-                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${sc}">${epic.status}</span>
-                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="event.stopPropagation();Projects.deleteEpic('${epic.id}')" class="text-slate-300 hover:text-red-500 p-1"><i class="fas fa-trash-alt text-xs"></i></button>
+            const escapedTitle = JSON.stringify(epic.title).replace(/"/g, '&quot;');
+            const escapedDesc = JSON.stringify(epic.description || '').replace(/"/g, '&quot;');
+            return `<div onclick="Projects.selectEpic('${epic.id}', ${escapedTitle}, ${escapedDesc})"
+                class="p-4 cursor-pointer hover:bg-slate-50 transition-all border-l-4 ${isActive ? 'bg-blue-50 border-l-blue-600' : 'border-l-transparent'}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-bold truncate flex-1 mr-2 ${isActive ? 'text-blue-700' : 'text-slate-900'}">${epic.title}</span>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${sc}">${epic.status}</span>
+                        <button onclick="event.stopPropagation();Projects.deleteEpic('${epic.id}')" class="text-slate-200 hover:text-red-500 p-0.5 transition-colors"><i class="fas fa-trash-alt text-[8px]"></i></button>
                     </div>
                 </div>
-                <h4 class="font-bold text-slate-900 text-base mb-1 leading-tight">${epic.title}</h4>
-                <p class="text-slate-400 text-xs line-clamp-2 mb-4 h-8">${epic.description || ''}</p>
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="flex-1 bg-slate-100 rounded-full h-1.5">
-                        <div class="bg-blue-500 h-1.5 rounded-full transition-all" style="width:${progress}%"></div>
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="flex-1 bg-slate-100 rounded-full h-1">
+                        <div class="bg-blue-500 h-1 rounded-full transition-all" style="width:${progress}%"></div>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-400">${progress}%</span>
+                    <span class="text-[9px] font-bold text-slate-400 shrink-0">${progress}%</span>
                 </div>
-                <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold">
-                    <span><i class="fas fa-book-open mr-1"></i>${epic.story_count || 0} stories</span>
-                    <div class="flex gap-3">
-                        ${doing > 0 ? `<span class="text-blue-500">${doing} doing</span>` : ''}
-                        ${done > 0 ? `<span class="text-green-500">${done} done</span>` : ''}
-                        ${total > 0 ? `<span>${total} tasks</span>` : ''}
-                    </div>
-                </div>
+                <span class="text-[9px] text-slate-400 font-medium">${epic.story_count || 0} stories · ${total} tasks</span>
             </div>`;
         }).join('');
     },
 
-    async openEpic(epicId, title) {
+    async selectEpic(epicId, title, desc) {
         this.currentEpicId = epicId;
         this.currentEpicTitle = title;
-        const _q = id => document.getElementById(id);
-        if (_q('epic-board'))      _q('epic-board').classList.add('hidden');
-        if (_q('story-board'))     _q('story-board').classList.remove('hidden');
-        if (_q('back-to-epics'))   _q('back-to-epics').classList.remove('hidden');
-        if (_q('epic-view-title')) _q('epic-view-title').textContent = title;
-        if (_q('add-btn-label'))   _q('add-btn-label').textContent = 'NEW TASK';
-        if (_q('add-btn'))         _q('add-btn').onclick = () => this.openAddTaskPrompt();
+
+        const titleEl = document.getElementById('epic-panel-title');
+        const descEl = document.getElementById('epic-panel-desc');
+        if (titleEl) titleEl.textContent = title;
+        if (descEl) descEl.textContent = desc || '—';
+
+        const placeholder = document.getElementById('story-placeholder');
+        const panel = document.getElementById('story-panel');
+        if (placeholder) placeholder.classList.add('hidden');
+        if (panel) { panel.classList.remove('hidden'); panel.classList.add('flex'); }
+
+        // Re-render sidebar to reflect active state
+        this.renderEpics(this._epics);
+
         await this.loadStories(epicId);
     },
 
@@ -152,16 +148,20 @@ const Projects = {
 
         const list = document.getElementById('story-list');
         if (!list) return;
-        // Restore scroll for list mode (kanban sets overflow: hidden)
+        // Restore defaults for list mode (kanban overrides these inline)
         list.style.overflow = '';
+        list.style.display = '';
+        list.style.flexDirection = '';
+        list.style.padding = '';
+        list.style.gap = '';
         if (stories.length === 0) {
-            list.innerHTML = `<div class="flex flex-col items-center justify-center h-40 text-slate-300 gap-3">
+            list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-300 gap-3">
                 <i class="fas fa-book-open text-3xl"></i>
                 <span class="text-xs font-bold uppercase tracking-widest">No stories yet — add the first milestone</span>
             </div>`;
             return;
         }
-        list.innerHTML = stories.map(story => {
+        const storiesHtml = stories.map(story => {
             const statusDot = { open: 'bg-slate-400', in_progress: 'bg-blue-500', done: 'bg-green-500' };
             const dot = statusDot[story.status] || 'bg-slate-300';
             const tasks = story.tasks || [];
@@ -198,6 +198,7 @@ const Projects = {
                 <div class="p-3 space-y-2">${taskHtml}</div>
             </div>`;
         }).join('');
+        list.innerHTML = `<div class="p-6 space-y-4">${storiesHtml}</div>`;
     },
 
     _renderKanban(stories, epicId) {
@@ -214,7 +215,7 @@ const Projects = {
         ];
 
         if (allTasks.length === 0) {
-            list.innerHTML = `<div class="flex flex-col items-center justify-center h-40 text-slate-300 gap-3">
+            list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-300 gap-3">
                 <i class="fas fa-th-large text-3xl"></i>
                 <span class="text-xs font-bold uppercase tracking-widest">No tasks yet</span>
             </div>`;
@@ -286,8 +287,12 @@ const Projects = {
 
         // Switch story-list to overflow-hidden so columns scroll independently
         list.style.overflow = 'hidden';
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.padding = '1.5rem';
+        list.style.gap = '0.75rem';
 
-        list.innerHTML = filterBar + `<div class="flex gap-4 overflow-x-auto" style="height:calc(100% - 40px)">` +
+        list.innerHTML = filterBar + `<div class="flex gap-4 overflow-x-auto flex-1 min-h-0">` +
             columns.map(col => {
                 const colTasks = visibleTasks.filter(t => t.status === col.key);
                 const cards = colTasks.length === 0
