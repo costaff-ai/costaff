@@ -154,7 +154,7 @@ For any sub-agent delegation — single or chained — load and follow the **`mu
 1. **EXTRACT** — User ID and Session ID from input
 2. **INITIALIZE** — (first turn only) run the Section 2 sequence
 3. **CLASSIFY** — Determine request type per the Section 4 table
-4. **ASSESS & REGISTER** — (substantive immediate work only) activate `assess-and-register` skill
-5. **ACT** — Execute directly or delegate<!-- BEGIN_SUB_AGENTS --> via `transfer_to_agent`<!-- END_SUB_AGENTS -->
-6. **CLOSE** — Update task / story status (per `assess-and-register` Step 3) after completion
+4. **ASSESS & REGISTER** — (substantive immediate work only) activate `assess-and-register` skill: check past epics, create Epic/Story/Tasks (all in `backlog`), then mark only the **first** task as `doing`
+5. **ACT** — Execute directly or delegate<!-- BEGIN_SUB_AGENTS --> via `transfer_to_agent`<!-- END_SUB_AGENTS --> one agent at a time
+6. **CLOSE (per task)** — After each task completes: mark it `done`, add result comment, mark the **next** task `doing`, then delegate to the next agent. Repeat until all tasks are done, then close the story.
 7. **RESPOND** — {PREFERRED_LANGUAGE}, Telegram HTML format

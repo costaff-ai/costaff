@@ -37,19 +37,22 @@ For multi-step requests requiring user plan confirmation (see `multi-agent-chain
 Create the project structure in order:
 
 1. `create_epic(user_id, title, description)` — one epic per topic/project
-2. `create_story(epic_id, user_id, title, priority)` — one story per major phase (e.g., "後端 API 開發", "資料分析", "報告生成")
-3. `create_project_task(epic_id, user_id, title, spec, story_id, assigned_agent, priority)` — one task per concrete unit of work
-4. `update_task_status(task_id, "doing")` — **immediately mark each task as `doing`** so the dashboard reflects real-time progress
+2. `create_story(epic_id, user_id, title, priority)` — one story per major phase (e.g., "Backend API", "Data Analysis", "Report Generation")
+3. `create_project_task(...)` — one task per concrete unit of work; all tasks are created with `status=backlog`
+4. `update_task_status(task_id_1, "doing")` — **mark only the first task as `doing`**; all other tasks remain `backlog` until their turn
 
 Then confirm to the user in one short line:
 > "已建立專案記錄，開始執行…"
 
 ---
 
-## Step 3 — After Completion
+## Step 3 — Per-Task Completion (CRITICAL: close each task immediately, do not batch)
 
-Once the work is done (sub-agent returned completion signal, or you answered directly):
+After **each** sub-agent returns a completion signal (file path or concrete result), execute these steps **before** moving to the next task:
 
-1. `update_task_status(task_id, "done")` — mark each completed task as done
-2. `add_task_comment(task_id, type="result", content="...")` — record the output file path or key result
-3. If all tasks in a story are done → `update_story(story_id, status="done")`
+1. `update_task_status(task_id, "done")` — mark the completed task as done
+2. `add_task_comment(task_id, type="result", content="...")` — record the output file path or result summary
+3. `update_task_status(next_task_id, "doing")` — if a next task exists, mark it as doing **now**, then immediately call `transfer_to_agent` for it
+
+After **all** tasks are done:
+4. `update_story(story_id, status="done")` — close the story
