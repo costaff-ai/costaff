@@ -1448,9 +1448,18 @@ const UI = {
     closeModal() { document.getElementById('modal-container').classList.add('hidden'); document.getElementById('modal-input').value = ''; },
     async deleteItem(type, name) { if (confirm(`DE-INDEX ${name}?`)) { await API.fetch(`/api/${type}/${name}`, { method: 'DELETE' }); App.refresh(); } },
     
-    updateLogServices(svcs) { 
+    updateLogServices(svcs) {
         const sel = document.getElementById('log-service-select'); if (!sel) return;
-        const cur = sel.value; sel.innerHTML = `<option value="">-- SELECT NODE --</option>` + svcs.map(s => `<option value="${s.name}" ${s.name===cur?'selected':''}>${s.name.toUpperCase()}</option>`).join(''); 
+        const cur = sel.value;
+        // Match Runtime Monitor (renderDashboard): only show CoStaff-managed
+        // containers, sorted alphabetically. The /api/status endpoint also
+        // returns unrelated containers (e.g. ai-rap-*, gpt-vis), which the
+        // log monitor doesn't need to drop down.
+        const filtered = [...svcs]
+            .filter(s => s.name.toLowerCase().startsWith('costaff-'))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        sel.innerHTML = `<option value="">-- SELECT NODE --</option>`
+            + filtered.map(s => `<option value="${s.name}" ${s.name===cur?'selected':''}>${s.name.toUpperCase()}</option>`).join('');
     },
 
     async renderLogs() { 
