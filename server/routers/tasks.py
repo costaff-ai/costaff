@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from managers.auth import AuthManager
 from managers.database import DatabaseManager
-from models.requests import (
+from server.schemas import (
     RegularWorkCreateRequest,
     RegularWorkUpdateRequest,
     EpicCreateRequest,

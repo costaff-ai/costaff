@@ -9,7 +9,7 @@ from dotenv import load_dotenv, set_key
 from managers.auth import AuthManager
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from models.requests import GatewayUpdateRequest, AddMCPRequest, AgentMCPConfigRequest
+from server.schemas import GatewayUpdateRequest, AddMCPRequest, AgentMCPConfigRequest
 from utils.helpers import PATHS, _project_root, _runtime_root
 
 router = APIRouter()

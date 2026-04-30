@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from managers.auth import AuthManager
 from managers.config import ConfigManager
 from managers.database import DatabaseManager
-from models.requests import ApiConfigCreateRequest, ApiConfigUpdateRequest, SkillConfigCreateRequest, SkillConfigUpdateRequest
+from server.schemas import ApiConfigCreateRequest, ApiConfigUpdateRequest, SkillConfigCreateRequest, SkillConfigUpdateRequest
 from utils.crypto import encrypt_headers, decrypt_headers
 from utils.network import is_safe_url
 from utils.helpers import _project_root, _serialize_row

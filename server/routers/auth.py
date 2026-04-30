@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from managers.auth import AuthManager
 from managers.audit import audit
-from models.requests import LoginRequest, SetupRequest
+from server.schemas import LoginRequest, SetupRequest
 from utils.helpers import VERSION
 
 router = APIRouter()

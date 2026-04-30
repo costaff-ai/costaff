@@ -9,7 +9,7 @@ from managers.auth import AuthManager
 from managers.audit import audit
 from managers.config import ConfigManager
 from managers.docker import DockerManager
-from models.requests import ExternalAgentAddRequest, ExternalAgentUpdateRequest
+from server.schemas import ExternalAgentAddRequest, ExternalAgentUpdateRequest
 from utils.helpers import _validate_a2a_url
 
 router = APIRouter()
