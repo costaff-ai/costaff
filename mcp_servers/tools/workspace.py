@@ -42,10 +42,14 @@ def move_to_shared(src_path: str, overwrite: bool = False) -> str:
 
 
 @mcp.tool()
-def list_workspace(path: str, pattern: Optional[str] = None) -> str:
+def list_data_files(path: str, pattern: Optional[str] = None) -> str:
     """
     List files under a path inside /app/data. Use this to verify output files exist
     before marking a task as done.
+
+    Renamed from list_workspace to avoid name collision with the
+    business_analysis agent's own list_workspace(subdir) tool, which is a
+    different function with a different signature.
 
     - path: absolute path under /app/data (e.g. /app/data/shared/costaff-agent-coding)
     - pattern: optional filename filter, e.g. "*.pdf" or "report.csv"

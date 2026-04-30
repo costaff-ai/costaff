@@ -37,7 +37,7 @@ Extract each absolute path. If no such lines exist → skip acceptance check, pr
 
 For each extracted path, call:
 ```
-list_workspace(path="<absolute_path>")
+list_data_files(path="<absolute_path>")
 ```
 
 Interpret the result:
