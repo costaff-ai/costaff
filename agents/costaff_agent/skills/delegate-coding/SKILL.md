@@ -1,20 +1,21 @@
 ---
 name: delegate-coding
 description: >
-  Use when delegating any task to the coding expert — including Python scripting,
-  data analysis, SVM / ML algorithms, file I/O, package installation, git operations,
-  or running tests. Load this skill before calling transfer_to_agent(agent_name='coding')
-  to know exactly what to send and how to interpret the response.
+  Use when delegating any task to the coding expert — Python scripting,
+  data analysis, SVM / ML algorithms, file I/O, package installation,
+  git operations, or running tests. Load this skill before calling
+  `coding(request='...')` so you know what to send and how to read the
+  response.
 ---
 
 # Delegate to Coding Expert
 
 ## Step 0 — Check Availability First (CRITICAL)
 
-Before doing anything, verify that `coding` appears in the **Team Roster** (Section 6.2 of the main instruction).
+Before doing anything, verify that a `coding` agent tool appears in your tool spec.
 
-- **If `coding` IS in the roster** → proceed with delegation as described below.
-- **If `coding` is NOT in the roster** → the coding expert is not currently deployed. You MUST:
+- **If `coding` IS registered** → proceed with delegation as described below.
+- **If `coding` is NOT registered** → the coding expert is not currently deployed. You MUST:
   1. Inform the user honestly: "程式開發專家目前尚未部署，無法執行此操作。"
   2. Do NOT attempt the task yourself via text or fabricated results.
   3. Do NOT call any coding-related tool — you do not have them.
@@ -29,32 +30,32 @@ Before doing anything, verify that `coding` appears in the **Team Roster** (Sect
 ## How to Delegate
 
 ```
-transfer_to_agent(
-    agent_name='coding',
-    message='<clear task description in English or Chinese>'
-)
+coding(request="<self-contained, imperative task description>")
 ```
 
-**What to include in the message:**
+The specialist sees **only the `request` string** — no session history, no plan, no prior turns. Write a complete imperative.
+
+**What to include in `request`:**
 - The exact task (e.g. "Run SVM classification on the wine dataset using scikit-learn")
 - Any input file paths (absolute, under `/app/data/shared/`)
 - The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine_svm_results.json`")
 - Any specific libraries to use
+- A `[PROGRESS_CONTEXT]` block with `user_id`, `channel`, `session_id` if user-facing progress messages are wanted
 
-**What to NEVER include in the message (CRITICAL):**
-- ❌ Any mention of other agents: "then pass results to business_analysis", "after this, transfer to BA agent"
-- ❌ Any orchestration instruction: "use transfer_to_agent", "call the reporting expert"
-- `transfer_to_agent` is an ADK mechanism available **only to you (the Manager)**. If you mention it in the message to coding, the coding agent's LLM will attempt to call it and fail with `Tool 'transfer_to_agent' not found`, breaking the task.
-- The coding agent's only job is: **do the work, save the file, report back**. Chaining to the next agent is your responsibility after it finishes.
+**What to NEVER include in `request` (CRITICAL):**
+- ❌ Mentions of other specialists or chaining: "then pass results to business_analysis", "after this, transfer to BA agent"
+- ❌ Single-word acknowledgements like "OK" or "go" — the specialist cannot infer the task from those
+- ❌ References to "the user's earlier message" or "the plan we discussed" — the specialist cannot see those
+- The coding agent's only job is: **do the work, save the file, report back**. Chaining to the next specialist is your responsibility after `coding(...)` returns.
 
 ## What the Coding Agent Returns
 
-The coding agent's **completion signal** contains at least one of:
+The return value contains at least one of:
 - An absolute output file path: `/app/data/shared/costaff-agent-coding/<filename>`
 - Computed values or a structured summary
 - An explicit failure message with reason
 
-**Progress signals** (mid-task `send_message_now` messages like "安裝套件中…", "正在執行腳本…") are NOT completion — do not proceed to the next step until the A2A call actually resolves.
+**Progress signals** (mid-task `send_message_now` messages like "安裝套件中…", "正在執行腳本…") are NOT completion — do not proceed to the next step until the `coding(...)` call actually resolves.
 
 ## Output Paths
 
@@ -70,3 +71,4 @@ Use the **exact path returned by the agent** — never reconstruct or guess it.
 - ❌ Calling `run_python_code`, `write_file`, `pip_install`, `run_shell` yourself — these are the coding agent's **internal** MCP tools and are not in your toolset
 - ❌ Proceeding to the next step after only seeing a progress message
 - ❌ Inventing the output file path — always use what the agent returned
+- ❌ Writing an empty or single-word `request` — the coding agent will reply conversationally and do no work

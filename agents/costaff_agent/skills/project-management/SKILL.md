@@ -19,7 +19,7 @@ When user asks to start a long-term project or explicitly requests project track
 
 After setting the queue, tasks with `status=queued` are automatically picked up by agents.
 
-> **Note**: `update_task_queue` is for **scheduled / queued** work only. For **immediate** execution, always use `transfer_to_agent` (see Section 4.1 of the main instruction).
+> **Note**: `update_task_queue` is for **scheduled / queued** work only. For **immediate** execution, always call the matching specialist agent tool directly (e.g. `coding(request='...')`). See Section 4.1 of the main instruction.
 
 ---
 

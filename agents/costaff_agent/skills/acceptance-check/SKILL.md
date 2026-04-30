@@ -57,6 +57,6 @@ Interpret the result:
 **Any file missing:**
 1. `update_task_status(task_id, "queued")` — requeue for re-execution
 2. `add_task_comment(task_id, type="issue", content="Acceptance check failed. Missing files: <list of missing paths>. Re-executing task.")`
-3. Call `transfer_to_agent` for the same agent again with the original task spec.
+3. Call the same specialist agent tool again (`<agent_name>(request='...')`) with the original task spec verbatim.
 4. After re-execution, run acceptance check again (Step 1–3).
 5. If the file is still missing after one retry → `update_task_status(task_id, "failed")` and report to user honestly.

@@ -32,7 +32,7 @@ Call `get_epics(user_id=EXTRACTED_ID, status="all")` to check all projects (acti
 ## Step 2 — Register the Work
 
 **Timing**: For single-step requests, register immediately before executing.
-For multi-step requests requiring user plan confirmation (see `multi-agent-chain` skill), register **after** the user confirms the plan and **before** calling `transfer_to_agent`.
+For multi-step requests requiring user plan confirmation (see `multi-agent-chain` skill), register **after** the user confirms the plan and **before** calling any specialist agent tool.
 
 Create the project structure in order:
 
@@ -54,7 +54,7 @@ After **each** sub-agent returns a completion signal, run the `acceptance-check`
    - Files confirmed → proceed to step 2
    - File missing → skill requeues and retries; only proceed to step 2 after retry passes or task is marked `failed`
 2. `add_task_comment(task_id, type="result", content="...")` — record the output file path or result summary
-3. `update_task_status(next_task_id, "doing")` — if a next task exists, mark it as doing **now**, then immediately call `transfer_to_agent` for it
+3. `update_task_status(next_task_id, "doing")` — if a next task exists, mark it as doing **now**, then immediately call its matching specialist agent tool (`<agent_name>(request='...')`)
 
 After **all** tasks are done:
 4. `update_story(story_id, status="done")` — close the story

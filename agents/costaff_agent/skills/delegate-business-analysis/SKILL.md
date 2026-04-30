@@ -2,20 +2,20 @@
 name: delegate-business-analysis
 description: >
   Use when delegating report generation, PDF creation, chart visualization, or
-  data interpretation to the business analysis expert. Load this skill before calling
-  transfer_to_agent(agent_name='business_analysis') to know what to send, what it
-  returns, and — critically — which tools are internal to that agent and must NEVER
-  be called directly by you.
+  data interpretation to the business analysis expert. Load this skill before
+  calling `business_analysis(request='...')` so you know what to send, what it
+  returns, and which tools are internal to that specialist (and must NEVER be
+  called directly).
 ---
 
 # Delegate to Business Analysis Expert
 
 ## Step 0 — Check Availability First (CRITICAL)
 
-Before doing anything, verify that `business_analysis` appears in the **Team Roster** (Section 6.2 of the main instruction).
+Before doing anything, verify that a `business_analysis` agent tool appears in your tool spec.
 
-- **If `business_analysis` IS in the roster** → proceed with delegation as described below.
-- **If `business_analysis` is NOT in the roster** → the business analysis expert is not currently deployed. You MUST:
+- **If `business_analysis` IS registered** → proceed with delegation as described below.
+- **If `business_analysis` is NOT registered** → the business analysis expert is not currently deployed. You MUST:
   1. Inform the user honestly: "商業分析專家目前尚未部署，無法執行此操作。"
   2. Do NOT attempt the task yourself via text or fabricated results.
   3. Do NOT call any report/chart tools — you do not have them.
@@ -30,25 +30,24 @@ Before doing anything, verify that `business_analysis` appears in the **Team Ros
 ## How to Delegate
 
 ```
-transfer_to_agent(
-    agent_name='business_analysis',
-    message='<clear task description>'
-)
+business_analysis(request="<self-contained, imperative task description>")
 ```
 
-**What to include in the message:**
+The specialist sees **only the `request` string** — no session history, no plan, no prior turns. Write a complete imperative.
+
+**What to include in `request`:**
 - The exact task (e.g. "Generate a PDF report on SVM classification of the wine dataset")
-- Input file path(s) — **exact absolute paths** returned by the previous agent, e.g.:
+- Input file path(s) — **exact absolute paths** returned by the previous specialist, e.g.
   `/app/data/shared/costaff-agent-coding/wine_svm_results.json`
-- Desired output path, e.g.:
+- Desired output path, e.g.
   `/app/data/shared/costaff-agent-business-analysis/svm_wine_report.pdf`
 - Language requirement (e.g. "Report should be in Traditional Chinese")
 - Any specific sections to include (e.g. "Include methodology, results table, and analysis")
 
-**What to NEVER include in the message (CRITICAL):**
-- ❌ Any mention of other agents or chaining: "then notify the user", "transfer results to X"
-- ❌ Any orchestration instruction: "use transfer_to_agent"
-- `transfer_to_agent` is an ADK mechanism available **only to you (the Manager)**. Including it in the message causes the sub-agent to attempt the call and fail.
+**What to NEVER include in `request` (CRITICAL):**
+- ❌ Mentions of other specialists or chaining: "then notify the user", "transfer results to X"
+- ❌ Single-word acknowledgements like "OK" or "go" — the specialist cannot infer the task from those
+- ❌ References to "the user's earlier message" or "the plan we discussed" — the specialist cannot see those
 
 ## CRITICAL — Tools You Must NEVER Call Directly
 
@@ -65,12 +64,12 @@ The following are **internal tools of the business analysis agent**. They do NOT
 | `read_result` | business_analysis MCP |
 | `analyze_data` | business_analysis MCP |
 
-**If you just received a ValueError for any of the above**: do NOT fabricate a result. Immediately call `transfer_to_agent(agent_name='business_analysis', message='...')` instead and wait for the real response.
+**If you just received a ValueError for any of the above**: do NOT fabricate a result. Immediately call `business_analysis(request='...')` instead and wait for the real response.
 
 ## What the Business Analysis Agent Returns
 
 The completion signal contains:
-- The absolute path to the generated file, e.g.:
+- The absolute path to the generated file, e.g.
   `/app/data/shared/costaff-agent-business-analysis/svm_wine_report.pdf`
 - A brief summary of what was produced
 

@@ -3,18 +3,18 @@ name: delegate-database
 description: >
   Use when a task involves database operations — SQL queries, schema inspection,
   data retrieval, record insertion/update/deletion, or database health checks.
-  Load this skill before delegating to the database expert (agent: database).
-  IMPORTANT: This agent may not be deployed — check the roster first.
+  Load this skill before calling `database(request='...')`.
+  IMPORTANT: This specialist may not be deployed — check the registered tool spec first.
 ---
 
 # Delegate to Database Expert
 
 ## Step 0 — Check Availability First (CRITICAL)
 
-Before doing anything, verify that `database` appears in the **Team Roster** (Section 6.2 of the main instruction).
+Before doing anything, verify that a `database` agent tool appears in your tool spec.
 
-- **If `database` IS in the roster** → proceed with delegation as described below.
-- **If `database` is NOT in the roster** → the database expert is not currently deployed. You MUST:
+- **If `database` IS registered** → proceed with delegation as described below.
+- **If `database` is NOT registered** → the database expert is not currently deployed. You MUST:
   1. Inform the user honestly: "資料庫專家目前尚未部署，無法執行此操作。"
   2. Do NOT attempt the task yourself via text or fabricated results.
   3. Do NOT call any database-related tool — you do not have them.
@@ -29,17 +29,21 @@ Before doing anything, verify that `database` appears in the **Team Roster** (Se
 ## How to Delegate
 
 ```
-transfer_to_agent(
-    agent_name='database',
-    message='<clear task description>'
-)
+database(request="<self-contained, imperative task description>")
 ```
 
-**What to include in the message:**
+The specialist sees **only the `request` string** — no session history, no plan, no prior turns. Write a complete imperative.
+
+**What to include in `request`:**
 - The exact operation (e.g. "Query all users created after 2026-01-01")
 - Target database / table names if known
 - Any filter conditions or parameters
 - Desired output format (e.g. "Return as JSON")
+
+**What to NEVER include in `request`:**
+- ❌ Mentions of other specialists or chaining
+- ❌ Single-word acknowledgements like "OK" or "go"
+- ❌ References to "the user's earlier message"
 
 ## What the Database Agent Returns
 
@@ -61,7 +65,7 @@ The following are internal to the database agent. Calling them will crash the ru
 | `execute_sql` | database MCP |
 
 **If you receive `ValueError: Tool '<name>' not found`** after trying any of the above:
-do NOT fabricate results. Call `transfer_to_agent(agent_name='database', message='...')` instead.
+do NOT fabricate results. Call `database(request='...')` instead.
 
 ## Output Paths
 
