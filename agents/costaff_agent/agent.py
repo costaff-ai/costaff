@@ -1,10 +1,8 @@
 import os
 import json
+import re
 import sys
 import logging
-import httpx
-import time
-from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -105,7 +103,6 @@ if raw_agents:
         logger.error(f"A2A system failure: {e}")
 
 # Construct dynamic instruction
-import re
 preferred_lang = os.getenv("COSTAFF_PREFERRED_LANGUAGE", "Traditional Chinese (繁體中文)")
 
 if sub_agents:
