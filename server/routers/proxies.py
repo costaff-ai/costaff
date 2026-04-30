@@ -1,29 +1,30 @@
-import json
+"""Operator proxies: container log tail + pass-through to the local ADK web server.
+
+`/api/logs/{service}` shells out to `docker logs --tail`. The service name
+is validated against a hard-coded prefix allow-list AND the dynamic set
+of registered external-agent container names, to prevent command
+injection via path parameter.
+
+`/api/proxy/run_sse` and `/api/proxy/sessions/...` forward to the local
+`adk web` instance (default port 18080) so the dashboard front-end can
+hit a single CORS origin instead of cross-origin requesting the ADK
+server directly.
+"""
 import os
-import sys
-from datetime import datetime, timezone
-from typing import Any, Dict
+import subprocess
 
 import httpx
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from services.auth import AuthManager
 from services.config import ConfigManager
-from services.database import DatabaseManager
-from server.schemas import ApiConfigCreateRequest, ApiConfigUpdateRequest, SkillConfigCreateRequest, SkillConfigUpdateRequest
-from utils.crypto import encrypt_headers, decrypt_headers
-from utils.network import is_safe_url
-from utils.helpers import _project_root, _serialize_row
 
 router = APIRouter()
 
 
 @router.get("/api/logs/{service}")
 def get_service_logs(service: str, tail: int = 100, auth: bool = Depends(AuthManager.verify_token)):
-    import subprocess
     conf = ConfigManager.get_config()
     ext_agents = conf.get("external_agents", {})
 

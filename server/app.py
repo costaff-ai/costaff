@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from utils.helpers import PATHS
-from server.routers import auth, system, config, tasks, agents, users, diary, identity, chat_inspect, integrations
+from server.routers import auth, system, config, tasks, agents, diary, identity, chat_inspect, integrations, proxies
 
 
 def _setup_logging() -> None:
@@ -52,11 +52,11 @@ server.include_router(system.router)
 server.include_router(config.router)
 server.include_router(tasks.router)
 server.include_router(agents.router)
-server.include_router(users.router)
 server.include_router(diary.router)
 server.include_router(identity.router)
 server.include_router(chat_inspect.router)
 server.include_router(integrations.router)
+server.include_router(proxies.router)
 
 
 @server.get("/")
