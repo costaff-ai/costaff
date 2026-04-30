@@ -19,8 +19,8 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import SseServerParams, StreamableHTTPServerParams
 from google.adk.skills import load_skill_from_dir
 from google.adk.tools import skill_toolset
-from utils.models.litellm_model.litellm_model_config import litellm_model
-from utils.instructions import AGENT_INSTRUCTION
+from models.litellm_model.litellm_model_config import litellm_model
+from instructions import AGENT_INSTRUCTION
 
 # --- Configuration ---
 raw_config = os.getenv("COSTAFF_AGENT_MCP_URLS") or os.getenv("MCP_SERVER_URLS", "")
@@ -58,7 +58,7 @@ for name, entry in mcp_config.items():
         logger.error(f"FAILED to load MCP '{name}': {e}")
 
 # Load ADK Skills
-_skills_dir = pathlib.Path(__file__).parent / "utils" / "skills"
+_skills_dir = pathlib.Path(__file__).parent / "skills"
 _skills = [
     load_skill_from_dir(d)
     for d in sorted(_skills_dir.iterdir())
