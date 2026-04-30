@@ -36,7 +36,7 @@ def get_os_stats(auth: bool = Depends(AuthManager.verify_token)):
 @router.get("/api/license")
 def get_license(auth: bool = Depends(AuthManager.verify_token)):
     sys.path.insert(0, _project_root)
-    from src.core.license import LicenseManager, OSS_LIMITS
+    from core.license import LicenseManager, OSS_LIMITS
     costaff_dir = _runtime_root
     license_path = os.path.join(costaff_dir, "costaff-license.yaml")
 

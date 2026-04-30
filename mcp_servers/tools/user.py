@@ -1,9 +1,9 @@
 import json
 from typing import Optional
 
-from src.core import models
-from src.core.database import SessionLocal
-from src.core.license import LicenseManager
+from core import models
+from core.database import SessionLocal
+from core.license import LicenseManager
 from mcp_servers.core import mcp, tz
 from mcp_servers.background import _ensure_default_regular_works
 from datetime import datetime

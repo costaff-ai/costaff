@@ -7,9 +7,9 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 from mcp_servers.core import mcp, scheduler, scheduled_job_ids, logger, tz
-from src.core.database import SessionLocal, init_db
-from src.core import models
-from src.core.license import LicenseManager
+from core.database import SessionLocal, init_db
+from core import models
+from core.license import LicenseManager
 
 # Import all tool modules to register @mcp.tool() decorators
 from mcp_servers.tools import user, messaging, reminders, regular_works, projects, diary, events, apis, skills, workspace

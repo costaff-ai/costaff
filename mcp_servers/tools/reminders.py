@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from src.core import models
-from src.core.database import SessionLocal
+from core import models
+from core.database import SessionLocal
 from mcp_servers.core import mcp
 
 

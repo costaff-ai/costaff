@@ -51,7 +51,7 @@ def agent_add(
     try:
         import sys as _sys
         _sys.path.insert(0, _project_root)
-        from src.core.license import LicenseManager
+        from core.license import LicenseManager
         current_count = len([a for a in conf.get("external_agents", {}).values() if a.get("enabled")])
         LicenseManager.check_agent_limit(current_count)
     except ValueError as e:

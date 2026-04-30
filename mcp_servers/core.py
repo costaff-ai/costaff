@@ -4,7 +4,7 @@ import pytz
 from mcp.server.fastmcp import FastMCP
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from src.core.database import SessionLocal, engine, init_db
+from core.database import SessionLocal, engine, init_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("costaff-agent-engine")

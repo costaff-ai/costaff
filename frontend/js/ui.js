@@ -124,11 +124,11 @@ const UI = {
             return;
         }
 
-        const isEnterprise = data.plan !== 'oss';
-        const isExpired    = data.is_expired;
-        const planLabel    = data.plan.toUpperCase();
-        const planColor    = isExpired ? 'red' : isEnterprise ? 'blue' : 'slate';
-        const limits       = data.limits || {};
+        const isPaid    = data.plan !== 'oss';
+        const isExpired = data.is_expired;
+        const planLabel = data.plan.toUpperCase();
+        const planColor = isExpired ? 'red' : isPaid ? 'blue' : 'slate';
+        const limits    = data.limits || {};
 
         const expiryText = data.expires_at
             ? (isExpired ? `Expired on ${data.expires_at}` : `Valid until ${data.expires_at}`)
@@ -158,7 +158,7 @@ const UI = {
         const metrics = [
             { label: 'Agents',  used: usage.agents ?? 0, limit: limits.max_agents ?? 1 },
             { label: 'Users',   used: usage.users  ?? 0, limit: limits.max_users  ?? 1 },
-            { label: 'Skills',  used: usage.skills ?? 0, limit: limits.max_skills ?? 5 },
+            { label: 'Skills',  used: usage.skills ?? 0, limit: limits.max_skills ?? 10 },
         ];
 
         card.innerHTML = `
@@ -166,7 +166,7 @@ const UI = {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-2xl bg-${planColor}-50 flex items-center justify-center">
-                            <i class="fas fa-${isEnterprise ? 'shield-alt' : 'code-branch'} text-${planColor}-500 text-xl"></i>
+                            <i class="fas fa-${isPaid ? 'shield-alt' : 'code-branch'} text-${planColor}-500 text-xl"></i>
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
@@ -177,8 +177,8 @@ const UI = {
                             <p class="text-xs ${expiryColor} mt-0.5">${expiryText}</p>
                         </div>
                     </div>
-                    ${!isEnterprise ? `
-                    <a href="mailto:simonliuyuwei@gmail.com?subject=CoStaff Enterprise License Inquiry"
+                    ${!isPaid ? `
+                    <a href="mailto:simonliuyuwei@gmail.com?subject=CoStaff License Inquiry"
                        class="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 transition-all whitespace-nowrap">
                         Upgrade →
                     </a>` : ''}

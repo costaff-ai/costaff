@@ -17,7 +17,7 @@ def license(
 ):
     """Manage your CoStaff Agent license."""
     sys.path.insert(0, _project_root)
-    from src.core.license import LicenseManager, OSS_LIMITS
+    from core.license import LicenseManager, OSS_LIMITS
 
     costaff_dir = _runtime_root
     dest = os.path.join(costaff_dir, "costaff-license.yaml")
@@ -50,7 +50,7 @@ def license(
             raise typer.Exit(1)
 
     elif action == "machine-id":
-        from src.core.license import get_machine_id
+        from core.license import get_machine_id
         mid = get_machine_id()
         console.print(Panel.fit(
             f"  Machine ID : [bold]{mid}[/bold]\n\n"

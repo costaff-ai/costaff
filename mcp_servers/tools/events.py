@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import text as sa_text
 
-from src.core.database import SessionLocal
+from core.database import SessionLocal
 from mcp_servers.core import mcp, tz
 
 

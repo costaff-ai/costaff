@@ -387,7 +387,7 @@ def create_skill_config(req: SkillConfigCreateRequest, auth: bool = Depends(Auth
         raise HTTPException(status_code=500, detail="Database connection failed")
     try:
         sys.path.insert(0, _project_root)
-        from src.core.license import LicenseManager
+        from core.license import LicenseManager
         with Session(engine) as _s:
             LicenseManager.check_skill_limit(_s)
     except ValueError as e:

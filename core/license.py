@@ -220,7 +220,7 @@ class LicenseManager:
     @classmethod
     def check_user_limit(cls, db) -> None:
         """Raises ValueError if the total number of user profiles has reached the license limit."""
-        from src.core.models import UserContact
+        from core.models import UserContact
         limit = cls.get().max_users
         count = db.query(UserContact).count()
         if count >= limit:
@@ -233,7 +233,7 @@ class LicenseManager:
     @classmethod
     def check_skill_limit(cls, db) -> None:
         """Raises ValueError if the total number of Skill configs has reached the license limit."""
-        from src.core.models import SkillConfig
+        from core.models import SkillConfig
         limit = cls.get().max_skills
         count = db.query(SkillConfig).count()
         if count >= limit:

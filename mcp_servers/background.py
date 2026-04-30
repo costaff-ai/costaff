@@ -4,8 +4,8 @@ from datetime import datetime
 
 from apscheduler.triggers.cron import CronTrigger
 
-from src.core import models
-from src.core.database import SessionLocal
+from core import models
+from core.database import SessionLocal
 from mcp_servers.core import logger, scheduler, scheduled_job_ids, tz
 from mcp_servers.executors.reminder import execute_reminder
 from mcp_servers.executors.regular_work import execute_regular_work

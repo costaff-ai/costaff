@@ -2,8 +2,8 @@ import httpx
 import logging
 import os
 from dotenv import load_dotenv
-from src.core import models
-from src.core.database import SessionLocal
+from core import models
+from core.database import SessionLocal
 
 load_dotenv()
 logger = logging.getLogger(__name__)

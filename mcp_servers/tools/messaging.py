@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from src.core import models
-from src.core.database import SessionLocal
-from src.core.notifiers.telegram import send_telegram_notification, send_telegram_document
-from src.core.notifiers.line_notifier import send_line_notification
-from src.core.notifiers.discord import send_discord_notification
+from core import models
+from core.database import SessionLocal
+from core.notifiers.telegram import send_telegram_notification, send_telegram_document
+from core.notifiers.line_notifier import send_line_notification
+from core.notifiers.discord import send_discord_notification
 from mcp_servers.core import mcp, tz
 
 _FILE_EXTS = r"pdf|docx|md|txt|html|htm|png|jpg|jpeg|gif|csv|json|xlsx|xls|zip"
