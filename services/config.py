@@ -132,21 +132,50 @@ class ConfigManager:
         costaff_urls = {k: v for k, v in urls.items() if k in costaff_names}
         set_key(PATHS["env"], "COSTAFF_AGENT_MCP_URLS", json.dumps(costaff_urls))
 
+        # Per-agent MCP tool whitelists. Schema in config.json:
+        #   "agent_mcp_filters": {
+        #     "<agent_key>": {
+        #       "<mcp_name>": ["tool_a", "tool_b"]   # only these tools enter the agent's spec
+        #     }
+        #   }
+        # Why: when a sub-agent connects to the manager core MCP it inherits
+        # ~40 tools, most irrelevant to its job (epic/story/diary etc.).
+        # Bloat costs tokens on every LLM call and increases mis-selection.
+        # A whitelist keeps each plugin's tool spec small and focused.
+        agent_mcp_filters = conf.get("agent_mcp_filters", {})
+
         # External agents
         for ext_name, ext_agent in conf.get("external_agents", {}).items():
             if not ext_agent.get("mcp_configurable"):
                 continue
             agent_key = ext_name.replace("-", "_")
             env_var = ext_agent.get("mcp_env_var") or (agent_key.upper() + "_MCP_URLS")
-            
+
             selected = agent_mcps.get(agent_key)
             if selected is None:
                 # Default: Specialist can see itself + Root Tools (costaff)
                 selected = ["costaff", ext_name]
-            
-            extra_urls = {k: v for k, v in urls.items() if k in selected}
+
+            extra_urls = {}
+            filters_for_agent = agent_mcp_filters.get(agent_key, {})
+            for k, v in urls.items():
+                if k not in selected:
+                    continue
+                tool_filter = filters_for_agent.get(k)
+                if tool_filter and isinstance(v, dict):
+                    extra_urls[k] = {**v, "tool_filter": tool_filter}
+                elif tool_filter and isinstance(v, str):
+                    # Promote string URL to dict so we can attach the filter
+                    extra_urls[k] = {"url": v, "tool_filter": tool_filter}
+                else:
+                    extra_urls[k] = v
+
             set_key(PATHS["env"], env_var, json.dumps(extra_urls))
-            print(f"[MCP] Wrote {env_var}: {list(extra_urls.keys())}")
+            filter_summary = {k: len(filters_for_agent[k]) for k in filters_for_agent if k in extra_urls}
+            if filter_summary:
+                print(f"[MCP] Wrote {env_var}: {list(extra_urls.keys())} (filters: {filter_summary})")
+            else:
+                print(f"[MCP] Wrote {env_var}: {list(extra_urls.keys())}")
 
         # Important: Allow a small window for disk sync and reload env
         time.sleep(0.5)
