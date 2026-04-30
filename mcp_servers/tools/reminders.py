@@ -10,13 +10,15 @@ from mcp_servers.core import mcp
 
 @mcp.tool()
 async def create_reminder_tool(
-    user_id: str, session_id: str, channel: str, recipient: str,
+    user_id: str, session_id: str, channel: str,
     message: str, run_at: str,
+    recipient: Optional[str] = None,
     app_name: str = "costaff_agent"
 ) -> str:
     """
     Creates a one-time reminder that sends a message to the user at run_at.
     run_at format: ISO 8601 datetime string, e.g. '2026-04-10T09:00:00'
+    recipient: optional internal routing key (hashed_id). If omitted, defaults to user_id.
     For recurring scheduled agent work, use create_regular_work instead.
     """
     db = SessionLocal()
@@ -31,6 +33,10 @@ async def create_reminder_tool(
         except ValueError:
             return f"Error: invalid run_at format. Use ISO 8601, e.g. '2026-04-10T09:00:00'"
 
+        # Fallback: if LLM forgot to set recipient (or set it to a non-hashed string),
+        # use user_id which is always the hashed_id by convention.
+        resolved_recipient = recipient if (recipient and len(recipient) == 16) else user_id
+
         new_r = models.Reminder(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -39,7 +45,7 @@ async def create_reminder_tool(
             message=message,
             run_at=run_dt,
             channel=chan,
-            recipient=recipient,
+            recipient=resolved_recipient,
             status="pending",
             created_at=datetime.utcnow()
         )

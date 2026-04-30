@@ -18,10 +18,16 @@ description: >
 ## Steps
 
 1. Call `get_current_time()` to calculate the correct absolute datetime.
-2. Call `create_reminder_tool(user_id, run_at, message)`:
-   - `run_at`: ISO 8601 string, e.g. `"2026-04-10T09:00:00"`
-   - `message`: The exact message to send at that time
+2. Call `create_reminder_tool` with **all** of these parameters:
+   - `user_id`: the **hashed_id** from the current session (a 16-character hex string, e.g. `c9e4719ba839d6b6`). This is the same identifier you receive in every tool call. **Never** put the user's display name (e.g. `"Simon"`) here.
+   - `session_id`: the current `session_id` (e.g. `tg_12345`).
+   - `channel`: `"telegram"` / `"discord"` / `"line"` — derive from the session_id prefix (`tg_*` → telegram, `dc_*` → discord, `line_*` → line).
+   - `recipient`: **same as `user_id`** (the hashed_id). The notifier will resolve it to the real chat_id via the IdentityMap. **Do NOT** put the user's name here.
+   - `message`: The exact text to send at that time.
+   - `run_at`: ISO 8601 datetime string, e.g. `"2026-04-10T09:00:00"`.
 3. Confirm to the user: "已設定提醒，將於 [時間] 通知您。"
+
+> **Important**: `recipient` is an internal routing key, not a human-readable name. Always pass the same hashed_id you got from `check_identity` / session context.
 
 ---
 

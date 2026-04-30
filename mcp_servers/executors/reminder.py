@@ -30,11 +30,23 @@ async def execute_reminder(reminder_id: str):
         success = False
         try:
             db2 = SessionLocal()
+            # Try recipient first; if it doesn't resolve to a real_id (e.g. LLM
+            # accidentally stored a display name like "Simon"), fall back to user_id.
             target_id = reminder.recipient
             mapping = db2.query(models.IdentityMap).filter(
                 (models.IdentityMap.hashed_id == target_id) |
                 (models.IdentityMap.session_id == target_id)
             ).first()
+            if not mapping and reminder.user_id and reminder.user_id != target_id:
+                logger.warning(
+                    f"Reminder {reminder_id}: recipient '{target_id}' not in IdentityMap, "
+                    f"falling back to user_id '{reminder.user_id}'"
+                )
+                target_id = reminder.user_id
+                mapping = db2.query(models.IdentityMap).filter(
+                    (models.IdentityMap.hashed_id == target_id) |
+                    (models.IdentityMap.session_id == target_id)
+                ).first()
             if mapping:
                 target_id = mapping.real_id
             db2.close()

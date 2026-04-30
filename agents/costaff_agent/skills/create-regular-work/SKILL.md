@@ -19,14 +19,20 @@ description: >
 ## Steps
 
 1. Call `get_current_time()` to confirm current time and timezone.
-2. Call `create_regular_work(user_id, spec, cron, agent_id, channel, recipient)`:
-   - `spec`: Full, self-contained instructions the agent needs to execute autonomously (no user context available at run time)
-   - `cron`: 5-part cron expression (minute hour day month weekday)
-   - `agent_id`: Which agent executes — default `costaff_agent`; use a specialist if the task is domain-specific
-   - `channel` + `recipient`: Where to deliver results
+2. Call `create_regular_work` with these parameters:
+   - `user_id`: the **hashed_id** from the current session (a 16-character hex string, e.g. `c9e4719ba839d6b6`). **Never** the user's display name.
+   - `session_id`: the current `session_id`.
+   - `title`: short human-readable name for the work (e.g. `"每日科技新聞摘要"`).
+   - `spec`: Full, self-contained instructions the agent needs to execute autonomously (no user context available at run time).
+   - `cron`: 5-part cron expression (minute hour day month weekday).
+   - `agent_id` *(optional)*: Which agent executes — default `costaff_agent`; pass a specialist name if the task is domain-specific.
+   - `channel` *(optional)*: `"telegram"` / `"discord"` / `"line"`. If omitted, the system auto-resolves from the user's IdentityMap.
+   - `recipient` *(optional)*: **same as `user_id`** (the hashed_id) when explicitly delivering to the requesting user. If omitted, auto-resolved.
 3. Confirm to the user: "已加入團隊定期排程，將於每 [schedule] 自動執行。"
 
 **Do NOT execute the work immediately** — only confirm the schedule is set.
+
+> **Important**: `recipient` is an internal routing key (a hashed_id), not a human-readable name. Either omit it (let the system auto-resolve) or pass the same hashed_id you got from `check_identity` / session context.
 
 ---
 

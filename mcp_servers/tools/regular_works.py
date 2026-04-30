@@ -24,6 +24,12 @@ async def create_regular_work(
     """
     db = SessionLocal()
     try:
+        # Fallback: if LLM passed a non-hashed string as recipient (e.g. a display
+        # name), normalize to user_id so the IdentityMap lookup succeeds at execution.
+        resolved_recipient = recipient if (recipient and len(recipient) == 16) else (recipient or None)
+        if recipient and len(recipient) != 16:
+            resolved_recipient = user_id
+
         new_w = models.RegularWork(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -33,7 +39,7 @@ async def create_regular_work(
             cron=cron,
             agent_id=agent_id,
             channel=channel,
-            recipient=recipient,
+            recipient=resolved_recipient,
             status="active",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
