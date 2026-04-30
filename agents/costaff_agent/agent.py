@@ -1,22 +1,19 @@
 import os
 import json
 import re
-import sys
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add current directory to sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from google.adk.agents import LlmAgent
 from google.adk.tools import skill_toolset
-from mcp_toolsets import load_all_mcp_toolsets
-from models.litellm_model import litellm_model
-from instruction import instruction_content
-from skills import load_all_skills
+
+from .mcp_toolsets import load_all_mcp_toolsets
+from .models.litellm_model import litellm_model
+from .instruction import instruction_content
+from .skills import load_all_skills
 
 # Load MCP toolsets
 tools = list(load_all_mcp_toolsets())
