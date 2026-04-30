@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from managers.config import ConfigManager
-from managers.docker import DockerManager
+from managers.runtime import get_runtime
 from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
 from utils.helpers import _deploy_local_channel, _write_channel_fragment
 
@@ -136,18 +136,14 @@ def channel_remove(name: str = typer.Argument(...)):
     chan_conf = conf["dynamic_channels"][name]
     fragment_path = chan_conf.get("fragment_path")
     container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
+    runtime = get_runtime()
 
     if fragment_path and os.path.exists(fragment_path):
         console.print(f"Stopping containers for channel [bold]{name}[/bold]...")
-        stop_cmd = DockerManager.get_cmd() + [
-            "-f", main_compose, "-f", fragment_path, "down", "--remove-orphans"
-        ]
-        subprocess.run(stop_cmd, check=False, cwd=_project_root)
+        runtime.down(fragment=fragment_path, remove_orphans=True)
     elif container_names:
         for c in container_names:
-            subprocess.run(["docker", "stop", c], capture_output=True)
-            subprocess.run(["docker", "rm", c], capture_output=True)
+            runtime.force_remove_container(c)
 
     del conf["dynamic_channels"][name]
     ConfigManager.save_config(conf)
@@ -171,7 +167,6 @@ def channel_rebuild(
     fragment_path = chan_conf["fragment_path"]
     container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
     source_path = chan_conf.get("source_path", "(unknown)")
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
 
     if pull and os.path.isdir(os.path.join(source_path, ".git")):
@@ -192,24 +187,22 @@ def channel_rebuild(
         console.print(f"[yellow]Fragment regenerate failed ({e}); using existing fragment.[/yellow]")
 
     console.print(f"Building channel [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
-    build_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"]
-    if no_cache:
-        build_cmd.append("--no-cache")
-    build_cmd.extend(container_names)
-
-    build_result = subprocess.run(build_cmd, cwd=_project_root)
-    if build_result.returncode != 0:
+    runtime = get_runtime()
+    try:
+        runtime.build(container_names, fragment=fragment_path, no_cache=no_cache)
+    except RuntimeError:
         console.print(f"[red]Build failed for channel '{name}'.[/red]")
         raise typer.Exit(1)
 
     console.print(f"Starting rebuilt channel containers for [bold]{name}[/bold]...")
-    up_result = subprocess.run(
-        DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path,
-                                   "up", "-d", "--force-recreate", "--remove-orphans"] + container_names,
-        cwd=_project_root,
-    )
-    if up_result.returncode == 0:
+    try:
+        runtime.up(
+            container_names,
+            fragment=fragment_path,
+            force_recreate=True,
+            remove_orphans=True,
+        )
         console.print(f"[green]Channel '{name}' rebuilt and restarted.[/green]")
-    else:
+    except subprocess.CalledProcessError:
         console.print(f"[red]Failed to start channel '{name}' after build.[/red]")
         raise typer.Exit(1)

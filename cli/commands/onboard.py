@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from managers.config import ConfigManager
-from managers.docker import DockerManager
+from managers.runtime import get_runtime
 from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
 
 console = Console()
@@ -190,7 +190,10 @@ def onboard():
 
     if questionary.confirm("Do you want to build Docker images now?").ask():
         console.print("Building Docker images...")
-        cmd = DockerManager.get_cmd() + ["-f", "docker-compose.yaml", "build"]
-        subprocess.run(cmd, check=True, cwd=costaff_dir)
+        try:
+            get_runtime().build()
+        except RuntimeError as e:
+            console.print(f"[red]Build failed: {e}[/red]")
+            raise typer.Exit(1)
 
     console.print("[bold green]Success! Run 'costaff start' to begin.[/bold green]")

@@ -13,7 +13,8 @@ from rich.console import Console
 from rich.table import Table
 
 from managers.config import ConfigManager
-from managers.docker import DockerManager
+from managers.docker import DockerManager  # still used for run_action restart trigger
+from managers.runtime import get_runtime
 from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
 from utils.helpers import _deploy_local_agent
 
@@ -215,25 +216,17 @@ def agent_restart(name: str = typer.Argument(..., help="Agent name to restart"))
 
     fragment_path = agent_conf["fragment_path"]
     container_names = agent_conf.get("container_names", [f"costaff-{name}"])
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
+    runtime = get_runtime()
 
     console.print(f"Stopping agent [bold]{name}[/bold]...")
-    for svc in container_names:
-        subprocess.run(
-            DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "stop", svc],
-            check=False, cwd=_project_root,
-        )
+    runtime.stop(container_names, fragment=fragment_path)
 
     console.print(f"Starting agent [bold]{name}[/bold]...")
-    result = subprocess.run(
-        DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path,
-                                   "up", "-d", "--force-recreate"] + container_names,
-        check=False, cwd=_project_root,
-    )
-    if result.returncode == 0:
+    try:
+        runtime.up(container_names, fragment=fragment_path, force_recreate=True)
         console.print(f"[green]Agent '{name}' restarted.[/green]")
-    else:
+    except subprocess.CalledProcessError:
         console.print(f"[red]Failed to restart agent '{name}'.[/red]")
         raise typer.Exit(1)
 
@@ -425,32 +418,24 @@ def agent_rebuild(
     fragment_path = agent_conf["fragment_path"]
     container_names = agent_conf.get("container_names", [f"costaff-{name}"])
     source_path = agent_conf.get("source_path", "(unknown)")
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     load_dotenv(PATHS["env"], override=True)
+    runtime = get_runtime()
 
     if pull and os.path.isdir(os.path.join(source_path, ".git")):
         console.print(f"Pulling latest code for [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
         subprocess.run(["git", "pull", "--ff-only"], cwd=source_path)
 
     console.print(f"Building [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
-    build_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"]
-    if no_cache:
-        build_cmd.append("--no-cache")
-    build_cmd.extend(container_names)
-
-    build_result = subprocess.run(build_cmd, cwd=_project_root)
-    if build_result.returncode != 0:
+    try:
+        runtime.build(container_names, fragment=fragment_path, no_cache=no_cache)
+    except RuntimeError:
         console.print(f"[red]Build failed for agent '{name}'.[/red]")
         raise typer.Exit(1)
 
     console.print(f"Starting rebuilt containers for [bold]{name}[/bold]...")
-    up_result = subprocess.run(
-        DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path,
-                                   "up", "-d", "--force-recreate"] + container_names,
-        cwd=_project_root,
-    )
-    if up_result.returncode == 0:
+    try:
+        runtime.up(container_names, fragment=fragment_path, force_recreate=True)
         console.print(f"[green]Agent '{name}' rebuilt and restarted.[/green]")
-    else:
+    except subprocess.CalledProcessError:
         console.print(f"[red]Failed to start agent '{name}' after build.[/red]")
         raise typer.Exit(1)
