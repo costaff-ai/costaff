@@ -12,10 +12,18 @@ for the given user_id.
 import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text as sa_text
+
+
+def _utcnow() -> datetime:
+    """Tz-aware UTC `now`. Tests must use this, not `datetime.now()`, because
+    the production query path computes day boundaries with `datetime.now(tz)`
+    (UTC by default) — naive local-time `now()` would land in tomorrow when
+    re-tagged as UTC and the day filter would miss it."""
+    return datetime.now(timezone.utc)
 
 
 def _create_adk_tables(engine):
@@ -47,6 +55,11 @@ def _add_session(db, session_id: str, user_id: str):
 
 
 def _add_event(db, session_id: str, author: str, text: str, when: datetime):
+    """Store events with tz-aware UTC timestamps. Caller should pass values
+    from `_utcnow()` (or arithmetic on it); raw `datetime.now()` is naive
+    local time and would land in the wrong UTC day when slammed with UTC tz."""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
     ed = {"author": author, "content": {"role": author, "parts": [{"text": text}]}}
     db.execute(sa_text(
         "INSERT INTO events (id, session_id, event_data, \"timestamp\") "
@@ -74,14 +87,14 @@ def events_module(db_session, monkeypatch):
 
 def test_returns_no_events_message_when_user_has_none(events_module, db_session):
     out = asyncio.run(events_module.read_today_events("user-with-no-data"))
-    assert "No events found for today" in out
+    assert "No events found" in out
 
 
 def test_returns_today_events_for_correct_user(events_module, db_session):
     """The fix: link via sessions.user_id, not substring match in event_data."""
     _add_session(db_session, "sess-1", "alice")
-    _add_event(db_session, "sess-1", "user", "Hello agent", datetime.now())
-    _add_event(db_session, "sess-1", "costaff_agent", "Hi Alice!", datetime.now())
+    _add_event(db_session, "sess-1", "user", "Hello agent", _utcnow())
+    _add_event(db_session, "sess-1", "costaff_agent", "Hi Alice!", _utcnow())
 
     out = asyncio.run(events_module.read_today_events("alice"))
 
@@ -94,8 +107,8 @@ def test_returns_today_events_for_correct_user(events_module, db_session):
 def test_excludes_other_users_events(events_module, db_session):
     _add_session(db_session, "sess-alice", "alice")
     _add_session(db_session, "sess-bob", "bob")
-    _add_event(db_session, "sess-alice", "user", "alice's message", datetime.now())
-    _add_event(db_session, "sess-bob", "user", "bob's secret", datetime.now())
+    _add_event(db_session, "sess-alice", "user", "alice's message", _utcnow())
+    _add_event(db_session, "sess-bob", "user", "bob's secret", _utcnow())
 
     out = asyncio.run(events_module.read_today_events("alice"))
 
@@ -107,8 +120,8 @@ def test_excludes_yesterdays_events(events_module, db_session):
     """The other half of the fix: a date filter so we don't pull all-time
     events. Otherwise diaries would summarize the agent's entire history."""
     _add_session(db_session, "sess-1", "alice")
-    yesterday = datetime.now() - timedelta(days=2)  # safely in the past
-    today_msg = datetime.now()
+    yesterday = _utcnow() - timedelta(days=2)  # safely in the past
+    today_msg = _utcnow()
     _add_event(db_session, "sess-1", "user", "old message", yesterday)
     _add_event(db_session, "sess-1", "user", "today message", today_msg)
 
@@ -118,6 +131,26 @@ def test_excludes_yesterdays_events(events_module, db_session):
     assert "old message" not in out
 
 
+def test_date_str_param_targets_a_specific_past_day(events_module, db_session):
+    """Backfill use case: pass an explicit YYYY-MM-DD to fetch events for
+    that single day only — yesterday's events come through, today's don't."""
+    _add_session(db_session, "sess-1", "alice")
+    yday = _utcnow() - timedelta(days=1)
+    yday_str = yday.strftime("%Y-%m-%d")
+    _add_event(db_session, "sess-1", "user", "yesterday's message", yday)
+    _add_event(db_session, "sess-1", "user", "today's message", _utcnow())
+
+    out = asyncio.run(events_module.read_today_events("alice", date_str=yday_str))
+
+    assert "yesterday's message" in out
+    assert "today's message" not in out
+
+
+def test_date_str_invalid_format_returns_helpful_error(events_module, db_session):
+    out = asyncio.run(events_module.read_today_events("alice", date_str="not-a-date"))
+    assert "Invalid date_str" in out
+
+
 def test_event_data_substring_does_not_falsely_match(events_module, db_session):
     """Reject the original buggy behaviour: even if user_id appears as a
     substring inside some other user's event_data JSON, we must NOT return it.
@@ -125,9 +158,9 @@ def test_event_data_substring_does_not_falsely_match(events_module, db_session):
     _add_session(db_session, "sess-bob", "bob")
     # Bob's event mentions "alice" in text — old code would have leaked it
     _add_event(db_session, "sess-bob", "user",
-               "I am bob talking about alice", datetime.now())
+               "I am bob talking about alice", _utcnow())
 
     out = asyncio.run(events_module.read_today_events("alice"))
 
     assert "I am bob" not in out
-    assert "No events found" in out
+    assert "No events found" in out  # alice has no session today
