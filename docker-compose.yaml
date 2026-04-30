@@ -17,8 +17,8 @@ services:
 
   costaff-agent-costaff:
     build:
-      context: .
-      dockerfile: agents/costaff_agent/Dockerfile
+      context: agents
+      dockerfile: Dockerfile
     container_name: costaff-agent-costaff
     restart: on-failure
     ports:
