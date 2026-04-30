@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from google.adk.agents import LlmAgent
 from google.adk.tools import skill_toolset
 from mcp_toolsets import load_all_mcp_toolsets
-from models.litellm_model.litellm_model_config import litellm_model
+from models.litellm_model import litellm_model
 from instruction import instruction_content
 from skills import load_all_skills
 
