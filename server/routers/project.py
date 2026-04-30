@@ -1,18 +1,27 @@
+"""Project Management endpoints — Epic / Story / ProjectTask hierarchy.
+
+The dashboard's "Projects" view manages a 3-level hierarchy:
+  Epic    — top-level project / long-term goal
+  Story   — milestone or feature within an Epic (1 epic : many stories)
+  Task    — atomic unit of work; lives directly under an Epic OR under a
+            Story (1 story : many tasks). Tasks are what agents execute.
+
+Cascade delete is implemented manually via raw SQL because the schema
+predates SQLAlchemy `ON DELETE CASCADE` configuration.
+"""
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
 from services.auth import AuthManager
 from services.database import DatabaseManager
 from server.schemas import (
-    EpicCreateRequest,
-    EpicUpdateRequest,
+    EpicCreateRequest, EpicUpdateRequest,
     StoryCreateRequest,
-    ProjectTaskCreateRequest,
-    ProjectTaskUpdateRequest,
+    ProjectTaskCreateRequest, ProjectTaskUpdateRequest,
 )
 from utils.helpers import _serialize_row
 
@@ -20,7 +29,7 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# Projects API — Epics / Stories / ProjectTasks
+# Epics
 # ---------------------------------------------------------------------------
 
 @router.get("/api/epics")
@@ -110,6 +119,10 @@ def delete_epic_api(epic_id: str, auth: bool = Depends(AuthManager.verify_token)
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ---------------------------------------------------------------------------
+# Stories (nested under Epics)
+# ---------------------------------------------------------------------------
+
 @router.get("/api/epics/{epic_id}/stories")
 def get_stories_api(epic_id: str, auth: bool = Depends(AuthManager.verify_token)):
     engine = DatabaseManager.get_engine()
@@ -171,6 +184,10 @@ def delete_story_api(epic_id: str, story_id: str, auth: bool = Depends(AuthManag
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ---------------------------------------------------------------------------
+# Project Tasks (atomic unit; lives under Epic, optionally under Story)
+# ---------------------------------------------------------------------------
 
 @router.get("/api/project-tasks")
 def list_project_tasks(epic_id: Optional[str] = None, auth: bool = Depends(AuthManager.verify_token)):

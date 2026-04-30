@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from utils.helpers import PATHS
-from server.routers import auth, system, config, tasks, agents, diary, identity, chat_inspect, integrations, proxies, regular_works
+from server.routers import auth, system, config, agents, diary, identity, chat_inspect, integrations, proxies, regular_works, project
 
 
 def _setup_logging() -> None:
@@ -50,8 +50,8 @@ server.mount("/views", StaticFiles(directory=os.path.join(PATHS["frontend"], "vi
 server.include_router(auth.router)
 server.include_router(system.router)
 server.include_router(config.router)
-server.include_router(tasks.router)
 server.include_router(agents.router)
+server.include_router(project.router)
 server.include_router(diary.router)
 server.include_router(identity.router)
 server.include_router(chat_inspect.router)
