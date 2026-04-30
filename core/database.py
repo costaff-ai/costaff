@@ -24,12 +24,15 @@ if "+aiosqlite" in uri:
 
 SQLALCHEMY_DATABASE_URL = uri
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
-    pool_pre_ping=True,
-)
+# Pool sizing args are PostgreSQL-only; SQLite uses SingletonThreadPool
+# and rejects them. Skip the kwargs for SQLite so unit tests can use
+# `sqlite:///:memory:` without a TypeError on engine creation.
+_engine_kwargs = {"pool_pre_ping": True}
+if not uri.startswith("sqlite"):
+    _engine_kwargs["pool_size"] = int(os.getenv("DB_POOL_SIZE", "10"))
+    _engine_kwargs["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
