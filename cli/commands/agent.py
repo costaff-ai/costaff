@@ -7,17 +7,14 @@ their functions with `@agent_app.command(...)`. We import them at the
 bottom of this file so their decorators run when `costaff` boots.
 """
 import os
-import subprocess
 from typing import Optional
 
-import httpx
+import questionary
 import typer
-from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
 from services.config import ConfigManager
-from services.runtime import get_runtime
 from utils.helpers import PATHS
 
 console = Console()
@@ -25,66 +22,11 @@ console = Console()
 agent_app = typer.Typer(help="Manage external agents.")
 
 
-# Lifecycle commands (add / remove / enable / disable) live in
-# .agent_lifecycle and register against agent_app at import time.
-from . import agent_lifecycle  # noqa: E402,F401  (imported for side effects)
-
-
-@agent_app.command("list")
-def agent_list():
-    """List all external agents with health status."""
-    conf = ConfigManager.get_config()
-    agents = conf.get("external_agents", {})
-    if not agents:
-        console.print("[yellow]No external agents configured.[/yellow]")
-        return
-    table = Table(title="External Agents")
-    table.add_column("Name", style="cyan")
-    table.add_column("Type", style="blue")
-    table.add_column("A2A URL")
-    table.add_column("Health", justify="center")
-    table.add_column("Enabled", justify="center")
-    table.add_column("Description")
-    for name, agent in agents.items():
-        health = "—"
-        if agent.get("a2a_url") and agent.get("enabled"):
-            try:
-                r = httpx.get(f"{agent['a2a_url']}/.well-known/agent-card.json", timeout=3.0)
-                health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
-            except Exception:
-                health = "[red]●[/red]"
-        table.add_row(name, agent.get("type", "url"), agent.get("a2a_url", ""), health,
-                      "✓" if agent.get("enabled") else "✗", (agent.get("description", "") or "")[:50])
-    console.print(table)
-
-
-@agent_app.command("restart")
-def agent_restart(name: str = typer.Argument(..., help="Agent name to restart")):
-    """Restart a local agent's containers without rebuilding."""
-    conf = ConfigManager.get_config()
-    if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
-        raise typer.Exit(1)
-    agent_conf = conf["external_agents"][name]
-    if agent_conf.get("type") != "github" or not agent_conf.get("fragment_path"):
-        console.print(f"[red]Error: Agent '{name}' is not a local agent (no compose fragment).[/red]")
-        raise typer.Exit(1)
-
-    fragment_path = agent_conf["fragment_path"]
-    container_names = agent_conf.get("container_names", [f"costaff-{name}"])
-    load_dotenv(PATHS["env"], override=True)
-    runtime = get_runtime()
-
-    console.print(f"Stopping agent [bold]{name}[/bold]...")
-    runtime.stop(container_names, fragment=fragment_path)
-
-    console.print(f"Starting agent [bold]{name}[/bold]...")
-    try:
-        runtime.up(container_names, fragment=fragment_path, force_recreate=True)
-        console.print(f"[green]Agent '{name}' restarted.[/green]")
-    except subprocess.CalledProcessError:
-        console.print(f"[red]Failed to restart agent '{name}'.[/red]")
-        raise typer.Exit(1)
+# Subcommand modules — each imports `agent_app` from this module and
+# registers its own commands via @agent_app.command(...). Imported for
+# their decorator side effects.
+from . import agent_lifecycle  # noqa: E402,F401  add / remove / enable / disable
+from . import agent_container  # noqa: E402,F401  list / restart / rebuild
 
 
 DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
