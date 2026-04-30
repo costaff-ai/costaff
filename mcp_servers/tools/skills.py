@@ -2,7 +2,7 @@ import json
 
 from core import models
 from core.database import SessionLocal
-from mcp_servers.core import mcp
+from mcp_servers.setup import mcp
 
 
 def _get_accessible_skill_configs(db, user_id: str, agent_id: str = "__all__"):

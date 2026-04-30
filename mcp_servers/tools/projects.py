@@ -7,7 +7,7 @@ from typing import Optional
 
 from core import models
 from core.database import SessionLocal
-from mcp_servers.core import mcp
+from mcp_servers.setup import mcp
 from mcp_servers.executors.project_task import execute_project_task
 
 logger = logging.getLogger("costaff-agent-engine")

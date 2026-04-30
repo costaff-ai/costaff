@@ -4,7 +4,7 @@ from typing import Optional
 from core import models
 from core.database import SessionLocal
 from core.license import LicenseManager
-from mcp_servers.core import mcp, tz
+from mcp_servers.setup import mcp, tz
 from mcp_servers.background import _ensure_default_regular_works
 from datetime import datetime
 

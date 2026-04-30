@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from core import models
 from core.database import SessionLocal
-from mcp_servers.core import logger, scheduler, scheduled_job_ids, tz
+from mcp_servers.setup import logger, scheduler, scheduled_job_ids, tz
 from mcp_servers.executors.reminder import execute_reminder
 from mcp_servers.executors.regular_work import execute_regular_work
 from mcp_servers.executors.project_task import execute_project_task

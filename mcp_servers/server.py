@@ -6,7 +6,7 @@ _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
     sys.path.insert(0, _root)
 
-from mcp_servers.core import mcp, scheduler, scheduled_job_ids, logger, tz
+from mcp_servers.setup import mcp, scheduler, scheduled_job_ids, logger, tz
 from core.database import SessionLocal, init_db
 from core import models
 from core.license import LicenseManager

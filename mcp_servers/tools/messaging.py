@@ -9,7 +9,7 @@ from core.database import SessionLocal
 from core.notifiers.telegram import send_telegram_notification, send_telegram_document
 from core.notifiers.line_notifier import send_line_notification
 from core.notifiers.discord import send_discord_notification
-from mcp_servers.core import mcp, tz
+from mcp_servers.setup import mcp, tz
 
 _FILE_EXTS = r"pdf|docx|md|txt|html|htm|png|jpg|jpeg|gif|csv|json|xlsx|xls|zip"
 _ABS_PATH_RE = re.compile(r"(/app/data/[\w./-]+\.(?:" + _FILE_EXTS + r"))", re.IGNORECASE)

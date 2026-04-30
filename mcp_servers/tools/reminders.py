@@ -5,7 +5,7 @@ from typing import Optional
 
 from core import models
 from core.database import SessionLocal
-from mcp_servers.core import mcp
+from mcp_servers.setup import mcp
 
 
 @mcp.tool()

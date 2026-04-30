@@ -7,7 +7,7 @@ from core import models
 from core.database import SessionLocal
 from core.adk_client import run_adk_prompt
 from core.license import LicenseManager
-from mcp_servers.core import logger
+from mcp_servers.setup import logger
 from mcp_servers.utils import _send_notification
 
 

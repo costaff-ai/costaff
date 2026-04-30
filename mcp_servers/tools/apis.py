@@ -5,7 +5,7 @@ import httpx
 
 from core import models
 from core.database import SessionLocal
-from mcp_servers.core import mcp
+from mcp_servers.setup import mcp
 from mcp_servers.utils import _decrypt_headers, _is_safe_url
 
 

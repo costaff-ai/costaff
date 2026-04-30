@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from mcp_servers.core import mcp
+from mcp_servers.setup import mcp
 
 _DATA_ROOT = Path(os.getenv("WORKSPACE_DIR", "/app/data"))
 

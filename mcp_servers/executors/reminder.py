@@ -4,7 +4,7 @@ from core.notifiers.telegram import send_telegram_notification
 from core.notifiers.line_notifier import send_line_notification
 from core.notifiers.discord import send_discord_notification
 from core.notifiers.email_notifier import send_email_notification
-from mcp_servers.core import logger
+from mcp_servers.setup import logger
 
 
 async def execute_reminder(reminder_id: str):
