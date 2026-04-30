@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Place agent under /app/agents/ so ADK web scans only that directory,
+# avoiding collisions with /app/data/ (bind-mounted at runtime).
+COPY costaff_agent /app/agents/costaff_agent
+
+WORKDIR /app/agents
 
 EXPOSE 8080
 
