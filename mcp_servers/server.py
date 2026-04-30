@@ -12,7 +12,7 @@ from core import models
 from core.license import LicenseManager
 
 # Import all tool modules to register @mcp.tool() decorators
-from mcp_servers.tools import user, messaging, reminders, regular_works, projects, diary, events, apis, skills, workspace
+from mcp_servers.tools import user, messaging, reminders, regular_works, epics, stories, project_tasks, task_comments, diary, events, apis, skills, workspace
 
 # Import background task functions
 from mcp_servers.background import sync_database_tasks, poll_queued_tasks, _ensure_default_regular_works
