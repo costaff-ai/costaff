@@ -143,7 +143,7 @@ class RegularWorkLog(Base):
 class Epic(Base):
     """
     Top-level project container. Represents a long-term goal or initiative.
-    Examples: '記帳系統', 'costaff 開發', '健康追蹤'
+    Examples: 'Expense tracker', 'costaff development', 'Health monitor'
     """
     __tablename__ = "epics"
 

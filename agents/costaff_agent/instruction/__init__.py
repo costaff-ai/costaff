@@ -1,9 +1,9 @@
-"""自動讀取本資料夾下的 system.md 作為 agent 系統提示詞。
+"""Auto-load `system.md` from this folder as the agent's system prompt.
 
-使用方式：
+Usage:
     from instruction import instruction_content
 
-若 system.md 不存在則回傳預設訊息。
+Falls back to a generic placeholder if `system.md` is missing.
 """
 from pathlib import Path
 
@@ -12,4 +12,4 @@ _SYSTEM_PATH = Path(__file__).parent / "system.md"
 if _SYSTEM_PATH.exists():
     instruction_content = _SYSTEM_PATH.read_text(encoding="utf-8")
 else:
-    instruction_content = "你是一個專業的 AI 助手。"
+    instruction_content = "You are a professional AI assistant."

@@ -27,7 +27,7 @@ def _require_approved(user_id: str, db) -> "str | None":
 async def create_epic(user_id: str, title: str, description: Optional[str] = None) -> str:
     """
     Creates a new Epic (top-level project).
-    Examples: '記帳系統', 'costaff 開發', '健康管理計畫'
+    Examples: 'Expense tracker', 'costaff development', 'Health management plan'
     """
     db = SessionLocal()
     try:

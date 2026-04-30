@@ -1,17 +1,17 @@
-"""MCP toolset 載入器：從環境變數讀取設定並建立 McpToolset 清單。
+"""MCP toolset loader: read configuration from environment and build a list of McpToolset.
 
-使用方式：
+Usage:
     from mcp_toolsets import load_all_mcp_toolsets
-    toolsets = load_all_mcp_toolsets()  # 取得 McpToolset 清單
+    toolsets = load_all_mcp_toolsets()  # returns a list of McpToolset
 
-讀取環境變數順序：COSTAFF_AGENT_MCP_URLS → MCP_SERVER_URLS。
-支援格式：
-    1. JSON 物件：{"name": {"url": "...", "headers": {...}, "transport": "sse|streamable", "enabled": true}}
-    2. JSON 字串：{"name": "url", ...}
-    3. Comma-separated URL 字串："url1,url2,url3"
+Environment variable lookup order: COSTAFF_AGENT_MCP_URLS → MCP_SERVER_URLS.
+Supported formats:
+    1. JSON object: {"name": {"url": "...", "headers": {...}, "transport": "sse|streamable", "enabled": true}}
+    2. JSON string-mapped: {"name": "url", ...}
+    3. Comma-separated URL string: "url1,url2,url3"
 
-注意：本資料夾命名為 mcp_toolsets/ 而非 mcp/，避免與 site-packages 中的
-google-adk MCP SDK 套件 (mcp) 命名衝突。
+Note: this folder is named mcp_toolsets/ (not mcp/) to avoid collision with
+the google-adk MCP SDK package (mcp), which lives in site-packages.
 """
 import json
 import logging
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_connection_params(entry):
-    """根據 entry 內的 url / headers / transport 設定回傳對應的 ADK ServerParams。"""
+    """Return ADK ServerParams based on the entry's url / headers / transport fields."""
     if isinstance(entry, str):
         url, headers, transport = entry, None, None
     else:
@@ -47,13 +47,13 @@ def _get_connection_params(entry):
 
 
 def load_all_mcp_toolsets() -> List[McpToolset]:
-    """讀取環境變數中的 MCP 設定並建立 McpToolset 清單。
+    """Read MCP configuration from environment and build a list of McpToolset.
 
     Returns:
-        List[McpToolset]: 已成功註冊的 MCP toolset 清單，可直接放入 Agent(tools=[...])。
+        List[McpToolset]: registered MCP toolsets, ready to drop into Agent(tools=[...]).
 
     Raises:
-        EnvironmentError: 當 COSTAFF_AGENT_MCP_URLS 與 MCP_SERVER_URLS 都未設定時。
+        EnvironmentError: when neither COSTAFF_AGENT_MCP_URLS nor MCP_SERVER_URLS is set.
     """
     raw = os.getenv("COSTAFF_AGENT_MCP_URLS") or os.getenv("MCP_SERVER_URLS", "")
     if not raw:
