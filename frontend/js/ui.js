@@ -507,23 +507,29 @@ const UI = {
             </tr>`;
         }).join('');
             
+        // Restrict every metric to CoStaff-managed containers. The
+        // backend `/api/status` is permissive (returns anything matching
+        // costaff/mcp/bot/postgres/gpt-vis), so unrelated containers from
+        // other projects (ai-rap-*, gpt-vis, the host postgres) would
+        // otherwise inflate the counts here.
+        const costaff = svcs.filter(s => s.name.toLowerCase().startsWith('costaff-'));
         const statsGrid = document.getElementById('stats-grid');
         if (statsGrid) statsGrid.innerHTML = `
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">TOTAL SERVICES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${svcs.length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">HEALTHY NODES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${svcs.filter(s=>s.status.includes('Up')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.status.includes('Up')).length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">GATEWAYS</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${svcs.filter(s=>s.name.includes('bot')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.name.startsWith('costaff-channel-')).length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">MCP CORES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${svcs.filter(s=>s.name.includes('mcp')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.name.startsWith('costaff-mcp-')).length}</div>
             </div>`;
     },
 
