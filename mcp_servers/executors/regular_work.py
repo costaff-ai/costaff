@@ -57,7 +57,12 @@ async def _run_for_user(regular_work_id: str, work, user_id: str):
 
         app_name = os.getenv("ADK_APP_NAME", "costaff_agent")
         session_id = f"rwork_{regular_work_id}_{user_id[:8]}"
-        spec = work.spec
+        spec = (
+            f"(System Context: Your ADK session user_id is '{user_id}'. "
+            "Use this EXACT value whenever a tool requires a user_id parameter — "
+            "do not invent placeholder values like 'abcdef1234567890'.)\n\n"
+            + work.spec
+        )
         if channel and recipient:
             spec += f"\n\n(System Note: This is a scheduled regular work. Deliver your output to the user via {channel}. Do NOT call send_message_now for this recipient.)"
 
