@@ -9,67 +9,321 @@
 
 [繁體中文](./README_zhtw.md) | **English**
 
-**CoStaff** is a self-hosted, privacy-first AI agent platform built on **Google ADK (Agent Development Kit)** and **Model Context Protocol (MCP)**. It connects your preferred chat platforms — **Telegram, Discord, and Line** — while exposing a full-featured web dashboard for operators to manage agents, tools, users, and sessions.
+**CoStaff is a self-hosted AI assistant platform you run on your own machine.**
+Talk to your assistant from Telegram, Discord, LINE, or a built-in web chat;
+manage everything from a browser-based dashboard. No cloud account, no
+data leaves your hardware.
 
-External agents (such as [`costaff-agent-coding`](https://github.com/costaff-ai/costaff-agent-coding) and [`costaff-agent-business-analysis`](https://github.com/costaff-ai/costaff-agent-business-analysis)) integrate via the **A2A protocol**, extending the platform's capabilities without modifying the core.
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Web Dashboard](#web-dashboard)
-- [External Agents](#external-agents)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [CLI Reference](#cli-reference)
-- [Bot Commands](#bot-commands)
-- [License](#license)
+> **Note:** CoStaff is shipped as **self-hosted software** (Path A in our
+> [deployment strategy](docs/DEPLOYMENT_STRATEGY.md)). You install it on
+> your laptop, on a home server, or on a VPS you own — we don't host
+> anything for you.
 
 ---
 
-## Features
+## Who is this for
 
-- **Multi-Agent Orchestration** — The primary CoStaff Agent delegates tasks to external agents via A2A protocol; add any `costaff.agent.json`-compatible agent with a single CLI command
-- **Per-Agent Tool Assignment** — Assign which MCPs, APIs, and Skills each agent can access; changes apply with a targeted restart, no full redeploy needed
-- **Dynamic MCP Layer** — Core MCPs are always present; add external MCPs (streamable HTTP or SSE) from the dashboard at runtime
-- **API & Skill Registry** — Register external REST APIs and reusable prompt templates in the database, assigned per-agent and per-user
-- **Multi-Channel Support** — Telegram, Discord, and Line bots out of the box
-- **Multi-Model Support** — Google Gemini natively, or any LiteLLM-compatible provider
-- **Secure Identity Hashing** — Platform IDs are mapped to 16-character SHA-256 hashes; real IDs never stored
-- **Identity Approval Workflow** — New users held pending until operator approves from the dashboard
-- **User Profile Memory** — Agent remembers name, role, company, contact info, and preferences across sessions
-- **Proactive Reminders** — Schedule cron-based notifications delivered to any connected chat platform
-- **Kanban Task Automation** — Recurring agent tasks (web search, DB queries, report generation) that push results back to users
-- **Web Dashboard** — Dark/light mode operator console for full lifecycle management
+- **Operators** who want a personal AI assistant that lives on their own
+  hardware and chats from the apps they already use.
+- **Small teams** who want a single AI assistant their whole team can
+  reach via a shared chat platform.
+- **Builders** who want to add their own agents (coding, BA, anything
+  speaking the A2A protocol) and tools (any MCP server) to the same chat.
+
+If you want a SaaS that someone else hosts for you, CoStaff is not for
+you yet — see the [deployment strategy](docs/DEPLOYMENT_STRATEGY.md) for
+when that might change.
+
+---
+
+## What you can do once it's running
+
+- **Chat from your existing apps.** Telegram, Discord, LINE, plus a
+  built-in web chat for when you don't want to set up a bot.
+- **Schedule reminders in plain language.** "Remind me to drink water at
+  3 PM every day" — the assistant pushes a notification at the right time
+  to whichever channel you connected.
+- **Run recurring tasks.** "Search for the latest AI news every morning
+  at 9 AM and send me a summary" — picks up the result, formats it,
+  delivers to chat.
+- **Hand work to specialist agents.** Coding tasks → the coding agent
+  runs Python in a sandbox. BI questions → the business-analysis agent
+  builds an HTML report with charts.
+- **Manage everything from a browser.** Approve users, attach API keys,
+  inspect chat history, watch live container logs.
+
+---
+
+## Prerequisites
+
+| | Minimum | Notes |
+|---|---|---|
+| OS | macOS 12+ **or** Ubuntu 20.04 / 22.04 / 24.04 | Apple Silicon and Intel both work |
+| RAM | 4 GB | 8 GB recommended for comfortable use |
+| Disk | 5 GB free | Plus space for your data |
+| Network | Outbound HTTPS | To download dependencies + reach AI provider |
+| AI provider | A **Gemini API key** | Free tier from [Google AI Studio](https://aistudio.google.com/) is enough to get started; any LiteLLM-compatible provider also works |
+
+> Docker and Python are installed automatically by the installer if not
+> already present.
+
+---
+
+## Install
+
+One command, on macOS or Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/costaff-ai/costaff/main/install.sh | bash
+```
+
+The installer:
+1. Detects your OS and installs missing dependencies (Homebrew /
+   Xcode CLT on macOS; deadsnakes Python on Ubuntu; Docker; git; curl).
+2. Clones the CoStaff repo to `~/.costaff/costaff`.
+3. Creates an isolated Python virtualenv at `~/.costaff/.venv`.
+4. Installs the `costaff` CLI into that venv and adds it to your `PATH`.
+5. Launches the **setup wizard** — asks for your AI provider key, admin
+   credentials, and which channels (if any) you want to set up.
+
+If the installer prints **"manual steps"** at the end (e.g. "log out and
+log back in for Docker group membership"), follow them, then run
+`costaff onboard` yourself.
+
+---
+
+## First run
+
+After the installer finishes:
+
+```bash
+# Start everything (Postgres → external agents → core → channels)
+costaff start
+
+# Open the operator dashboard
+costaff dashboard
+```
+
+The dashboard opens at **http://localhost:8501**. Click **Chat** and
+start talking to the assistant — no bot tokens needed.
+
+To add a Telegram / Discord / LINE bot later, go to **Dashboard →
+Channels**, paste the token, and apply. The core platform doesn't need
+to restart.
+
+---
+
+## Where things live
+
+CoStaff puts everything under a single directory: `~/.costaff/`. You
+own this directory; nothing else on your machine is touched.
+
+```
+~/.costaff/
+├── .venv/                    # Isolated Python environment for the CLI
+├── costaff/                  # Source + config
+│   ├── .env                  # Your secrets (gitignored, never overwritten)
+│   ├── config.json           # System config (gitignored, never overwritten)
+│   ├── docker-compose.yaml   # Core stack definition
+│   └── ...
+├── costaff-agent/<name>/     # Each external agent plugin
+│   ├── .env                  # That agent's secrets
+│   ├── src/                  # Agent source (git clone)
+│   └── compose-fragment.yaml
+├── costaff-channel/<name>/   # Each channel plugin (telegram, discord, ...)
+│   ├── .env                  # That channel's bot token
+│   ├── src/                  # Channel source (git clone)
+│   └── compose-fragment.yaml
+└── workspace/                # Shared agent data (mounted into containers)
+    └── shared/               # Files agents read/write for the user
+```
+
+### Secrets
+
+| File | What's in it |
+|---|---|
+| `~/.costaff/costaff/.env` | Gemini API key, admin password hash, MCP secret, identity hash salt, database URI |
+| `~/.costaff/costaff-channel/telegram/.env` | `TELEGRAM_BOT_TOKEN` |
+| `~/.costaff/costaff-channel/discord/.env` | `DISCORD_BOT_TOKEN` |
+| `~/.costaff/costaff-channel/line/.env` | `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET` |
+| `~/.costaff/costaff-agent/<name>/.env` | Per-agent credentials |
+
+These files are **never** modified by `costaff update` or any git
+operation. Back them up like you'd back up SSH keys.
+
+### Data
+
+| Path | Contains |
+|---|---|
+| Postgres volume `costaff_postgres_data` | Identity table, sessions, chat history, reminders, recurring tasks |
+| `~/.costaff/workspace/shared/` | Files agents produced for you (CSVs, PDFs, reports) |
+| `~/.costaff/workspace/agent-<name>/` | Per-agent scratch space |
+
+To back up everything: stop CoStaff, then archive `~/.costaff/` together
+with the Postgres volume — see **`costaff database backup`**.
+
+---
+
+## Day-to-day commands
+
+| Command | What it does |
+|---|---|
+| `costaff start` | Start every CoStaff service, in the right order |
+| `costaff start --no-build` | Same, but skip rebuilding Docker images |
+| `costaff stop` | Stop everything cleanly |
+| `costaff restart` | Stop + start |
+| `costaff status` | Show which containers are running |
+| `costaff logs <service>` | Tail logs for one service (or all if omitted) |
+| `costaff dashboard` | Launch the web dashboard |
+| `costaff chat` | Talk to the assistant in your terminal |
+| `costaff invoke <message>` | Send one message and exit (handy for scripts) |
+| `costaff doctor` | Diagnose common issues; writes a timestamped report |
+| `costaff update` | Pull the latest CoStaff release from GitHub |
+
+### Managing agents
+
+```bash
+costaff agent list                                  # Show registered agents
+costaff agent add <name> --github <repo URL>        # Clone + deploy a GitHub agent
+costaff agent add <name> --local <path>             # Deploy a local agent project
+costaff agent add <name> --url <a2a URL>            # Register a remote A2A endpoint
+costaff agent restart <name>                        # Restart an agent's containers
+costaff agent rebuild <name>                        # Rebuild + restart (after code changes)
+costaff agent remove <name>                         # Remove an agent
+costaff agent model                                 # Inspect/set the per-agent model
+```
+
+### Managing channels
+
+```bash
+costaff channel list             # Show registered channels with health
+costaff channel add <name>       # Add a channel (interactive, official channels auto-resolved)
+costaff channel rebuild <name>   # Rebuild + restart a channel
+costaff channel remove <name>    # Remove a channel
+```
+
+### Other
+
+```bash
+costaff config validate          # Validate config.json against the schema
+costaff database backup          # Dump the Postgres database to a file
+costaff license                  # Manage your CoStaff license
+```
+
+---
+
+## Update
+
+```bash
+costaff update
+```
+
+Pulls the latest release from GitHub and reinstalls the CLI. Your
+`.env`, `config.json`, and database are untouched.
+
+If you want to update by version (or roll back), pin the release tag:
+
+```bash
+cd ~/.costaff/costaff
+git fetch --tags
+git checkout v0.2.0           # or any tagged release
+pip install -e .
+```
+
+---
+
+## Remove
+
+```bash
+# Stop everything
+costaff stop
+
+# Remove containers, images, and the docker network
+docker compose -f ~/.costaff/costaff/docker-compose.yaml down --rmi local --volumes
+
+# (Optional) wipe the Postgres data volume
+docker volume rm costaff_postgres_data
+
+# (Optional) delete the install directory and your data
+rm -rf ~/.costaff
+```
+
+You're back to the state you were in before installing.
+
+---
+
+## Troubleshooting
+
+### `costaff: command not found` after install
+
+Reload your shell so the new PATH entry takes effect:
+
+```bash
+source ~/.zshrc      # macOS default
+source ~/.bashrc     # Ubuntu default
+```
+
+### "Cannot connect to Docker daemon"
+
+- **macOS**: Open Docker Desktop from Launchpad and wait for the whale
+  icon in the menu bar.
+- **Ubuntu**: Log out and back in (the installer added you to the
+  `docker` group), or `newgrp docker` in a new terminal.
+
+### "Port already in use" on start
+
+The dashboard uses `8501`, the core agent `18080`, Postgres `5432`,
+the webchat `18091`. Stop whatever else is bound to those ports, or
+edit `~/.costaff/costaff/docker-compose.yaml`.
+
+### Bot doesn't reply
+
+```bash
+costaff status                                  # Are all containers up?
+costaff logs costaff-channel-telegram           # Recent errors?
+costaff doctor                                  # Full diagnostic report
+```
+
+### Reset everything to a clean state
+
+```bash
+costaff stop
+docker compose -f ~/.costaff/costaff/docker-compose.yaml down --volumes
+costaff start
+```
+
+You'll lose chat history and the identity table. Bot tokens and API
+keys (in `.env` files) survive.
 
 ---
 
 ## Architecture
 
-CoStaff uses a **plugin-style architecture**. The core platform (agent + MCP + dashboard) runs as a standalone Docker stack. Channels and external agents each live in their own Docker projects and connect to the core via the shared `costaff_default` network.
+CoStaff is a **plugin platform**. The core (agent + MCP + dashboard)
+runs as one Docker stack. Each channel and each external agent runs as
+its own Docker project and connects via the shared `costaff_default`
+network.
 
 ```mermaid
 graph TD
-    subgraph Channels ["Channel Plugins (separate Docker projects)"]
+    subgraph Channels ["Channel plugins (separate Docker projects)"]
         CH_TG[costaff-channel-telegram]
         CH_DC[costaff-channel-discord]
         CH_LN[costaff-channel-line]
         CH_WEB[costaff-channel-webchat]
     end
 
-    subgraph Core ["CoStaff Core (.costaff/)"]
-        CoStaffAgent[CoStaff Agent\nGoogle ADK]
-        MCP_Core[Core MCP\nAPScheduler + Notifier]
+    subgraph Core ["CoStaff core (~/.costaff)"]
+        CoStaffAgent[costaff-agent-costaff<br/>Google ADK manager]
+        MCP_Core[costaff-mcp-costaff<br/>APScheduler + notifier]
         DB[(PostgreSQL)]
-        API[FastAPI Backend]
-        Dashboard[Web Dashboard]
+        API[FastAPI dashboard backend]
+        Dashboard[Web dashboard]
     end
 
-    subgraph Agents ["External Agent Plugins (separate Docker projects)"]
-        AG_CODE[costaff-agent-coding\nA2A]
-        AG_BA[costaff-agent-business-analysis\nA2A]
+    subgraph Agents ["External agent plugins (separate Docker projects)"]
+        AG_CODE[costaff-agent-coding]
+        AG_BA[costaff-agent-business-analysis]
     end
 
     CH_TG & CH_DC & CH_LN & CH_WEB -->|HTTP ADK API| CoStaffAgent
@@ -82,111 +336,79 @@ graph TD
     API -->|restart| CoStaffAgent
 ```
 
-All plugins connect through the **`costaff_default` Docker network** — no port mapping required between services.
+All chatbot-style channels share a runtime SDK
+([costaff-channel-chatbot](https://github.com/costaff-ai/costaff-channel-chatbot))
+so each platform repo is a thin adapter (~150 lines) on top of the same
+ADK pipeline.
+
+### First-party plugins
+
+| Repo | Purpose |
+|---|---|
+| [costaff-channel-telegram](https://github.com/costaff-ai/costaff-channel-telegram) | Telegram bot |
+| [costaff-channel-discord](https://github.com/costaff-ai/costaff-channel-discord) | Discord bot |
+| [costaff-channel-line](https://github.com/costaff-ai/costaff-channel-line) | LINE bot |
+| [costaff-channel-slack](https://github.com/costaff-ai/costaff-channel-slack) | Slack bot (Socket Mode) |
+| [costaff-channel-webchat](https://github.com/costaff-ai/costaff-channel-webchat) | Browser-based web chat |
+| [costaff-agent-coding](https://github.com/costaff-ai/costaff-agent-coding) | Sandboxed Python code execution |
+| [costaff-agent-business-analysis](https://github.com/costaff-ai/costaff-agent-business-analysis) | BI reporting & visualization |
 
 ---
 
-## Web Dashboard
+## Web dashboard reference
 
-The dashboard (`costaff dashboard`) is a browser-based operator console with dark/light mode:
-
-| Module | Description |
-|--------|-------------|
-| **Dashboard** | Live system stats (CPU, memory, disk) and service health overview |
-| **Chat** | Talk to the CoStaff Agent directly from the browser with full conversation history |
-| **Agents** | View internal/external agent status; configure per-agent MCP assignments with Apply & Restart |
-| **MCPs** | Manage MCP extensions — add/remove external MCPs at runtime |
-| **APIs** | Register external REST API configs and assign them per-agent or per-user |
-| **Skills** | Register reusable prompt templates and assign them per-agent or per-user |
-| **Reminders** | View and manage scheduled cron reminders |
-| **Tasks** | Monitor Kanban-style automation task results |
-| **Users** | Identity Map with User Profile detail panel |
-| **Sessions** | Browse chat sessions; Event Logs show full function call / response traces |
-| **Channels** | Configure Telegram / Discord / Line bot tokens |
-| **Config** | Theme, model provider, approval gate settings |
-| **Logs** | Stream container logs from any service in real time |
+| Module | What it shows |
+|--------|---------------|
+| **Dashboard** | Live system stats and service health |
+| **Chat** | Talk to the assistant directly |
+| **Agents** | Status of internal/external agents; per-agent MCP / API / Skill assignment |
+| **MCPs** | Add/remove external MCP servers at runtime |
+| **APIs** | Register external REST APIs and assign them per agent / per user |
+| **Skills** | Register reusable prompt templates and assign them per agent / per user |
+| **Reminders** | Cron reminders the assistant has scheduled |
+| **Tasks** | Recurring task history (web search, DB queries, report generation) |
+| **Users** | Identity Map; per-user profile (name, role, company, preferences) |
+| **Sessions** | Browse chat sessions; full function call / response traces |
+| **Channels** | Manage Telegram / Discord / LINE bot tokens |
+| **Config** | Theme, model provider, approval-gate toggle |
+| **Logs** | Stream container logs from any service |
 
 ---
 
-## External Agents
+## Bot interaction
 
-CoStaff supports deploying and managing external agents that communicate via the **A2A protocol**.
+After you've added a bot token (in **Dashboard → Channels**), open the
+bot in your chat app and send any message. The first message creates a
+**pending** identity — log into the dashboard, go to **Users**, and
+approve yourself. After that, the assistant responds normally.
 
-Any project containing a `costaff.agent.json` manifest can be registered and deployed:
+| Slash command | Behavior |
+|---|---|
+| `/reset` | Start a new conversation (clears the current session) |
 
-```bash
-# Deploy a local agent project
-costaff agent deploy --local /path/to/my-agent
+Other slash command names appear in the bot menu (`/start`, `/help`,
+`/profile`, `/list`) but they're handled as natural language — you can
+type the same thing in plain text and get the same result.
 
-# Add a remote URL agent
-costaff agent add my-agent --url http://my-agent.example.com
+**Natural-language examples**:
 
-# List all agents
-costaff agent list
-```
-
-**First-party agents:**
-
-| Agent | Repository | Role |
-|-------|------------|------|
-| Coding Agent | [costaff-agent-coding](https://github.com/costaff-ai/costaff-agent-coding) | Sandboxed Python code execution |
-| Business Analysis Agent | [costaff-agent-business-analysis](https://github.com/costaff-ai/costaff-agent-business-analysis) | BI reporting & visualization |
+- "Remind me to drink water at 3 PM every day."
+- "Search for the latest AI news every morning at 9 AM and send me a summary."
+- "Analyse this CSV and generate an HTML report with charts." *(attach a CSV)*
+- "Save my name as Simon and my role as software engineer."
 
 ---
 
-## Plugin Architecture
-
-CoStaff is designed as a **pluggable platform**. Both channels and agents are independent Docker projects that attach to the core at runtime — no modification to the core codebase is required.
-
-### How Plugins Connect
-
-Every plugin (channel or agent) joins the shared Docker network:
-
-```yaml
-# In the plugin's docker-compose.yaml
-networks:
-  default:
-    external: true
-    name: costaff_default
-```
-
-This gives the plugin direct access to `costaff-agent-costaff` (ADK API on port 8080) and `costaff-mcp-costaff` (MCP on port 8000) by container hostname — no port forwarding or tunnels needed.
-
-### Channel Plugins
-
-Channels are standalone bots/servers that:
-1. Receive messages from users (Telegram, Discord, LINE, HTTP)
-2. Forward them to the CoStaff Agent via `POST /run` on the ADK API
-3. Receive push notifications from the MCP notifier
-
-Built-in channels live under `.costaff/dynamic-channels/` and are started automatically with `costaff start`.
-
-### Agent Plugins
-
-External agents expose an **A2A-compatible** endpoint and register a `costaff.agent.json` manifest. The CoStaff Agent discovers and delegates tasks to them automatically.
-
-```bash
-# Register a local agent project
-costaff agent deploy --local /path/to/my-agent
-
-# Register a remote agent
-costaff agent add my-agent --url http://my-agent.internal
-```
-
----
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
-|-------|------------|
-| Agent Framework | [Google ADK](https://github.com/google/adk-python) |
-| Agent-to-Agent | A2A Protocol (`RemoteA2aAgent`) |
-| Tool Protocol | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) |
-| AI Models | Google Gemini, LiteLLM-compatible providers |
-| Telegram Bot | [Aiogram 3.x](https://docs.aiogram.dev/) |
-| Discord Bot | [discord.py](https://discordpy.readthedocs.io/) |
-| Line Bot | [line-bot-sdk](https://github.com/line/line-bot-sdk-python) |
-| Web Backend | [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) |
+|---|---|
+| Agent framework | [Google ADK](https://github.com/google/adk-python) |
+| Agent-to-agent | A2A protocol (`RemoteA2aAgent`) |
+| Tool protocol | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) |
+| AI models | Google Gemini, any LiteLLM-compatible provider |
+| Channel SDK | [costaff-channel-chatbot](https://github.com/costaff-ai/costaff-channel-chatbot) |
+| Web backend | [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) |
 | Database | [SQLAlchemy](https://www.sqlalchemy.org/) — PostgreSQL or SQLite |
 | Scheduler | [APScheduler](https://apscheduler.readthedocs.io/) |
 | Deployment | Docker + Docker Compose |
@@ -194,95 +416,26 @@ costaff agent add my-agent --url http://my-agent.internal
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.10+
-- Docker and Docker Compose
-- A **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/) (or any LiteLLM-compatible provider)
-
-### Quick Start (no bot tokens required)
-
-The fastest way to get started is with the built-in **Webchat** channel — no Telegram, Discord, or Line tokens needed.
-
-```bash
-# 1. Install the CLI
-pip install -e .
-
-# 2. Run the setup wizard (only Gemini API key required)
-costaff onboard
-
-# 3. Start the platform
-costaff start
-
-# 4. Open the dashboard
-costaff dashboard
-```
-
-Then open **http://localhost:8501**, go to **Chat**, and start talking to the agent immediately.
-
-To add bot channels later, go to **Dashboard → Channels** and enter your token — no restart of the core platform required.
-
-### Full Setup
-
-The setup wizard (`costaff onboard`) configures:
-- AI model provider (Gemini or LiteLLM)
-- Database type (SQLite or PostgreSQL)
-- Bot tokens (Telegram, Discord, Line — all optional)
-- Admin credentials for the web dashboard
-- Identity hashing salt
-
-All configuration is saved to `.costaff/` in the current directory.
-
----
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `costaff onboard` | Interactive setup wizard |
-| `costaff start` | Build and start all services |
-| `costaff start --no-build` | Start without rebuilding images |
-| `costaff stop` | Stop all services |
-| `costaff restart` | Restart all services |
-| `costaff ps` | Show status of running services |
-| `costaff dashboard` | Open the web dashboard |
-| `costaff chat` | CLI-based chat with the agent |
-| `costaff agent deploy --local <path>` | Deploy a local agent project |
-| `costaff agent add <name> --url <url>` | Register a remote URL agent |
-| `costaff agent list` | List all registered agents |
-| `costaff agent remove <name>` | Remove a registered agent |
-| `costaff config show` | Display current configuration |
-| `costaff database backup` | Backup the database |
-| `costaff database restore` | Restore from a backup |
-| `costaff version` | Show CLI version |
-
----
-
-## Bot Commands
-
-Available on Telegram, Discord, and Line:
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Initialise session and check identity |
-| `/profile` | View your stored profile |
-| `/list` | List active reminders and tasks |
-| `/reset` | Clear the current conversation context |
-| `/help` | Show available commands |
-
-**Natural language examples:**
-
-- "Remind me to drink water at 3 PM every day."
-- "Search for the latest AI news every morning at 9 AM and send me a summary."
-- "Analyse this CSV and generate an HTML report with charts."
-- "Save my name as Simon and my role as Software Engineer."
-
----
-
 ## License
 
-This project is dual-licensed under **AGPL v3 + Commercial License**. See `LICENSE` for details.
+Dual-licensed under **AGPL v3** + **commercial license**.
 
-For commercial licensing inquiries, contact: simonliuyuwei@gmail.com
+- Personal use, internal company use, and modifications you keep to
+  yourself: **free under AGPL v3**.
+- Re-distributing the software, or running a modified version as a
+  network service for others: **AGPL v3 obligations apply** (you must
+  release your modifications under AGPL v3).
+- If AGPL v3 doesn't work for your use case, contact us for a
+  commercial license.
+
+See [`LICENSE`](./LICENSE) for the full text.
+
+For commercial licensing inquiries: **simonliuyuwei@gmail.com**
+
+---
+
+## Support
+
+- **Documentation**: see the [`docs/`](./docs) folder
+- **Issues**: [github.com/costaff-ai/costaff/issues](https://github.com/costaff-ai/costaff/issues)
+- **Email**: simonliuyuwei@gmail.com
