@@ -3,7 +3,6 @@ import httpx
 import os
 import json
 import logging
-import io
 import hashlib
 import uuid
 from typing import Optional, List
@@ -16,10 +15,6 @@ logger = logging.getLogger(__name__)
 # ADK API Configuration
 ADK_URL = os.getenv("ADK_API_BASE_URL", "http://localhost:8000")
 TIMEOUT = 1800.0  # 30 minutes — long-running agent tasks
-
-# PrivAI Integration (for file uploads)
-PRIVAI_URL = os.getenv("PRIVAI_API_BASE_URL", "https://api.privai.ai")
-PRIVAI_KEY = os.getenv("PRIVAI_API_KEY")
 
 # Database/Identity Integration (Optional, used by some bots)
 try:
@@ -69,24 +64,6 @@ def sync_identity(hashed_id: str, real_id: str, session_id: str):
 def check_approved(session_id: str) -> bool:
     """Placeholder for approval logic. Defaults to True if not configured."""
     return True
-
-async def upload_to_costaff(file_content: io.BytesIO, filename: str, user_id: str, sid: str = None, app_name: str = "costaff_agent") -> str:
-    if not PRIVAI_KEY: return None
-    metadata = json.dumps({"owner_id": user_id, "source": "channel_upload"})
-    headers = {"Authorization": f"Bearer {PRIVAI_KEY}"}
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            file_content.seek(0)
-            files = {
-                "file": (filename, file_content),
-                "metadata": (None, metadata),
-                "instant_parse": (None, json.dumps({"parsing_mode": "HQ"}))
-            }
-            res = await client.post(f"{PRIVAI_URL}/v1/files", headers=headers, files=files, params={"purpose": "user_data"})
-            return res.json().get("id") if res.status_code == 200 else None
-        except Exception as e:
-            logger.warning(f"File upload to PrivAI failed: {e}")
-            return None
 
 # Shared HTTP client — reused across all ADK API calls to avoid per-request TCP overhead
 _http_client: Optional[httpx.AsyncClient] = None
