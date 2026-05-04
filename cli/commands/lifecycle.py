@@ -79,9 +79,40 @@ def start(build: bool = typer.Option(True, "--build/--no-build")):
 
 
 def stop():
-    """Stop all services."""
+    """Stop all services — iterate fragments + main, no orphan hammer."""
     runtime = get_runtime()
-    runtime.down(remove_orphans=True)
+    conf = ConfigManager.get_config()
+
+    # Collect channel + external-agent fragments. Iterating with
+    # docker-compose-down per-fragment lets us tear each one down safely
+    # without `--remove-orphans`, which would silently kill containers
+    # belonging to OTHER fragments (the same bug we hit in `start` and
+    # `channel rebuild`).
+    fragments: list[str] = []
+    for entry in conf.get("dynamic_channels", {}).values():
+        fp = entry.get("fragment_path")
+        if fp and os.path.exists(fp):
+            fragments.append(fp)
+    for entry in conf.get("external_agents", {}).values():
+        fp = entry.get("fragment_path")
+        if fp and os.path.exists(fp):
+            fragments.append(fp)
+
+    for fp in fragments:
+        try:
+            runtime.down(fragment=fp, remove_orphans=False)
+        except Exception as e:
+            console.print(f"[yellow]Failed to stop fragment {fp}: {e}[/yellow]")
+
+    # Final pass on the main compose. Each fragment-down already brought
+    # main services down (compose loads main + fragment together), so this
+    # is idempotent in practice — but it ensures cleanup if a deployment
+    # has no fragments at all.
+    try:
+        runtime.down(remove_orphans=False)
+    except Exception as e:
+        console.print(f"[yellow]Failed to stop core compose: {e}[/yellow]")
+
     # Kill any dashboard process holding port 8501
     try:
         result = subprocess.run(["lsof", "-ti", ":8501"], capture_output=True, text=True)
