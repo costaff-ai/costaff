@@ -66,8 +66,22 @@ def _prompt_model_config(manifest: dict, plugin_envs: dict, core_envs: dict) -> 
     return plugin_envs
 
 
-def _prompt_and_write_plugin_env(manifest: dict, fragment_dir: str, predefined_envs: dict = None) -> str:
-    """Prompt user for env vars defined in manifest and write to plugin .env. Returns plugin env path."""
+def _prompt_and_write_plugin_env(manifest: dict, fragment_dir: str, predefined_envs: dict = None, name: str = None) -> str:
+    """Prompt user for env vars defined in manifest and write to plugin .env. Returns plugin env path.
+
+    `name` is the plugin's stable id (e.g. "telegram", "coding"). Required for the
+    Specialist-path env injection at the end; if omitted, falls back to the
+    manifest's `name` field with the `costaff-agent-`/`costaff-channel-` prefix
+    stripped.
+    """
+    if name is None:
+        manifest_name = manifest.get("name", "")
+        for prefix in ("costaff-agent-", "costaff-channel-"):
+            if manifest_name.startswith(prefix):
+                name = manifest_name[len(prefix):]
+                break
+        else:
+            name = manifest_name or "plugin"
     plugin_env_path = os.path.join(fragment_dir, ".env")
     core_envs = dict(dotenv_values(PATHS["env"]))
     plugin_envs = dict(dotenv_values(plugin_env_path)) if os.path.exists(plugin_env_path) else {}
@@ -113,11 +127,8 @@ def _prompt_and_write_plugin_env(manifest: dict, fragment_dir: str, predefined_e
         for k, v in plugin_envs.items():
             f.write(f"{k}={v}\n")
         # Ensure Specialist path context is available for ADK Template injection.
-        # NOTE: this references `name` which is not a parameter of this function — a
-        # latent bug carried over from the pre-split helpers.py. Preserved verbatim
-        # to keep this commit a pure refactor; tracked for a follow-up fix.
-        NAME_UPPER = name.upper().replace("-", "_")  # noqa: F821
-        f.write(f"COSTAFF_SHARED_DIR_{NAME_UPPER}=/app/data/shared/costaff-agent-{name}\n")  # noqa: F821
+        NAME_UPPER = name.upper().replace("-", "_")
+        f.write(f"COSTAFF_SHARED_DIR_{NAME_UPPER}=/app/data/shared/costaff-agent-{name}\n")
         f.write(f"AGENT_WORKSPACE_DIR_{NAME_UPPER}=/app/data\n")
 
     # Also write required vars to core .env for YAML variable substitution

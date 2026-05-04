@@ -40,10 +40,19 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
     fragment_dir = os.path.join(_base_dir, "costaff-channel", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
-    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
+    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs, name=name)
     load_dotenv(PATHS["env"], override=True)
 
     fragment_path, ext_services, _ = _write_channel_fragment(name, source_path, public_port, plugin_env_path)
+
+    # Sync MCP_SERVER_URLS before container creation so the agent container
+    # is created with the bearer-form URL instead of the anonymous default
+    # from .env.template. Without this, scenarios that skip `costaff onboard`
+    # (e.g. manual .env setup) end up with the manager agent hitting MCP
+    # with no auth header → 401 Unauthorized.
+    from services.config import ConfigManager
+    ConfigManager.update_mcp_urls()
+    load_dotenv(PATHS["env"], override=True)
 
     from rich.console import Console
     console = Console()
@@ -116,7 +125,7 @@ def _deploy_local_agent(
     fragment_dir = os.path.join(_base_dir, "costaff-agent", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
-    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs)
+    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs, name=name)
     load_dotenv(PATHS["env"], override=True)
 
     # Plan B workspace directories: private per-agent + shared
@@ -230,6 +239,12 @@ def _deploy_local_agent(
 
     with open(fragment_path, "w") as f:
         _yaml.dump(fragment, f, default_flow_style=False, allow_unicode=True)
+
+    # Sync MCP_SERVER_URLS before container creation — see _deploy_local_channel
+    # for the rationale (manual-onboard installs otherwise hit MCP with no auth).
+    from services.config import ConfigManager
+    ConfigManager.update_mcp_urls()
+    load_dotenv(PATHS["env"], override=True)
 
     # Build & start
     import httpx
