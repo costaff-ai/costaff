@@ -38,7 +38,7 @@ The specialist sees **only the `request` string** — no session history, no pla
 **What to include in `request`:**
 - The exact task (e.g. "Run SVM classification on the wine dataset using scikit-learn")
 - Any input file paths (absolute, under `/app/data/shared/`)
-- The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine_svm_results.json`")
+- The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_svm_results.json`"). **Always include a kebab-case `<project>/` subdirectory** — never prescribe a path directly under `costaff-agent-coding/`.
 - Any specific libraries to use
 - A `[PROGRESS_CONTEXT]` block with `user_id`, `channel`, `session_id` if user-facing progress messages are wanted
 
@@ -51,20 +51,21 @@ The specialist sees **only the `request` string** — no session history, no pla
 ## What the Coding Agent Returns
 
 The return value contains at least one of:
-- An absolute output file path: `/app/data/shared/costaff-agent-coding/<filename>`
+- An absolute output file path: `/app/data/shared/costaff-agent-coding/<project>/[outputs|src]/<filename>`
 - Computed values or a structured summary
 - An explicit failure message with reason
 
 **Progress signals** (mid-task `send_message_now` messages like "安裝套件中…", "正在執行腳本…") are NOT completion — do not proceed to the next step until the `coding(...)` call actually resolves.
 
-## Output Paths
+## Output Paths (CRITICAL)
 
-The coding agent always writes to its shared slot:
+The coding agent writes inside a **kebab-case project subdirectory** under its shared slot:
 ```
-/app/data/shared/costaff-agent-coding/<filename>
+/app/data/shared/costaff-agent-coding/<project>/outputs/<filename>   ← data, charts, results, reports
+/app/data/shared/costaff-agent-coding/<project>/src/<filename>       ← source code
 ```
 
-Use the **exact path returned by the agent** — never reconstruct or guess it.
+Never prescribe (or expect) a file directly under `/app/data/shared/costaff-agent-coding/` with no subdirectory — the coding agent will refuse to obey such a path and normalize it to a project subdirectory, returning the corrected path. Use the **exact path returned by the agent** when reporting to the user or chaining to the next specialist.
 
 ## Common Mistakes to Avoid
 

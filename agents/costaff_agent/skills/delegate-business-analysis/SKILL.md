@@ -38,9 +38,9 @@ The specialist sees **only the `request` string** — no session history, no pla
 **What to include in `request`:**
 - The exact task (e.g. "Generate a PDF report on SVM classification of the wine dataset")
 - Input file path(s) — **exact absolute paths** returned by the previous specialist, e.g.
-  `/app/data/shared/costaff-agent-coding/wine_svm_results.json`
-- Desired output path, e.g.
-  `/app/data/shared/costaff-agent-business-analysis/svm_wine_report.pdf`
+  `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_svm_results.json`
+- Desired output path including a kebab-case `<report-name>/` subdirectory, e.g.
+  `/app/data/shared/costaff-agent-business-analysis/svm-wine-report/svm_wine_report.pdf`
 - Language requirement (e.g. "Report should be in Traditional Chinese")
 - Any specific sections to include (e.g. "Include methodology, results table, and analysis")
 
@@ -70,14 +70,16 @@ The following are **internal tools of the business analysis agent**. They do NOT
 
 The completion signal contains:
 - The absolute path to the generated file, e.g.
-  `/app/data/shared/costaff-agent-business-analysis/svm_wine_report.pdf`
+  `/app/data/shared/costaff-agent-business-analysis/svm-wine-report/svm_wine_report.pdf`
 - A brief summary of what was produced
 
 **Copy this path exactly** when reporting to the user — do not retype or reconstruct it.
 
-## Output Paths
+## Output Paths (CRITICAL)
 
-The business analysis agent always writes to:
+The business analysis agent writes inside a **kebab-case `<report-name>/` subdirectory** under its shared slot:
 ```
-/app/data/shared/costaff-agent-business-analysis/<filename>
+/app/data/shared/costaff-agent-business-analysis/<report-name>/<filename>
 ```
+
+Never prescribe (or expect) a file directly under `/app/data/shared/costaff-agent-business-analysis/` with no subdirectory.

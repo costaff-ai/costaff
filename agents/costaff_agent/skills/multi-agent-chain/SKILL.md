@@ -32,12 +32,12 @@ When a request requires **two or more** specialist calls (any file or data hand-
 <b>Step 1: [專家職稱] (agent: <code>&lt;agent_name&gt;</code>)</b>
 • 任務：...
 • 輸入：...
-• 預期產出：<code>/app/data/shared/costaff-agent-&lt;hyphen-name&gt;/xxx.ext</code>
+• 預期產出：<code>/app/data/shared/costaff-agent-&lt;hyphen-name&gt;/&lt;project&gt;/xxx.ext</code>
 
 <b>Step 2: [專家職稱] (agent: <code>&lt;agent_name&gt;</code>)</b>
 • 任務：...
 • 輸入：Step 1 的產出
-• 預期產出：<code>...</code>
+• 預期產出：<code>/app/data/shared/costaff-agent-&lt;hyphen-name&gt;/&lt;project&gt;/yyy.ext</code>
 
 請回覆「OK」開始執行，或告訴我需要調整的地方（工具、順序、輸出格式等）。
 ```
@@ -80,6 +80,27 @@ Classify the request before planning. **An iteration is anything that touches a 
 
 ---
 
+## Principle 1B — Path Format (CRITICAL)
+
+Every path you write in a plan or in a `request` MUST include a kebab-case **project subdirectory** under the agent's shared slot. Format:
+
+```
+/app/data/shared/costaff-agent-<name>/<project>/.../<filename>
+```
+
+- `<project>` = kebab-case name inferred from the user's task (e.g. `wine-eda`, `quicksort-practice`, `wine-svm-report`).
+- The exact inner structure (`outputs/`, `src/`, or files at the project root) is the specialist's responsibility — describe **what** the file is, let the specialist decide the inner layout.
+- Reuse the same `<project>` across every step of the plan so the user sees one consistent project name.
+
+**FORBIDDEN**: never prescribe a path directly under `/app/data/shared/costaff-agent-<name>/` (no subdirectory). The agent will normalize it elsewhere; your plan and final `[FILE: ...]` summary will then point at a non-existent path, confusing the user. Examples of bad vs good:
+
+| ❌ Bad (flat root) | ✅ Good (with project subdir) |
+|---|---|
+| `/app/data/shared/costaff-agent-coding/wine_stats.csv` | `/app/data/shared/costaff-agent-coding/wine-eda/outputs/wine_stats.csv` |
+| `/app/data/shared/costaff-agent-business-analysis/wine_report.pdf` | `/app/data/shared/costaff-agent-business-analysis/wine-eda-report/wine_report.pdf` |
+
+---
+
 ## Principle 2 — Write a Complete `request` (CRITICAL)
 
 The specialist agent tool receives **only the `request` string you write** — it does not see the user's prior messages, your plan text, or the conversation history. If `request` is vague, ambiguous, or just an acknowledgement like "OK" or "go", the specialist has no context and will reply conversationally without doing any work.
@@ -89,8 +110,8 @@ The specialist agent tool receives **only the `request` string you write** — i
 | Element | Required? | Example |
 |---|---|---|
 | Concrete action verb | always | "Load the wine dataset and run EDA…" |
-| Input source / file paths | if any | "Read `/app/data/shared/costaff-agent-coding/wine_results.json`" |
-| Expected output format & path | always | "Save as `/app/data/shared/costaff-agent-business-analysis/wine_report.pdf`" |
+| Input source / file paths | if any | "Read `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_results.json`" |
+| Expected output format & path | always | "Save as `/app/data/shared/costaff-agent-business-analysis/wine-svm-report/wine_report.pdf`" |
 | Constraints / language / quality bar | as needed | "Report in Traditional Chinese; include charts and analysis narrative" |
 | `[PROGRESS_CONTEXT]` block (when applicable) | if user-facing progress matters | with `user_id`, `channel`, `session_id` |
 
@@ -109,7 +130,7 @@ The specialist's only job: **do the work, save the file, report back**. Chaining
 Call only one agent tool per step. **Wait for the tool to return** before calling the next. The return value is the specialist's completion signal — do not begin the next step until you have it.
 
 A valid completion signal always includes at least one of:
-- An absolute output file path (e.g. `/app/data/shared/costaff-agent-<name>/result.csv`)
+- An absolute output file path (e.g. `/app/data/shared/costaff-agent-<name>/<project>/result.csv`)
 - A concrete computed result or value
 - A structured analysis, summary, or conclusion
 - An explicit failure declaration explaining why the task cannot be completed
@@ -200,7 +221,7 @@ If the specialist also fails after one retry → report partial results honestly
    - `` `text` `` → `<code>text</code>`
    - `# Heading` / `## Heading` → `<b>Heading</b>` (no heading tags in Telegram)
    - `- item` → `• item` (keep the bullet, remove the dash)
-4. Deliver ALL files using `[FILE: /app/data/shared/costaff-agent-<name>/file.ext]` format — include intermediate files (CSV, PNG) AND final output (PDF).
+4. Deliver ALL files using `[FILE: /app/data/shared/costaff-agent-<name>/<project>/file.ext]` format — include intermediate files (CSV, PNG) AND final output (PDF). Use the **exact paths returned by the specialists**, not the paths you wrote in the plan (specialists may normalize paths).
 5. Use `{PREFERRED_LANGUAGE}` and Telegram HTML throughout.
 6. Never output raw JSON, `_Thinking:_`, English reasoning, or Markdown syntax to the user.
 

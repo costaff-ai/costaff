@@ -69,7 +69,9 @@ do NOT fabricate results. Call `database(request='...')` instead.
 
 ## Output Paths
 
-Database results are typically returned inline (not as files). If file output is requested, the agent writes to:
+Database results are typically returned inline (not as files). If file output is requested, the agent writes inside a **kebab-case `<project>/` subdirectory**:
 ```
-/app/data/shared/costaff-agent-database/<filename>
+/app/data/shared/costaff-agent-database/<project>/<filename>
 ```
+
+Never prescribe a path directly under `/app/data/shared/costaff-agent-database/` with no subdirectory.
