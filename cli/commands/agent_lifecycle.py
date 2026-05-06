@@ -53,10 +53,14 @@ def agent_add(
         console.print(f"[red]Error: Agent '{name}' already exists. Use 'costaff agent remove {name}' first.[/red]")
         raise typer.Exit(1)
 
-    # License check
+    # License check. Each CLI invocation is a fresh process, so the
+    # in-memory `_license` cache is None until `load()` is called —
+    # without it, `check_agent_limit()` would fall back to OSS limits
+    # even on ENTERPRISE plans.
     try:
         sys.path.insert(0, _project_root)
         from core.license import LicenseManager
+        LicenseManager.load()
         current_count = len([a for a in conf.get("external_agents", {}).values() if a.get("enabled")])
         LicenseManager.check_agent_limit(current_count)
     except ValueError as e:
