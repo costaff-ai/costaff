@@ -124,7 +124,7 @@ const App = {
                 
                 // One-time initialization for specific tabs
                 if (tabId === 'chat') await UI.initChat();
-                if (tabId === 'tasks') await Tasks.init();
+                if (tabId === 'tasks') await Projects.init();
                 if (tabId === 'cronjobs' && typeof RegularWork !== 'undefined') await RegularWork.init();
                 if (tabId === 'apis') Apis.init();
                 if (tabId === 'skills') Skills.init();

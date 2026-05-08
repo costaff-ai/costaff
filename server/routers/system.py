@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import time
@@ -19,6 +20,7 @@ from services.database import DatabaseManager
 from server.schemas import ServiceActionRequest
 from utils.helpers import PATHS, _project_root, _runtime_root
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -137,6 +139,7 @@ def service_action(service: str, req: ServiceActionRequest, auth: bool = Depends
                 ConfigManager.save_config(conf)
         return {"status": "success"}
     except Exception as e:
+        logger.exception("service_action failed for service=%s action=%s", service, req.action)
         raise HTTPException(status_code=500, detail=str(e))
 
 

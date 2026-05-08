@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
@@ -5,6 +7,7 @@ from services.auth import AuthManager
 from services.database import DatabaseManager
 from utils.helpers import _serialize_row
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -21,4 +24,5 @@ def list_diary(days: int = 7, auth: bool = Depends(AuthManager.verify_token)):
             ), {"lim": days * 10})
             return [_serialize_row(dict(r._mapping)) for r in res]
     except Exception:
+        logger.exception("list_diary failed")
         return []

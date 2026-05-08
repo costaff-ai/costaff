@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import threading
@@ -12,6 +13,7 @@ from services.docker import DockerManager
 from server.schemas import ExternalAgentAddRequest, ExternalAgentUpdateRequest
 from utils.helpers import _validate_a2a_url
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -130,12 +132,10 @@ def remove_external_agent(name: str, auth: bool = Depends(AuthManager.verify_tok
 @router.get("/api/dashboard/ai-team")
 def dashboard_ai_team(auth: bool = Depends(AuthManager.verify_token)):
     """Returns active regular works with their last execution output + recent diary entries."""
-    import logging
     from sqlalchemy import text
     from services.database import DatabaseManager
     from utils.helpers import _serialize_row
 
-    logger = logging.getLogger(__name__)
     engine = DatabaseManager.get_engine()
     if not engine:
         return {"works": [], "diary": []}
@@ -167,6 +167,6 @@ def dashboard_ai_team(auth: bool = Depends(AuthManager.verify_token)):
             diary = [_serialize_row(dict(r._mapping)) for r in diary_res]
 
         return {"works": works, "diary": diary}
-    except Exception as e:
-        logger.error(f"dashboard ai-team error: {e}")
+    except Exception:
+        logger.exception("dashboard ai-team error")
         return {"works": [], "diary": []}

@@ -8,6 +8,7 @@ here is operator tooling — read/write throughput is low.
 API configs encrypt their `headers` field with utils.crypto so the
 list endpoint only reveals the header *key names*, never values.
 """
+import logging
 import sys
 import uuid
 from datetime import datetime, datetime as _dt, timezone
@@ -27,6 +28,7 @@ from utils.crypto import encrypt_headers, decrypt_headers
 from utils.network import is_safe_url
 from utils.helpers import _project_root
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -60,6 +62,7 @@ def list_api_configs(auth: bool = Depends(AuthManager.verify_token)):
                 rows.append(d)
             return rows
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -88,6 +91,7 @@ def create_api_config(req: ApiConfigCreateRequest, auth: bool = Depends(AuthMana
             conn.commit()
         return {"status": "success", "id": new_id}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -114,6 +118,7 @@ def update_api_config(api_id: str, req: ApiConfigUpdateRequest, auth: bool = Dep
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -128,6 +133,7 @@ def delete_api_config(api_id: str, auth: bool = Depends(AuthManager.verify_token
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -151,6 +157,7 @@ def list_skill_configs(auth: bool = Depends(AuthManager.verify_token)):
                 rows.append(d)
             return rows
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -182,6 +189,7 @@ def create_skill_config(req: SkillConfigCreateRequest, auth: bool = Depends(Auth
             conn.commit()
         return {"status": "success", "id": new_id}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -207,6 +215,7 @@ def update_skill_config(skill_id: str, req: SkillConfigUpdateRequest, auth: bool
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -221,4 +230,5 @@ def delete_skill_config(skill_id: str, auth: bool = Depends(AuthManager.verify_t
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("integrations router handler failed")
         raise HTTPException(status_code=500, detail=str(e))

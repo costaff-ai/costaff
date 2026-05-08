@@ -7,6 +7,7 @@ viewer with a hard-coded allow-list of table names and columns; do not
 expose untrusted user input to it.
 """
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,7 @@ from sqlalchemy import text
 from services.auth import AuthManager
 from services.database import DatabaseManager
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -28,8 +30,7 @@ def get_chat_sessions(auth: bool = Depends(AuthManager.verify_token)):
             res = conn.execute(text('SELECT id, user_id, app_name, "update_time" FROM sessions ORDER BY "update_time" DESC'))
             return [dict(row._mapping) for row in res]
     except Exception:
-        import traceback
-        traceback.print_exc()
+        logger.exception("get_chat_sessions failed")
         return []
 
 
@@ -50,8 +51,7 @@ def get_chat_history(session_id: str, auth: bool = Depends(AuthManager.verify_to
                 rows.append({"event_data": ed, "timestamp": ts})
             return rows
     except Exception:
-        import traceback
-        traceback.print_exc()
+        logger.exception("get_chat_history failed for session_id=%s", session_id)
         return []
 
 
@@ -128,4 +128,5 @@ def get_db_table_data(table: str, auth: bool = Depends(AuthManager.verify_token)
                 rows.append(d)
             return rows
     except Exception:
+        logger.exception("get_db_table_data failed for table=%s", table)
         return []

@@ -5,6 +5,7 @@ to an agent on schedule. Decoupled from the project Epic/Story/Task
 hierarchy because regular works run autonomously and do not produce
 per-run artifacts (their effect is the side-effects each agent run has).
 """
+import logging
 import uuid
 from datetime import datetime
 
@@ -17,6 +18,7 @@ from services.database import DatabaseManager
 from server.schemas import RegularWorkCreateRequest, RegularWorkUpdateRequest
 from utils.helpers import _serialize_row, _validate_cron
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -33,6 +35,7 @@ def list_regular_works(auth: bool = Depends(AuthManager.verify_token)):
             ))
             return [_serialize_row(dict(r._mapping)) for r in res]
     except Exception:
+        logger.exception("regular_works list-handler failed")
         return []
 
 
@@ -63,6 +66,7 @@ def create_regular_work_api(req: RegularWorkCreateRequest, auth: bool = Depends(
         audit("work.create", id=wid, title=req.title, cron=req.cron)
         return {"status": "success", "id": wid}
     except Exception as e:
+        logger.exception("regular_works router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -91,6 +95,7 @@ def update_regular_work_api(work_id: str, req: RegularWorkUpdateRequest, auth: b
         audit("work.update", id=work_id, changes={k: v for k, v in updates.items() if k not in ("id", "now")})
         return {"status": "success"}
     except Exception as e:
+        logger.exception("regular_works router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -106,6 +111,7 @@ def delete_regular_work_api(work_id: str, auth: bool = Depends(AuthManager.verif
         audit("work.delete", id=work_id)
         return {"status": "success"}
     except Exception as e:
+        logger.exception("regular_works router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -127,6 +133,7 @@ def toggle_regular_work(work_id: str, auth: bool = Depends(AuthManager.verify_to
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("regular_works router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -143,4 +150,5 @@ def get_regular_work_logs(work_id: str, auth: bool = Depends(AuthManager.verify_
             ), {"id": work_id})
             return [_serialize_row(dict(r._mapping)) for r in res]
     except Exception:
+        logger.exception("regular_works list-handler failed")
         return []

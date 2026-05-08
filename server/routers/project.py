@@ -9,6 +9,7 @@ The dashboard's "Projects" view manages a 3-level hierarchy:
 Cascade delete is implemented manually via raw SQL because the schema
 predates SQLAlchemy `ON DELETE CASCADE` configuration.
 """
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -18,6 +19,8 @@ from sqlalchemy import text
 
 from services.auth import AuthManager
 from services.database import DatabaseManager
+
+logger = logging.getLogger(__name__)
 from server.schemas import (
     EpicCreateRequest, EpicUpdateRequest,
     StoryCreateRequest,
@@ -57,6 +60,7 @@ def list_epics(auth: bool = Depends(AuthManager.verify_token)):
                 result.append(d)
             return result
     except Exception:
+        logger.exception("project router list-handler failed")
         return []
 
 
@@ -77,6 +81,7 @@ def create_epic_api(req: EpicCreateRequest, auth: bool = Depends(AuthManager.ver
             conn.commit()
         return {"status": "success", "id": eid}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -99,6 +104,7 @@ def update_epic_api(epic_id: str, req: EpicUpdateRequest, auth: bool = Depends(A
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -116,6 +122,7 @@ def delete_epic_api(epic_id: str, auth: bool = Depends(AuthManager.verify_token)
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -145,6 +152,7 @@ def get_stories_api(epic_id: str, auth: bool = Depends(AuthManager.verify_token)
                 result.append(d)
             return result
     except Exception:
+        logger.exception("project router list-handler failed")
         return []
 
 
@@ -166,6 +174,7 @@ def create_story_api(epic_id: str, req: StoryCreateRequest, auth: bool = Depends
             conn.commit()
         return {"status": "success", "id": sid}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -182,6 +191,7 @@ def delete_story_api(epic_id: str, story_id: str, auth: bool = Depends(AuthManag
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -205,6 +215,7 @@ def list_project_tasks(epic_id: Optional[str] = None, auth: bool = Depends(AuthM
             res = conn.execute(text(q), params)
             return [_serialize_row(dict(r._mapping)) for r in res]
     except Exception:
+        logger.exception("project router list-handler failed")
         return []
 
 
@@ -232,6 +243,7 @@ def create_project_task_api(req: ProjectTaskCreateRequest, auth: bool = Depends(
             conn.commit()
         return {"status": "success", "id": tid}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -254,6 +266,7 @@ def update_project_task_api(task_id: str, req: ProjectTaskUpdateRequest, auth: b
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -269,6 +282,7 @@ def delete_project_task_api(task_id: str, auth: bool = Depends(AuthManager.verif
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("project router handler failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -285,4 +299,5 @@ def get_task_comments(task_id: str, auth: bool = Depends(AuthManager.verify_toke
             ), {"id": task_id})
             return [_serialize_row(dict(r._mapping)) for r in res]
     except Exception:
+        logger.exception("project router list-handler failed")
         return []

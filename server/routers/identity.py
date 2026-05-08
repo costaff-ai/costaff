@@ -5,6 +5,7 @@ Covers:
   - Approving / revoking / deleting a session's identity
   - Hard-deleting a user (and ad-hoc cleanup of their state and reminders)
 """
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,7 @@ from sqlalchemy import text
 from services.auth import AuthManager
 from services.database import DatabaseManager
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -30,6 +32,7 @@ def get_users(auth: bool = Depends(AuthManager.verify_token)):
             ))
             return [dict(r._mapping) for r in rows]
     except Exception as e:
+        logger.exception("get_users failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -72,6 +75,7 @@ def get_identities(auth: bool = Depends(AuthManager.verify_token)):
                 result.append(d)
             return result
     except Exception as e:
+        logger.exception("get_identities failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -141,4 +145,5 @@ def delete_reminder(reminder_id: str, auth: bool = Depends(AuthManager.verify_to
             conn.commit()
         return {"status": "success"}
     except Exception as e:
+        logger.exception("delete_reminder failed for reminder_id=%s", reminder_id)
         raise HTTPException(status_code=500, detail=str(e))
