@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from utils.helpers import _project_root, _runtime_root
+from utils.paths import _project_root, _runtime_root
 
 console = Console()
 

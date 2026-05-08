@@ -6,7 +6,7 @@ import secrets
 from typing import Optional
 from fastapi import HTTPException, Header
 
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 _SESSION_TTL = int(os.getenv("SESSION_TOKEN_TTL_HOURS", "24")) * 3600
 

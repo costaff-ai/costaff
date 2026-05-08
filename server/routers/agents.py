@@ -11,7 +11,7 @@ from services.audit import audit
 from services.config import ConfigManager
 from services.docker import DockerManager
 from server.schemas import ExternalAgentAddRequest, ExternalAgentUpdateRequest
-from utils.helpers import _validate_a2a_url
+from utils.validators import _validate_a2a_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -134,7 +134,7 @@ def dashboard_ai_team(auth: bool = Depends(AuthManager.verify_token)):
     """Returns active regular works with their last execution output + recent diary entries."""
     from sqlalchemy import text
     from services.database import DatabaseManager
-    from utils.helpers import _serialize_row
+    from utils.serialization import _serialize_row
 
     engine = DatabaseManager.get_engine()
     if not engine:

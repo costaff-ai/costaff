@@ -9,7 +9,7 @@ from rich.table import Table
 from sqlalchemy import text
 
 from services.database import DatabaseManager
-from utils.helpers import VERSION
+from utils.paths import VERSION
 
 console = Console()
 

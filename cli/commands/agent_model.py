@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from services.config import ConfigManager
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 from .agent import agent_app
 

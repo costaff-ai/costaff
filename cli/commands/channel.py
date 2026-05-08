@@ -14,8 +14,9 @@ from rich.table import Table
 from services.config import ConfigManager
 from services.runtime import get_runtime
 from services.runtime.git import Git, GitError
-from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
-from utils.helpers import _deploy_local_channel, _write_channel_fragment
+from utils.paths import PATHS, _project_root, _runtime_root, _base_dir
+from utils.compose import _write_channel_fragment
+from utils.deploy import _deploy_local_channel
 
 console = Console()
 

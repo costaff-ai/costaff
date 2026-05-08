@@ -1,6 +1,6 @@
 import typer
 
-from utils.helpers import VERSION
+from utils.paths import VERSION
 from cli.commands.lifecycle import start, stop, status, logs, restart
 from cli.commands.onboard import onboard
 from cli.commands.dashboard import dashboard, chat, invoke

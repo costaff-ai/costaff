@@ -5,7 +5,7 @@ import warnings
 from typing import Dict, Any
 from dotenv import load_dotenv, set_key
 
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 
 class ConfigManager:

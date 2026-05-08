@@ -18,7 +18,7 @@ from services.config import ConfigManager
 from services.docker import DockerManager
 from services.database import DatabaseManager
 from server.schemas import ServiceActionRequest
-from utils.helpers import PATHS, _project_root, _runtime_root
+from utils.paths import PATHS, _project_root, _runtime_root
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -26,7 +26,7 @@ from server.schemas import (
     StoryCreateRequest,
     ProjectTaskCreateRequest, ProjectTaskUpdateRequest,
 )
-from utils.helpers import _serialize_row
+from utils.serialization import _serialize_row
 
 router = APIRouter()
 

@@ -26,7 +26,7 @@ from server.schemas import (
 )
 from utils.crypto import encrypt_headers, decrypt_headers
 from utils.network import is_safe_url
-from utils.helpers import _project_root
+from utils.paths import _project_root
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

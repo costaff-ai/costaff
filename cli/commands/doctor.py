@@ -9,7 +9,7 @@ from rich.table import Table
 
 from services.config import ConfigManager
 from services.docker import DockerManager
-from utils.helpers import PATHS, _project_root, _runtime_root
+from utils.paths import PATHS, _project_root, _runtime_root
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -81,7 +81,7 @@ def doctor():
     # 0. Version / git rev ─────────────────────────────────────────────────────
     console.print("\n[bold]0. Version[/bold]")
     try:
-        from utils.helpers import VERSION
+        from utils.paths import VERSION
         console.print(f"costaff: {VERSION}")
     except Exception:
         pass

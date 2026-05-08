@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from server.app import server
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 console = Console()
 

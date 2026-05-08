@@ -70,7 +70,6 @@ costaff/
 │   ├── plugin_env.py        # _prompt_model_config, _prompt_and_write_plugin_env
 │   ├── compose.py           # _write_channel_fragment
 │   ├── deploy.py            # _deploy_local_channel, _deploy_local_agent
-│   ├── helpers.py           # 薄薄的 re-export 殼，舊 `from utils.helpers import X` 都還能用
 │   ├── crypto.py            # encrypt_headers / decrypt_headers (Fernet)
 │   └── network.py           # is_safe_url (SSRF guard)
 ├── tests/                   # pytest 測試（host-side，**不需 deploy 任何容器**）
@@ -136,7 +135,7 @@ ssh Simon-Mac-Mini-Remote 'costaff agent rebuild coding && costaff agent rebuild
 （agent restart 不夠，需要 rebuild 才會讓 plugin 重讀新的 `<NAME>_AGENT_MCP_URLS` 環境變數）
 
 ### 2.4 測試與部署
-- **`utils/helpers.py` 是 re-export 殼**：別人 import 的 13 個 callers 都還能用，未來新 code 應該直接 import `utils.paths` 等具體模組。
+- **`utils/` 已完全 domain-split**：直接 import `utils.paths` / `utils.serialization` / `utils.validators` / `utils.ports` / `utils.plugin_env` / `utils.compose` / `utils.deploy`，不要再寫 `from utils.helpers import …`（殼已刪）。
 - **`tests/` 純 host-side**：pytest 跑完不影響任何 container；改完 `git push` 就好，不用 deploy 容器。
 - **`server/app.py` 的 FastAPI 跑在 host**（由 `costaff dashboard` 啟動），不在 manager 容器內。所以改 `server/` 或 `utils/` 後 **只需** `pip install -e ~/.costaff/costaff`，**不用** rebuild 任何容器。
 
@@ -184,7 +183,7 @@ python3 -m pytest tests/ -q
 
 | 原檔（已不存在或變殼） | 拆成 |
 |---|---|
-| `utils/helpers.py` (528 行) | `paths.py` / `serialization.py` / `validators.py` / `ports.py` / `plugin_env.py` / `compose.py` / `deploy.py` |
+| `utils/helpers.py` (528 行 → 已刪除) | `paths.py` / `serialization.py` / `validators.py` / `ports.py` / `plugin_env.py` / `compose.py` / `deploy.py` |
 | `server/routers/users.py` (500 行, 22 endpoints) | `identity.py` / `chat_inspect.py` / `integrations.py` / `proxies.py` |
 | `server/routers/tasks.py` (405 行, 18 endpoints) | `regular_works.py` / `project.py` |
 | `cli/commands/agent.py` (441 行) | 自己變 23 行 registry + `agent_lifecycle.py` / `agent_container.py` / `agent_model.py` |

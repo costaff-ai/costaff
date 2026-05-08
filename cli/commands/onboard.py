@@ -11,7 +11,7 @@ from rich.panel import Panel
 
 from services.config import ConfigManager
 from services.runtime import get_runtime
-from utils.helpers import PATHS, _project_root, _runtime_root, _base_dir
+from utils.paths import PATHS, _project_root, _runtime_root, _base_dir
 
 console = Console()
 
@@ -136,7 +136,7 @@ def onboard():
 
     if platforms:
         from cli.commands.channel import OFFICIAL_CHANNELS
-        from utils.helpers import _deploy_local_channel
+        from utils.deploy import _deploy_local_channel
         
         for p in platforms:
             if p == "email":

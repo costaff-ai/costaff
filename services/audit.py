@@ -8,7 +8,7 @@ import os
 import time
 from typing import Any
 
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 logger = logging.getLogger(__name__)
 

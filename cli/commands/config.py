@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 
 from services.config_schema import CoStaffConfig
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 config_app = typer.Typer(help="config.json management")
 console = Console()

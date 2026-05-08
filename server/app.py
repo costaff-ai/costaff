@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from utils.helpers import PATHS
+from utils.paths import PATHS
 from server.routers import auth, system, config, agents, diary, identity, chat_inspect, integrations, proxies, regular_works, project
 
 

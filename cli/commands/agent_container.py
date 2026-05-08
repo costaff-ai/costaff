@@ -19,7 +19,7 @@ from rich.table import Table
 from services.config import ConfigManager
 from services.runtime import get_runtime
 from services.runtime.git import Git, GitError
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 from .agent import agent_app
 

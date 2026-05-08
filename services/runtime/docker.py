@@ -8,7 +8,7 @@ import os
 import subprocess
 from typing import Dict, List, Optional
 
-from utils.helpers import _project_root, _runtime_root
+from utils.paths import _project_root, _runtime_root
 
 from .base import Runtime
 

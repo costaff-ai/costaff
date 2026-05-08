@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
-from utils.helpers import PATHS
+from utils.paths import PATHS
 
 
 class DatabaseManager:

@@ -21,7 +21,8 @@ from rich.console import Console
 from services.config import ConfigManager
 from services.docker import DockerManager
 from services.runtime.git import Git, GitError
-from utils.helpers import _project_root, _base_dir, _deploy_local_agent
+from utils.paths import _project_root, _base_dir
+from utils.deploy import _deploy_local_agent
 
 from .agent import agent_app
 
