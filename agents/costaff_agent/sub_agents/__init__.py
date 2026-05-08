@@ -87,7 +87,7 @@ def load_all_remote_agent_tools() -> List:
             )
             agent_tools.append(AgentTool(agent=remote))
             logger.info(f"Successfully registered AgentTool for '{a2a_name}'")
-        except Exception as e:
-            logger.error(f"Failed to wrap remote agent '{agent_name}' as AgentTool: {e}")
+        except Exception:
+            logger.exception("Failed to wrap remote agent '%s' as AgentTool", agent_name)
 
     return agent_tools

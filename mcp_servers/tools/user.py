@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional
 
 from core import models
@@ -9,6 +10,8 @@ from mcp_servers.background import _ensure_default_regular_works
 from datetime import datetime
 
 
+
+logger = logging.getLogger(__name__)
 @mcp.tool()
 async def get_user_profile(user_id: str) -> str:
     """Retrieves the user's personal profile (name, job, company, email, etc.)."""
@@ -31,6 +34,7 @@ async def get_user_profile(user_id: str) -> str:
         }
         return json.dumps(data, ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -68,6 +72,7 @@ async def update_user_profile(
         return f"Profile updated for {user_id}."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -8,6 +9,8 @@ from core.database import SessionLocal
 from mcp_servers.setup import mcp, scheduler, scheduled_job_ids
 
 
+
+logger = logging.getLogger(__name__)
 @mcp.tool()
 async def create_regular_work(
     user_id: str, session_id: str,
@@ -50,6 +53,7 @@ async def create_regular_work(
         return f"Regular work '{title}' created (ID: {new_w.id}), schedule: {cron}."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -90,6 +94,7 @@ async def update_regular_work(
         return f"Regular work {regular_work_id} updated."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -115,6 +120,7 @@ async def pause_regular_work(regular_work_id: str) -> str:
         return f"Regular work '{w.title}' paused."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -134,6 +140,7 @@ async def resume_regular_work(regular_work_id: str) -> str:
         return f"Regular work '{w.title}' resumed. Will sync to scheduler within 30s."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -158,6 +165,7 @@ async def delete_regular_work(regular_work_id: str) -> str:
         return f"Regular work {regular_work_id} deleted."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -183,6 +191,7 @@ async def get_regular_works(user_id: str, status: Optional[str] = None) -> str:
             "last_run": w.last_run.isoformat() if w.last_run else None
         } for w in items], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -208,6 +217,7 @@ async def get_regular_work_logs(regular_work_id: str, limit: int = 10) -> str:
             "created_at": l.created_at.isoformat()
         } for l in logs], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

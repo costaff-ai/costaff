@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -6,6 +7,8 @@ from typing import Optional
 from core import models
 from core.database import SessionLocal
 from mcp_servers.setup import mcp, tz
+
+logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
@@ -62,6 +65,7 @@ async def write_diary(
         return f"Diary entry written for {agent_name} on {date}."
     except Exception as e:
         db.rollback()
+        logger.exception("write_diary failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -88,6 +92,7 @@ async def get_diary(user_id: str, date: str) -> str:
             "ref_task_ids": json.loads(e.ref_task_ids or "[]")
         } for e in entries], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("get_diary failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -119,6 +124,7 @@ async def get_recent_diaries(user_id: str, days: int = 3) -> str:
             "done": e.done, "blocker": e.blocker, "next": e.next
         } for e in entries], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("get_recent_diaries failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

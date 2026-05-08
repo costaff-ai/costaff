@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -8,6 +9,8 @@ from core.database import SessionLocal
 from mcp_servers.setup import mcp
 
 
+
+logger = logging.getLogger(__name__)
 @mcp.tool()
 async def create_reminder_tool(
     user_id: str, session_id: str, channel: str,
@@ -55,6 +58,7 @@ async def create_reminder_tool(
         return f"Reminder created (ID: {new_r.id}). Will send at {run_at}."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -73,6 +77,7 @@ async def delete_reminder_tool(reminder_id: str) -> str:
         return f"Reminder {reminder_id} deleted."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -94,6 +99,7 @@ async def get_reminders_tool(user_id: str, status: Optional[str] = None) -> str:
             "channel": r.channel, "status": r.status
         } for r in items], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

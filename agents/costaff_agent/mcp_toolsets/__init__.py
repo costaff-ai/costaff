@@ -79,6 +79,6 @@ def load_all_mcp_toolsets() -> List[McpToolset]:
                 McpToolset(connection_params=_get_connection_params(entry))
             )
             logger.info(f"Registered MCP: {name}")
-        except Exception as e:
-            logger.error(f"FAILED to load MCP '{name}': {e}")
+        except Exception:
+            logger.exception("FAILED to load MCP '%s'", name)
     return toolsets

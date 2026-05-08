@@ -59,8 +59,8 @@ def send_telegram_notification(recipient_id: str, message: str, session_id: str 
                 if response.status_code != 200:
                     logger.error(f"Plain text send also failed ({response.status_code}): {response.text}")
             return response.status_code == 200
-        except Exception as e:
-            logger.error(f"Telegram notification exception: {e}")
+        except Exception:
+            logger.exception("Telegram notification failed")
             return False
 
 def send_telegram_document(recipient_id: str, file_path: str, caption: str = None):
@@ -89,6 +89,6 @@ def send_telegram_document(recipient_id: str, file_path: str, caption: str = Non
                     data["caption"] = caption
                 res = client.post(url, data=data, files=files)
                 return res.status_code == 200
-        except Exception as e:
-            logger.error(f"Failed to send Telegram document: {e}")
+        except Exception:
+            logger.exception("Failed to send Telegram document")
             return False

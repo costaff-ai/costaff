@@ -48,8 +48,8 @@ async def startup():
                         args=[r.id], id=job_id, replace_existing=True
                     )
                     scheduled_job_ids.add(job_id)
-                except Exception as e:
-                    logger.error(f"Failed to pre-load reminder {r.id}: {e}")
+                except Exception:
+                    logger.exception("Failed to pre-load reminder %s", r.id)
     finally:
         db.close()
 

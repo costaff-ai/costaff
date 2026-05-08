@@ -151,7 +151,7 @@ async def create_project_task(
         return result
     except Exception as e:
         db.rollback()
-        logger.error(f"[create_project_task] Error: {e}")
+        logger.exception("[create_project_task] failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -178,6 +178,7 @@ async def update_task_status(task_id: str, status: str) -> str:
         return f"Task {task_id} status updated to '{status}'."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -248,7 +249,7 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
         return result
     except Exception as e:
         db.rollback()
-        logger.error(f"[update_task_queue] Error: {e}")
+        logger.exception("[update_task_queue] failed")
         return f"Internal Error: {str(e)}"
     finally:
         db.close()
@@ -285,6 +286,7 @@ async def get_agent_queue(user_id: str, assigned_agent: str) -> str:
             "epic_id": t.epic_id, "depends_on": t.depends_on
         } for t in tasks], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -324,6 +326,7 @@ async def get_next_task(user_id: str, assigned_agent: str) -> str:
             }, ensure_ascii=False, indent=2)
         return "No tasks ready to execute."
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -363,6 +366,7 @@ async def get_project_tasks(
             "epic_id": t.epic_id, "story_id": t.story_id, "depends_on": t.depends_on
         } for t in tasks], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

@@ -45,8 +45,8 @@ def backup(output: str = typer.Argument(None)):
                         if isinstance(v, datetime):
                             r[k] = v.isoformat()
                 data["tables"][t] = rows
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"[yellow]Skipping table {t}: {e}[/yellow]")
     with open(output, "w") as f:
         json.dump(data, f, indent=2)
     console.print(f"Backup saved to {output}")
@@ -84,7 +84,7 @@ def clean():
             for t in tables:
                 try:
                     conn.execute(text(f"DELETE FROM {t}"))
-                except Exception:
-                    pass
+                except Exception as e:
+                    console.print(f"[yellow]Skipping {t}: {e}[/yellow]")
             conn.commit()
         console.print("Database wiped.")

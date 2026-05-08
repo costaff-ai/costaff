@@ -1,5 +1,6 @@
 """MCP tools for managing Epics (top-level projects)."""
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -8,6 +9,8 @@ from core import models
 from core.database import SessionLocal
 from mcp_servers.setup import mcp
 from mcp_servers.tools._shared import require_approved
+
+logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
@@ -36,6 +39,7 @@ async def create_epic(user_id: str, title: str, description: Optional[str] = Non
         return f"Epic '{title}' created (ID: {epic.id})."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -65,6 +69,7 @@ async def update_epic(
         return f"Epic {epic_id} updated."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -92,6 +97,7 @@ async def get_epics(user_id: str, status: Optional[str] = None) -> str:
             "status": e.status, "created_at": e.created_at.isoformat()
         } for e in epics], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -131,6 +137,7 @@ async def get_epic_detail(epic_id: str) -> str:
             "direct_tasks": [{"id": t.id, "title": t.title, "status": t.status, "assigned_agent": t.assigned_agent} for t in direct_tasks]
         }, ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

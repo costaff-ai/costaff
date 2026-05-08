@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional
 
 import httpx
@@ -10,6 +11,8 @@ from utils.crypto import decrypt_headers
 from utils.network import is_safe_url
 
 
+
+logger = logging.getLogger(__name__)
 def _get_accessible_api_configs(db, user_id: str, agent_id: str = "__all__"):
     all_configs = db.query(models.ApiConfig).filter(models.ApiConfig.is_active == True).all()
     result = []
@@ -103,6 +106,7 @@ async def request_api(user_id: str, api_name: str, agent_id: str = "__all__", pa
     except httpx.TimeoutException:
         return "Error: Request timed out."
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

@@ -125,8 +125,8 @@ async def ensure_session(app: str, uid: str, sid: str) -> bool:
     try:
         res = await client.post(url, json={"sessionId": sid, "state": {}})
         return res.status_code in [200, 201, 409]
-    except Exception as e:
-        logger.warning(f"Failed to ensure session {sid}: {e}")
+    except Exception:
+        logger.exception("Failed to ensure session sid=%s", sid)
         return False
 
 async def delete_session(app: str, uid: str, sid: str) -> bool:
@@ -135,8 +135,8 @@ async def delete_session(app: str, uid: str, sid: str) -> bool:
     try:
         res = await client.delete(url)
         return res.status_code == 200
-    except Exception as e:
-        logger.warning(f"Failed to delete session {sid}: {e}")
+    except Exception:
+        logger.exception("Failed to delete session sid=%s", sid)
         return False
 
 async def run_adk_prompt(app: str, uid: str, sid: str, prompt: Optional[str] = None, parts: Optional[List[dict]] = None) -> str:
@@ -161,8 +161,8 @@ async def run_adk_prompt(app: str, uid: str, sid: str, prompt: Optional[str] = N
                         preferred_lang = os.getenv("COSTAFF_PREFERRED_LANGUAGE", "English")
                         payload["newMessage"] = {"role": "user", "parts": [{"text": f"The task is complete. Please summarize the result for the user in {preferred_lang}."}]}
                         continue
-                except Exception as e:
-                    logger.warning(f"ADK request attempt failed cid={cid} sid={sid}: {e}")
+                except Exception:
+                    logger.exception("ADK request attempt failed cid=%s sid=%s", cid, sid)
                     await asyncio.sleep(2)
             logger.warning(f"ADK request exhausted retries cid={cid} sid={sid}")
             return "⚠️ Failed to get a response from the agent."

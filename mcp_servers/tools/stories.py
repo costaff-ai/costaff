@@ -1,5 +1,6 @@
 """MCP tools for managing Stories (milestones / features within an Epic)."""
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -8,6 +9,8 @@ from core import models
 from core.database import SessionLocal
 from mcp_servers.setup import mcp
 from mcp_servers.tools._shared import require_approved
+
+logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
@@ -42,6 +45,7 @@ async def create_story(
         return f"Story '{title}' created (ID: {story.id}) in Epic {epic_id}."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -74,6 +78,7 @@ async def update_story(
         return f"Story {story_id} updated."
     except Exception as e:
         db.rollback()
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -92,6 +97,7 @@ async def get_stories(epic_id: str) -> str:
             "priority": s.priority, "description": s.description
         } for s in stories], ensure_ascii=False, indent=2)
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error: {str(e)}"
     finally:
         db.close()

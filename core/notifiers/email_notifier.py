@@ -40,6 +40,6 @@ def send_email_notification(recipient_email: str, message: str, subject: str = N
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
         return True
-    except Exception as e:
-        logger.error(f"Email send failed: {e}")
+    except Exception:
+        logger.exception("Email send failed")
         return False

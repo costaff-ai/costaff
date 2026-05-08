@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy import text as sa_text
@@ -7,6 +8,8 @@ from core.database import SessionLocal
 from mcp_servers.setup import mcp, tz
 
 
+
+logger = logging.getLogger(__name__)
 @mcp.tool()
 async def read_today_events(user_id: str, date_str: str = "") -> str:
     """
@@ -67,6 +70,7 @@ async def read_today_events(user_id: str, date_str: str = "") -> str:
 
         return "\n".join(transcript[:100])  # Cap at 100 lines
     except Exception as e:
+        logger.exception("MCP tool failed")
         return f"Error reading events: {str(e)}"
     finally:
         db.close()

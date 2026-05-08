@@ -1,8 +1,11 @@
 import httpx
+import logging
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
+
 
 async def send_line_notification(user_id: str, message: str):
     """Sends a push notification message via LINE Messaging API.
@@ -16,9 +19,9 @@ async def send_line_notification(user_id: str, message: str):
     """
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
     if not token:
-        print("Error: LINE_CHANNEL_ACCESS_TOKEN not found")
+        logger.error("LINE_CHANNEL_ACCESS_TOKEN not found")
         return
-    
+
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -28,12 +31,12 @@ async def send_line_notification(user_id: str, message: str):
         "to": user_id,
         "messages": [{"type": "text", "text": message}]
     }
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return True
-        except Exception as e:
-            print(f"Line failed: {e}")
+        except Exception:
+            logger.exception("LINE notification failed")
             return False

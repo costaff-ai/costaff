@@ -36,8 +36,8 @@ async def sync_database_tasks():
                         )
                         scheduled_job_ids.add(job_id)
                         logger.info(f"Reminder {r.id} scheduled at {r.run_at}")
-                    except Exception as e:
-                        logger.error(f"Failed to schedule reminder {r.id}: {e}")
+                    except Exception:
+                        logger.exception("Failed to schedule reminder %s", r.id)
 
             # Sync RegularWorks (cron-based)
             works = db.query(models.RegularWork).filter(models.RegularWork.status == "active").all()
@@ -52,8 +52,8 @@ async def sync_database_tasks():
                         )
                         scheduled_job_ids.add(job_id)
                         logger.info(f"RegularWork {w.id} scheduled: {w.cron}")
-                    except Exception as e:
-                        logger.error(f"Failed to schedule regular_work {w.id}: {e}")
+                    except Exception:
+                        logger.exception("Failed to schedule regular_work %s", w.id)
 
             # Sync scheduled ProjectTasks (cron-based)
             scheduled_tasks = db.query(models.ProjectTask).filter(
@@ -71,8 +71,8 @@ async def sync_database_tasks():
                         )
                         scheduled_job_ids.add(job_id)
                         logger.info(f"ProjectTask {t.id} scheduled: {t.cron}")
-                    except Exception as e:
-                        logger.error(f"Failed to schedule project_task {t.id}: {e}")
+                    except Exception:
+                        logger.exception("Failed to schedule project_task %s", t.id)
 
             # Remove stale jobs
             current_ids = {job.id for job in scheduler.get_jobs()}
@@ -82,12 +82,12 @@ async def sync_database_tasks():
                         scheduler.remove_job(job_id)
                         scheduled_job_ids.discard(job_id)
                         logger.info(f"Removed stale job {job_id}")
-                    except Exception as e:
-                        logger.warning(f"Failed to remove job {job_id}: {e}")
+                    except Exception:
+                        logger.exception("Failed to remove job %s", job_id)
 
             db.close()
-        except Exception as e:
-            logger.error(f"sync_database_tasks error: {e}")
+        except Exception:
+            logger.exception("sync_database_tasks error")
         await asyncio.sleep(30)
 
 
@@ -118,8 +118,8 @@ async def poll_queued_tasks():
                     asyncio.create_task(execute_project_task(task.id))
 
             db.close()
-        except Exception as e:
-            logger.error(f"poll_queued_tasks error: {e}")
+        except Exception:
+            logger.exception("poll_queued_tasks error")
         await asyncio.sleep(5)
 
 
@@ -210,8 +210,8 @@ def _ensure_default_regular_works(user_id: str = None):
             ))
         db.commit()
         logger.info("Created default global Regular Works (user_id='*')")
-    except Exception as e:
+    except Exception:
         db.rollback()
-        logger.error(f"Failed to create default global Regular Works: {e}")
+        logger.exception("Failed to create default global Regular Works")
     finally:
         db.close()

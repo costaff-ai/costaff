@@ -59,6 +59,6 @@ def send_discord_notification(recipient_id: str, message: str, session_id: str =
                 return res_final.status_code == 200
             
             return False
-        except Exception as e:
-            logger.error(f"Discord notification exception: {e}")
+        except Exception:
+            logger.exception("Discord notification failed")
             return False
