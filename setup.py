@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="costaff-cli",
-    version="0.2.4",
+    version="0.1.0a1",
     description="CoStaff Agent Ecosystem CLI by CoStaff",
     author="Simon Liu",
     py_modules=["costaff"],

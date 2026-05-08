@@ -448,7 +448,7 @@ structure that meets §3 / §4 / §6 is conformant.
 
 | Version | Date | Changes |
 |---|---|---|
-| **1.0** | 2026-05-04 | Initial release. Documents the existing de-facto behaviour as of CoStaff CLI 0.2.4. |
+| **1.0** | 2026-05-04 | Initial release. Documents the existing de-facto behaviour as of CoStaff CLI 0.1.0-alpha-1. |
 
 ---
 
