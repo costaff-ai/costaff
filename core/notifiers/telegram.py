@@ -9,13 +9,21 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 def send_telegram_notification(recipient_id: str, message: str, session_id: str = None):
-    """Sends a notification message to a Telegram chat (Synchronous)."""
+    """Sends a notification message to a Telegram chat (Synchronous).
+
+    When the session has a recorded `last_message_id` (set by the channel
+    runtime on every inbound message), the outgoing notification quotes
+    that message via Telegram's `reply_parameters` so async callbacks land
+    as a reply to the user's original question rather than as a floating
+    new message.
+    """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         logger.error("TELEGRAM_BOT_TOKEN not found")
         return False
 
     final_recipient = recipient_id
+    reply_to_message_id: int | None = None
     db = SessionLocal()
     try:
         # 1. Try resolving via session_id if provided (Highest priority for accuracy)
@@ -24,6 +32,11 @@ def send_telegram_notification(recipient_id: str, message: str, session_id: str 
             if mapping:
                 final_recipient = mapping.real_id
                 logger.debug(f"Resolved session_id {session_id} → real_id {final_recipient}")
+                if mapping.last_message_id:
+                    try:
+                        reply_to_message_id = int(mapping.last_message_id)
+                    except (TypeError, ValueError):
+                        pass
 
         # 2. Fallback to resolving via hashed_id if recipient_id is not a digit
         if not str(final_recipient).isdigit():
@@ -31,6 +44,11 @@ def send_telegram_notification(recipient_id: str, message: str, session_id: str 
             if mapping:
                 final_recipient = mapping.real_id
                 logger.debug(f"Resolved hashed_id → real_id {final_recipient}")
+                if reply_to_message_id is None and mapping.last_message_id:
+                    try:
+                        reply_to_message_id = int(mapping.last_message_id)
+                    except (TypeError, ValueError):
+                        pass
             else:
                 logger.warning(f"Could not resolve hashed_id {final_recipient} to a real_id")
     finally:
@@ -47,8 +65,15 @@ def send_telegram_notification(recipient_id: str, message: str, session_id: str 
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": final_recipient, "text": message, "parse_mode": "HTML"}
+    if reply_to_message_id:
+        # allow_sending_without_reply: if the target message was deleted, the
+        # server still sends the new message (without quoting) instead of 400.
+        payload["reply_parameters"] = {
+            "message_id": reply_to_message_id,
+            "allow_sending_without_reply": True,
+        }
 
-    logger.info(f"Sending Telegram notification to {final_recipient}")
+    logger.info(f"Sending Telegram notification to {final_recipient} (reply_to={reply_to_message_id})")
     with httpx.Client(timeout=10.0) as client:
         try:
             response = client.post(url, json=payload)

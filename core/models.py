@@ -54,6 +54,7 @@ class IdentityMap(Base):
     real_id = Column(String, nullable=False)
     is_approved = Column(Boolean, default=False, nullable=False)
     active_session_id = Column(String, nullable=True)
+    last_message_id = Column(String, nullable=True)  # most recent inbound platform message id — used as reply_to target
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
