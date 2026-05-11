@@ -211,6 +211,7 @@ def recover_orphaned_tasks() -> int:
         ).all()
 
         for task in stuck:
+            stuck_since = task.updated_at  # capture BEFORE we overwrite it
             task.status = "failed"
             task.updated_at = datetime.utcnow()
             db.add(models.TaskComment(
@@ -232,7 +233,7 @@ def recover_orphaned_tasks() -> int:
             recovered += 1
             logger.warning(
                 f"recover_orphaned_tasks: task {task.id} ({task.title!r}) "
-                f"marked failed — was 'doing' since {task.updated_at}"
+                f"marked failed — was 'doing' since {stuck_since}"
             )
 
         if recovered:
