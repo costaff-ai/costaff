@@ -127,6 +127,9 @@ install_ubuntu() {
     else
         success "Python ${PYTHON_VERSION} already installed."
     fi
+    # Ensure venv module is present even when Python is already installed:
+    # Ubuntu Minimal ships python3.x without the venv module by default.
+    sudo apt-get install -y python${PYTHON_VERSION}-venv
 
     # Git & Curl
     step "Checking git and curl..."
