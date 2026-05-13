@@ -3,6 +3,7 @@ import typer
 from utils.paths import VERSION
 from cli.commands.lifecycle import start, stop, status, logs, restart
 from cli.commands.onboard import onboard
+from cli.commands.bootstrap import bootstrap
 from cli.commands.dashboard import dashboard, chat, invoke
 from cli.commands.licensing import license
 from cli.commands.agent import agent_app
@@ -16,6 +17,7 @@ app = typer.Typer(help=f"CoStaff Agent Ecosystem CLI v{VERSION}", rich_markup_mo
 
 # Register direct commands
 app.command()(onboard)
+app.command()(bootstrap)
 app.command()(start)
 app.command()(stop)
 app.command()(restart)
