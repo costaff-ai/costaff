@@ -12,7 +12,7 @@ COSTAFF_BASE="$HOME/.costaff"      # runtime parent directory
 COSTAFF_DIR="$COSTAFF_BASE/costaff"  # git clone target (CLI core)
 RUNTIME_DIR="$COSTAFF_DIR"
 VENV_DIR="$COSTAFF_BASE/.venv"
-PYTHON_VERSION="3.11"
+PYTHON_VERSION="3.12"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -120,7 +120,7 @@ install_ubuntu() {
     if ! command -v python${PYTHON_VERSION} &>/dev/null; then
         echo "Adding deadsnakes PPA for Python ${PYTHON_VERSION}..."
         sudo apt-get install -y software-properties-common
-        sudo add-apt-repository -y ppa:deadsnakes/python
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
         sudo apt-get update -q
         sudo apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-distutils
         success "Python ${PYTHON_VERSION} installed."
