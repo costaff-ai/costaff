@@ -127,7 +127,42 @@ The specialist's only job: **do the work, save the file, report back**. Chaining
 
 ## Principle 3 — Execute One Specialist at a Time, In Order
 
+**THIS IS THE MOST COMMONLY VIOLATED RULE — READ CAREFULLY.**
+
 Call only one agent tool per step. **Wait for the tool to return** before calling the next. The return value is the specialist's completion signal — do not begin the next step until you have it.
+
+### ⛔ ABSOLUTELY FORBIDDEN
+
+- Invoking two or more specialist agent tools in the same turn / response
+- Invoking the downstream specialist (e.g. `business_analysis`) before the upstream specialist (e.g. `coding`) has returned, *even if* you believe the downstream specialist can start partial work
+- Calling `business_analysis(request=...)` and `coding(request=...)` back-to-back without an intervening completion signal
+- "Just kicking them off in parallel to save time" — this **breaks the chain**: the downstream specialist runs against missing files and fails silently
+
+### ✅ Correct sequence (Coding → BA chain)
+
+```
+turn N    : call coding(request=...)
+          → wait for coding's return value (absolute path to output file)
+          → coding returns: "...wrote /app/data/shared/costaff-agent-coding/<project>/results.json"
+turn N+1  : (optional) brief send_message_now: "▶️ BA 正在生成報告，請稍候"
+turn N+1  : call business_analysis(request=...) — request includes the EXACT path coding returned
+          → wait for BA's return value
+turn N+2  : final consolidated reply to user with all artifacts
+```
+
+### ❌ Wrong sequence (today's reproduced bug — 2026-05-14)
+
+```
+turn N    : call business_analysis(request=...)   ← FIRES BA FIRST
+turn N    : call coding(request=...)              ← FIRES CODING 30s LATER
+                                                    in the same turn
+          → BA can't find coding's output → reports "file not found"
+          → coding finishes later, but BA already failed
+```
+
+Even if these two calls were made in opposite order, **putting them in the same turn is the violation**. The chain requires the upstream tool's **return value** to thread into the downstream tool's `request`. You cannot have that value until the upstream call returns.
+
+### Completion signal — what counts
 
 A valid completion signal always includes at least one of:
 - An absolute output file path (e.g. `/app/data/shared/costaff-agent-<name>/<project>/result.csv`)
@@ -136,6 +171,14 @@ A valid completion signal always includes at least one of:
 - An explicit failure declaration explaining why the task cannot be completed
 
 Mid-task progress messages sent via `send_message_now` (e.g. "安裝中…", "🔍 開始調查") are **NOT** completion signals — the specialist may emit several before its tool call finally returns.
+
+### Recovery if you realise you already invoked two specialists in parallel
+
+1. **Do NOT** retry calling the downstream specialist again "just in case it works this time" — the upstream output is still missing
+2. **Wait** for the upstream specialist (e.g. coding) to actually return
+3. Read its return value, extract the artefact path
+4. Then call the downstream specialist again with the extracted path in `request`
+5. Apologise briefly to the user only if the first BA failure was already reported — don't re-report it
 
 ---
 

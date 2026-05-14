@@ -215,8 +215,20 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
         updated_count = 0
         first_task_id = None
 
-        # Normalize agent name (handle costaff-agent-coding vs coding_agent)
-        norm_agent = assigned_agent.replace("-", "_")
+        # Normalize agent name. The caller (manager LLM) may pass any of these:
+        #   "coding", "coding_agent", "costaff-agent-coding", "business_analysis_agent"
+        # and `task.assigned_agent` recorded in DB at create-time may use a
+        # different form. Strip the "_agent" / "agent" suffix and convert
+        # hyphens to underscores so all four spellings collapse to one bare key.
+        def _norm(name: str) -> str:
+            n = (name or "").replace("-", "_")
+            if n.startswith("costaff_agent_"):
+                n = n[len("costaff_agent_"):]
+            if n.endswith("_agent"):
+                n = n[:-len("_agent")]
+            return n
+
+        norm_agent = _norm(assigned_agent)
 
         for idx, task_id in enumerate(task_ids_ordered):
             task = db.query(models.ProjectTask).filter(models.ProjectTask.id == task_id).first()
@@ -225,7 +237,7 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
                 logger.warning(f"[update_task_queue] task {task_id} not found in DB")
                 continue
 
-            task_norm = task.assigned_agent.replace("-", "_")
+            task_norm = _norm(task.assigned_agent)
             if task_norm != norm_agent:
                 logger.warning(f"[update_task_queue] agent mismatch: task has {task.assigned_agent!r}, expected {assigned_agent!r}")
                 continue
