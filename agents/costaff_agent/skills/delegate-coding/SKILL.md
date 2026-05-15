@@ -38,7 +38,7 @@ The specialist sees **only the `request` string** — no session history, no pla
 **What to include in `request`:**
 - The exact task (e.g. "Run SVM classification on the wine dataset using scikit-learn")
 - Any input file paths (absolute, under `/app/data/shared/`)
-- The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_svm_results.json`"). **Always include a kebab-case `<project>/` subdirectory** — never prescribe a path directly under `costaff-agent-coding/`.
+- The desired output format and output path (e.g. "Save results to `/app/data/shared/costaff-agent-coding/wine-svm/wine_svm_results.json`"). **Always include a kebab-case `<project>/` subdirectory** — never prescribe a path directly under `costaff-agent-coding/`. Do NOT add `outputs/` or any other inner directory yourself; leave inner layout to the specialist, and use whatever path the specialist returns when chaining downstream.
 - Any specific libraries to use
 - A `[PROGRESS_CONTEXT]` block with `user_id`, `channel`, `session_id` if user-facing progress messages are wanted
 
@@ -61,9 +61,12 @@ The return value contains at least one of:
 
 The coding agent writes inside a **kebab-case project subdirectory** under its shared slot:
 ```
-/app/data/shared/costaff-agent-coding/<project>/outputs/<filename>   ← data, charts, results, reports
+/app/data/shared/costaff-agent-coding/<project>/<filename>           ← the path the caller (you) prescribed
+/app/data/shared/costaff-agent-coding/<project>/outputs/<filename>   ← inner layout the agent chose (greenfield only)
 /app/data/shared/costaff-agent-coding/<project>/src/<filename>       ← source code
 ```
+
+When you (the Manager) prescribed a path in `request`, the agent should write there verbatim. When you only described what the file is (no explicit path), the agent picks its own inner layout — possibly using `outputs/`. Either way, **trust the path the agent reports back** and pass that exact string downstream.
 
 Never prescribe (or expect) a file directly under `/app/data/shared/costaff-agent-coding/` with no subdirectory — the coding agent will refuse to obey such a path and normalize it to a project subdirectory, returning the corrected path. Use the **exact path returned by the agent** when reporting to the user or chaining to the next specialist.
 

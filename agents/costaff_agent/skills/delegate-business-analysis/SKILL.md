@@ -37,8 +37,8 @@ The specialist sees **only the `request` string** — no session history, no pla
 
 **What to include in `request`:**
 - The exact task (e.g. "Generate a PDF report on SVM classification of the wine dataset")
-- Input file path(s) — **exact absolute paths** returned by the previous specialist, e.g.
-  `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_svm_results.json`
+- Input file path(s) — **exact absolute paths** returned by the previous specialist (use whatever path the specialist actually reported back, including any `outputs/` or other inner directory it chose), e.g.
+  `/app/data/shared/costaff-agent-coding/wine-svm/wine_svm_results.json`
 - Desired output path including a kebab-case `<report-name>/` subdirectory, e.g.
   `/app/data/shared/costaff-agent-business-analysis/svm-wine-report/svm_wine_report.pdf`
 - Language requirement (e.g. "Report should be in Traditional Chinese")

@@ -156,8 +156,10 @@ Every path you write in a plan or in a `request` MUST include a kebab-case **pro
 
 | ❌ Bad (flat root) | ✅ Good (with project subdir) |
 |---|---|
-| `/app/data/shared/costaff-agent-coding/wine_stats.csv` | `/app/data/shared/costaff-agent-coding/wine-eda/outputs/wine_stats.csv` |
+| `/app/data/shared/costaff-agent-coding/wine_stats.csv` | `/app/data/shared/costaff-agent-coding/wine-eda/wine_stats.csv` |
 | `/app/data/shared/costaff-agent-business-analysis/wine_report.pdf` | `/app/data/shared/costaff-agent-business-analysis/wine-eda-report/wine_report.pdf` |
+
+Do NOT add inner directories like `outputs/` or `src/` to the path you prescribe — that is the specialist's own decision. Your job is only to ensure the kebab-case `<project>/` segment is present.
 
 ---
 
@@ -170,7 +172,7 @@ The specialist agent tool receives **only the `request` string you write** — i
 | Element | Required? | Example |
 |---|---|---|
 | Concrete action verb | always | "Load the wine dataset and run EDA…" |
-| Input source / file paths | if any | "Read `/app/data/shared/costaff-agent-coding/wine-svm/outputs/wine_results.json`" |
+| Input source / file paths | if any | "Read `/app/data/shared/costaff-agent-coding/wine-svm/wine_results.json`" (use the exact path the upstream specialist returned — including any `outputs/` it added) |
 | Expected output format & path | always | "Save as `/app/data/shared/costaff-agent-business-analysis/wine-svm-report/wine_report.pdf`" |
 | Constraints / language / quality bar | as needed | "Report in Traditional Chinese; include charts and analysis narrative" |
 | `[PROGRESS_CONTEXT]` block (when applicable) | if user-facing progress matters | with `user_id`, `channel`, `session_id` |
