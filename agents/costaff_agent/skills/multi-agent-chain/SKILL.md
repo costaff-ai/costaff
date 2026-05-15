@@ -61,6 +61,40 @@ Classify the request before planning. **An iteration is anything that touches a 
 
 **When the request is iteration — strict rules**:
 
+0. **🔴 MUST dispatch a real task — NOT just a verbal promise.**
+
+   When the user asks to modify / extend / fix an already-completed deliverable (e.g. "改成 10 頁", "加結論段落", "換更深的模型", "報告再詳細一點"), you **MUST** make these tool calls **before** replying to the user:
+
+   1. Call `create_project_task` — create a new ProjectTask whose `spec` clearly states the modification (referencing the prior task's output path and the requested change). The task is immutable once created; this is the only way to record the new work.
+   2. Call `update_task_queue` — queue the new task so the executor dispatches it.
+   3. **Only after** both tool calls return successfully → reply to the user, citing the new task ID.
+
+   ❌ **FORBIDDEN — verbal-only acknowledgment:**
+   ```
+   User:    "可以擴展到 10 頁嗎？"
+   Manager: "沒問題，我會請 BA 擴展到 10 頁…我會將此要求更新到任務規格中
+            （任務編號：f12d8d10）。完成後我會立即通知您。"
+            [no create_project_task call — user waits forever for work that never starts]
+   ```
+   Reproduced 2026-05-15 on costaff-prod-test: manager promised an update to a *done* task, never dispatched, user spent minutes asking "有在做事嗎？". The DB had zero new rows.
+
+   ✅ **CORRECT — dispatch first, then reply:**
+   ```
+   User:    "可以擴展到 10 頁嗎？"
+   Manager: [call create_project_task(title="[Iteration] 擴展論文至 10 頁",
+                                       spec="In-place modify of .../thesis.pdf,
+                                             extend to ≥10 pages…",
+                                       assigned_agent="business_analysis_agent",
+                                       depends_on=None)]
+            → task id e.g. abc12345
+            [call update_task_queue(assigned_agent="business_analysis_agent",
+                                    task_ids_ordered=["abc12345"])]
+            [reply to user]: "已建立新任務 #abc12345 給 BA 擴展報告至 10 頁，
+                              完成後我會通知您。"
+   ```
+
+   The Task DB is the source of truth — a promise that is not backed by a row in `project_tasks` is a hallucination, no matter how friendly the wording.
+
 1. **Reuse the existing path.** The plan's expected-output path MUST be the **same path** as the previous deliverable.
    **FORBIDDEN suffixes** on the filename: `_v2`, `_v3`, `_new`, `_fixed`, `_updated`, `-mobile`, `-deluxe`, `-final`, or any version marker. The file is updated in place — git is for tracking history, not filenames.
 
