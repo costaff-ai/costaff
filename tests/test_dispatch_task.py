@@ -215,6 +215,139 @@ async def test_dispatch_task_requires_assigned_agent(db_session, patched_pt):
 
 
 @pytest.mark.asyncio
+async def test_dispatch_task_auto_chains_when_session_has_in_progress_task(db_session, patched_pt):
+    """When a second dispatch arrives for the same (user_id, session_id) while
+    an earlier task is still queued/doing, the second one MUST be auto-linked
+    via depends_on and inserted as backlog — not raced against the first.
+
+    This is the executor-side guarantee that backs Principle 3 ("one
+    specialist at a time"). The Manager LLM is supposed to enforce it via
+    prompt rules but is unreliable; this test pins down the structural
+    safety net."""
+    user_id = _make_user(db_session)
+    epic = _make_epic(db_session, user_id=user_id)
+    session_id = "tg_user_session_xyz"
+
+    # First dispatch — no in-progress task → queued, executor triggered.
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id,
+        title="Step 1 (Coding)", assigned_agent="coding_agent",
+        spec="load wine dataset", session_id=session_id,
+    )
+    await asyncio.sleep(0)
+    assert len(patched_pt) == 1, "First dispatch should trigger executor immediately"
+
+    # Second dispatch in same session, no explicit depends_on
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id,
+        title="Step 2 (BA)", assigned_agent="business_analysis_agent",
+        spec="write report", session_id=session_id,
+    )
+    await asyncio.sleep(0)
+
+    rows = (
+        db_session.query(models.ProjectTask)
+        .order_by(models.ProjectTask.created_at.asc())
+        .all()
+    )
+    coding, ba = rows[0], rows[1]
+    assert coding.status == "queued"
+    assert ba.status == "backlog", "Auto-linked task must start as backlog, not queued"
+    assert ba.depends_on == coding.id, "Auto-link must wire depends_on to upstream"
+    assert len(patched_pt) == 1, "Auto-linked task must NOT trigger executor immediately"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_task_no_auto_chain_without_session_id(db_session, patched_pt):
+    """If session_id is missing, auto-link cannot scope safely — fall back to
+    plain queued dispatch."""
+    user_id = _make_user(db_session)
+    epic = _make_epic(db_session, user_id=user_id)
+
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="T1",
+        assigned_agent="coding_agent", spec="x", session_id=None,
+    )
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="T2",
+        assigned_agent="coding_agent", spec="y", session_id=None,
+    )
+    await asyncio.sleep(0)
+
+    rows = (
+        db_session.query(models.ProjectTask)
+        .order_by(models.ProjectTask.created_at.asc())
+        .all()
+    )
+    assert all(r.status == "queued" for r in rows), \
+        "Without session_id, dispatches should not auto-chain"
+    assert all(r.depends_on is None for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_task_explicit_depends_on_creates_backlog(db_session, patched_pt):
+    """When the caller passes depends_on explicitly, the task is backlog
+    (waiting on dep) and the executor is NOT auto-triggered."""
+    user_id = _make_user(db_session)
+    epic = _make_epic(db_session, user_id=user_id)
+
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="T1",
+        assigned_agent="coding_agent", spec="x",
+    )
+    await asyncio.sleep(0)
+    t1 = db_session.query(models.ProjectTask).first()
+    assert len(patched_pt) == 1
+
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="T2",
+        assigned_agent="business_analysis_agent", spec="y",
+        depends_on=t1.id,
+    )
+    await asyncio.sleep(0)
+
+    t2 = (
+        db_session.query(models.ProjectTask)
+        .filter_by(title="T2").first()
+    )
+    assert t2.status == "backlog"
+    assert t2.depends_on == t1.id
+    assert len(patched_pt) == 1, "Explicit-depends_on task must not trigger executor"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_task_no_auto_chain_when_prior_is_done(db_session, patched_pt):
+    """A done upstream task is not in-progress → next dispatch starts fresh
+    (no auto-link), so unrelated user requests don't accumulate phantom deps."""
+    user_id = _make_user(db_session)
+    epic = _make_epic(db_session, user_id=user_id)
+    session_id = "tg_session_done"
+
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="Earlier (done)",
+        assigned_agent="coding_agent", spec="x", session_id=session_id,
+    )
+    # Mark first task done — simulates prior request completing earlier
+    first = db_session.query(models.ProjectTask).first()
+    first.status = "done"
+    db_session.commit()
+    await asyncio.sleep(0)
+
+    await pt_mod.dispatch_task(
+        epic_id=epic.id, user_id=user_id, title="New unrelated request",
+        assigned_agent="twinkle_hub_agent", spec="z", session_id=session_id,
+    )
+    await asyncio.sleep(0)
+
+    new_task = (
+        db_session.query(models.ProjectTask)
+        .filter_by(title="New unrelated request").first()
+    )
+    assert new_task.status == "queued"
+    assert new_task.depends_on is None
+
+
+@pytest.mark.asyncio
 async def test_dispatch_task_rejects_unapproved_user(db_session, patched_pt):
     """An unapproved IdentityMap row → require_approved returns an error string;
     no task is created."""

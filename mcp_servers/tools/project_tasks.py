@@ -189,6 +189,13 @@ async def dispatch_task(
         this agent's open tasks) + 1, so it appends to the end of the agent's queue.
       - If type is 'immediate' (no `cron`), the executor is triggered right away.
       - If `cron` is set, the task is created as 'scheduled' and not run immediately.
+      - **Auto-chain**: if `depends_on` is not provided AND there is an in-progress
+        (queued / doing) task for the same `(user_id, session_id)`, this new task
+        is auto-linked via `depends_on` and inserted as `backlog`. The executor
+        will wake it via `_advance_agent_queue` after the upstream finishes.
+        This prevents accidental parallel dispatch in a chain (Principle 3) —
+        Manager can call `dispatch_task` twice back-to-back and the second call
+        will queue cleanly behind the first instead of racing it.
 
     Spec format: see `create_project_task` — write the spec yourself before calling.
 
@@ -203,6 +210,29 @@ async def dispatch_task(
         err = require_approved(user_id, db)
         if err:
             return err
+
+        # Auto-chain: if this dispatch belongs to a user/session that already
+        # has work in flight, link it as a dependent rather than letting it
+        # race the upstream. The Manager LLM is supposed to enforce this via
+        # Principle 3 ("one specialist at a time"), but does not always — and
+        # the executor is the only layer that can structurally guarantee it.
+        if not depends_on and session_id:
+            in_progress = (
+                db.query(models.ProjectTask)
+                .filter(
+                    models.ProjectTask.user_id == user_id,
+                    models.ProjectTask.session_id == session_id,
+                    models.ProjectTask.status.in_(["queued", "doing"]),
+                )
+                .order_by(models.ProjectTask.created_at.desc())
+                .first()
+            )
+            if in_progress:
+                depends_on = in_progress.id
+                logger.info(
+                    f"[dispatch_task] auto-linked depends_on={depends_on} "
+                    f"(in-progress task {in_progress.title!r} for same session)"
+                )
 
         # Fallback spec — same shape as create_project_task
         if not spec:
@@ -252,7 +282,15 @@ async def dispatch_task(
         next_order = (existing_max or 0) + 1
 
         task_type = "scheduled" if cron else "immediate"
-        initial_status = "scheduled" if cron else "queued"
+        # backlog when waiting on a dependency — _advance_agent_queue will
+        # promote it to queued and trigger the executor once the upstream
+        # task is done.
+        if cron:
+            initial_status = "scheduled"
+        elif depends_on:
+            initial_status = "backlog"
+        else:
+            initial_status = "queued"
 
         task = models.ProjectTask(
             id=str(uuid.uuid4()),
@@ -278,9 +316,11 @@ async def dispatch_task(
         db.commit()
         db.refresh(task)
 
-        # Immediate tasks: hand to executor right now (do not wait for poll loop).
-        # Scheduled (cron) tasks: APScheduler picks them up later.
-        if task_type == "immediate":
+        # Immediate, dependency-free tasks: hand to executor right now (do not
+        # wait for poll loop). Scheduled (cron) and backlog (waiting on a
+        # dependency) tasks are picked up later by APScheduler or by
+        # `_advance_agent_queue` respectively.
+        if task_type == "immediate" and initial_status == "queued":
             asyncio.create_task(execute_project_task(task.id))
             logger.info(f"[dispatch_task] triggered execute_project_task for {task.id}")
 
