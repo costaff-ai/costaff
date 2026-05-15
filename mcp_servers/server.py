@@ -76,6 +76,13 @@ if __name__ == "__main__":
         starlette_app = mcp.streamable_http_app()
         logger.info("MCP transport: streamable-http (endpoint: /mcp)")
 
+        # Mount the plain-HTTP shim for the shared cross-agent tools so
+        # plugins can call them with httpx instead of a 2nd MCP session
+        # (which triggers the anyio CancelScope race). Added BEFORE the
+        # Bearer wrap below so the same MCP_SECRET_KEY guards it.
+        from mcp_servers.http_api import register_http_api
+        register_http_api(starlette_app)
+
         mcp_secret = os.getenv("MCP_SECRET_KEY")
         if mcp_secret:
             class BearerMiddleware(BaseHTTPMiddleware):
