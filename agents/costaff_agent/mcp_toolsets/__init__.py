@@ -33,7 +33,7 @@ def _get_connection_params(entry):
 
     Transport precedence:
       1. explicit `transport` field on the entry, else
-      2. global MCP_TRANSPORT env (default "sse"), else
+      2. global MCP_TRANSPORT env (default "streamable-http"), else
       3. inferred from the URL's /sse|/mcp suffix.
     SSE is race-free under to_a2a()+ADK1.33 (the streamable-http anyio
     CancelScope race #4454 does NOT occur on SSE — verified 2026-05-16).
@@ -50,7 +50,7 @@ def _get_connection_params(entry):
     if not url:
         raise ValueError("MCP entry has no URL")
     if transport is None:
-        transport = os.getenv("MCP_TRANSPORT", "sse").strip().lower()
+        transport = os.getenv("MCP_TRANSPORT", "streamable-http").strip().lower()
     # normalise both alias spellings
     if transport in ("streamable", "streamable-http", "streamable_http"):
         transport = "streamable"

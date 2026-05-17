@@ -79,7 +79,7 @@ if __name__ == "__main__":
         # shim is mounted on whichever app, so it keeps working either
         # way. MCP_TRANSPORT=streamable-http to switch back once ADK
         # fixes #4454.
-        _transport = os.getenv("MCP_TRANSPORT", "sse").strip().lower()
+        _transport = os.getenv("MCP_TRANSPORT", "streamable-http").strip().lower()
         if _transport == "streamable-http":
             starlette_app = mcp.streamable_http_app()
             logger.info("MCP transport: streamable-http (endpoint: /mcp)")
