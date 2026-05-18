@@ -7,8 +7,13 @@ EDITS that same message on every subsequent step and on finalize, so the
 user sees one self-updating status block instead of N spammed messages:
 
     [ Business Analysis Agent ] Working
-    generate_chart ... Done
-    export_pdf ... Doing
+    generate_chart - Done
+    export_pdf - Doing..
+
+A per-panel background ticker animates every still-"Doing" line with
+cycling dots (Doing. → Doing.. → Doing... → Doing.) while the step runs,
+since no callback fires between a tool's start and end. The ticker stops
+itself when nothing is "Doing" and is cancelled on finalize.
 
 Entirely fail-safe: nothing here may ever raise into the caller. A broken
 panel must never affect task execution (the agent/executor wrap calls in
@@ -24,6 +29,10 @@ from core import models
 from core.database import SessionLocal
 
 logger = logging.getLogger("costaff-agent-engine")
+
+# Breathing-dots tick interval (s). ~1.3s keeps it lively without
+# tripping Telegram's edit rate limit (429 is handled benignly anyway).
+_TICK = float(os.getenv("COSTAFF_PANEL_TICK", "1.3"))
 
 # Per-key in-process state. Key = the task session id ("task_<task_id>"),
 # which both the agent callback (from PROGRESS_CONTEXT) and the executor
@@ -70,8 +79,10 @@ def _resolve_chat(recipient: str, session_id: str):
 
 def _render(state: dict) -> str:
     lines = [f"[ {state['agent_disp']} ] {state['header']}"]
+    dots = "." * (1 + state.get("phase", 0) % 3)
     for label, st in state["steps"]:
-        lines.append(f"{label} ... {st}")
+        shown = f"Doing{dots}" if st == "Doing" else st
+        lines.append(f"{label} - {shown}")
     return "\n".join(lines)
 
 
@@ -120,6 +131,42 @@ async def _flush(key: str):
             _tg_edit, token, state["chat_id"], state["message_id"], text)
 
 
+def _has_doing(state) -> bool:
+    return any(s[1] == "Doing" for s in state["steps"])
+
+
+async def _ticker(key: str):
+    """Animate breathing dots on every still-'Doing' line until none
+    remain (then self-stop) or the task is cancelled on finalize."""
+    try:
+        while True:
+            await asyncio.sleep(_TICK)
+            lock = _LOCKS.get(key)
+            if lock is None:
+                return
+            async with lock:
+                state = _PANELS.get(key)
+                if state is None:
+                    return
+                if not _has_doing(state):
+                    state["ticker"] = None
+                    return
+                state["phase"] = state.get("phase", 0) + 1
+                await _flush(key)
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        logger.exception("[panel] ticker failed")
+
+
+def _ensure_ticker(key: str, state: dict):
+    if state.get("ticker") is None and _has_doing(state):
+        try:
+            state["ticker"] = asyncio.create_task(_ticker(key))
+        except Exception:
+            logger.exception("[panel] ticker start failed")
+
+
 async def panel_step(key, recipient, channel, session_id, agent,
                      tool, phase, ok):
     """Record a tool step. phase='start' → '<tool> ... Doing';
@@ -137,6 +184,7 @@ async def panel_step(key, recipient, channel, session_id, agent,
                 "message_id": None, "steps": [],
                 "agent_disp": _display_agent(agent),
                 "header": "Working", "last_text": None,
+                "phase": 0, "ticker": None,
             }
             _PANELS[key] = state
         label = (tool or "tool").strip()
@@ -155,6 +203,7 @@ async def panel_step(key, recipient, channel, session_id, agent,
                 state["steps"][idx][1] = new
             else:
                 state["steps"].append([label, new])
+        _ensure_ticker(key, state)
         await _flush(key)
 
 
@@ -168,6 +217,10 @@ async def panel_finalize(key, status):
         state = _PANELS.get(key)
         if state is None:
             return
+        t = state.get("ticker")
+        if t is not None:
+            t.cancel()
+            state["ticker"] = None
         done = status == "done"
         state["header"] = "Done" if done else "Failed"
         for s in state["steps"]:

@@ -15,6 +15,10 @@ def _reset_and_mute(monkeypatch):
     # Mute the Telegram side; assert on in-memory state + _render only.
     monkeypatch.setattr(pp, "_flush", _noop_flush)
     yield
+    for st in pp._PANELS.values():
+        t = st.get("ticker")
+        if t is not None:
+            t.cancel()
     pp._PANELS.clear()
     pp._LOCKS.clear()
 
@@ -22,13 +26,29 @@ def _reset_and_mute(monkeypatch):
 def test_render_matches_spec_format():
     state = {
         "agent_disp": "Business Analysis Agent", "header": "Working",
+        "phase": 0,
         "steps": [["generate image", "Done"], ["generate report", "Doing"]],
     }
     assert pp._render(state) == (
         "[ Business Analysis Agent ] Working\n"
-        "generate image ... Done\n"
-        "generate report ... Doing"
+        "generate image - Done\n"
+        "generate report - Doing."
     )
+
+
+def test_render_doing_dots_cycle():
+    state = {
+        "agent_disp": "Business Analysis Agent", "header": "Working",
+        "steps": [["write report", "Doing"]],
+    }
+    state["phase"] = 0
+    assert pp._render(state).endswith("write report - Doing.")
+    state["phase"] = 1
+    assert pp._render(state).endswith("write report - Doing..")
+    state["phase"] = 2
+    assert pp._render(state).endswith("write report - Doing...")
+    state["phase"] = 3  # wraps back to one dot
+    assert pp._render(state).endswith("write report - Doing.")
 
 
 @pytest.mark.asyncio
@@ -60,7 +80,7 @@ async def test_failed_tool_marks_failed_and_finalize_failed():
     assert st["steps"] == [["export_pdf", "Failed"]]
     txt = pp._render(st)
     assert txt.startswith("[ Business Analysis Agent ] Working")
-    assert "export_pdf ... Failed" in txt
+    assert "export_pdf - Failed" in txt
     await pp.panel_finalize(K, "failed")
     assert K not in pp._PANELS
 
