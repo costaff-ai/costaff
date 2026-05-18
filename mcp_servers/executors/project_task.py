@@ -126,11 +126,19 @@ async def execute_project_task(task_id: str):
 
         logger.info(f"Executing ProjectTask {task_id}: {task.title}")
 
-        # Resolve channel/recipient — auto-detect from IdentityMap if not set on task
+        # Resolve channel/recipient — auto-detect from IdentityMap if not set
+        # on the task. The Manager frequently sets channel + session_id but
+        # NOT recipient; the old `if not channel:` only filled when channel
+        # was ALSO empty, so a channel-set/recipient-empty task left recipient
+        # None → the `if channel and recipient:` delivery guard below silently
+        # skipped ALL progress / result / file delivery (user saw nothing in
+        # Telegram). Resolve whichever field is missing, independently.
         channel = task.channel
         recipient = task.recipient
-        if not channel:
-            channel, recipient = get_user_channel_info(task.user_id, db)
+        if not channel or not recipient:
+            ch2, rc2 = get_user_channel_info(task.user_id, db)
+            channel = channel or ch2
+            recipient = recipient or rc2
 
         # License gate (decisions A+B+C): if the license is degraded to OSS
         # and usage exceeds OSS limits, refuse to execute. Fail the task with
