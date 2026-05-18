@@ -261,6 +261,13 @@ async def execute_project_task(task_id: str):
             db.add(comment)
             db.commit()
 
+            # Flip the live progress panel header → Done (fail-safe).
+            try:
+                from core.notifiers.progress_panel import panel_finalize
+                await panel_finalize(f"task_{task_id}", "done")
+            except Exception:
+                logger.exception("[execute_project_task] panel finalize(done) swallowed")
+
             if channel and recipient:
                 # If the task carries an origin session_id (the user's main
                 # conversation), inject a SYSTEM_CALLBACK turn into that session
@@ -350,6 +357,11 @@ async def execute_project_task(task_id: str):
             logger.error(f"ProjectTask execution failed {task_id}: {e}")
             task.status = "failed"
             task.updated_at = datetime.utcnow()
+            try:
+                from core.notifiers.progress_panel import panel_finalize
+                await panel_finalize(f"task_{task_id}", "failed")
+            except Exception:
+                logger.exception("[execute_project_task] panel finalize(failed) swallowed")
             import traceback
             comment = models.TaskComment(
                 id=str(uuid.uuid4()),

@@ -84,8 +84,40 @@ async def _handle_tool(request: Request) -> JSONResponse:
     return JSONResponse({"result": result if result is not None else ""})
 
 
+async def _handle_progress(request: Request) -> JSONResponse:
+    """Live progress panel sink. ALWAYS 200 — a panel failure must never
+    propagate to the agent/executor. Body:
+      {action:"step", key, recipient, channel, session_id, agent,
+       tool, phase:"start"|"end", ok:bool}
+      {action:"finalize", key, status:"done"|"failed"}
+    """
+    try:
+        from core.notifiers.progress_panel import panel_step, panel_finalize
+        body = await request.json()
+        if not isinstance(body, dict):
+            return JSONResponse({"ok": False}, status_code=200)
+        action = body.get("action", "step")
+        if action == "finalize":
+            await panel_finalize(body.get("key"), body.get("status", "done"))
+        else:
+            await panel_step(
+                key=body.get("key"),
+                recipient=body.get("recipient"),
+                channel=body.get("channel"),
+                session_id=body.get("session_id"),
+                agent=body.get("agent"),
+                tool=body.get("tool"),
+                phase=body.get("phase", "start"),
+                ok=bool(body.get("ok", True)),
+            )
+    except Exception:
+        logger.exception("[http_api] progress_step swallowed")
+    return JSONResponse({"ok": True}, status_code=200)
+
+
 def register_http_api(app) -> None:
-    """Attach the /api/tool/{name} route to an existing Starlette app.
+    """Attach the /api/tool/{name} + /api/progress_step routes to an
+    existing Starlette app.
 
     Called from server.py with the app returned by
     ``mcp.streamable_http_app()`` BEFORE the Bearer middleware wraps it,
@@ -94,7 +126,10 @@ def register_http_api(app) -> None:
     app.router.routes.append(
         Route("/api/tool/{name}", _handle_tool, methods=["POST"])
     )
+    app.router.routes.append(
+        Route("/api/progress_step", _handle_progress, methods=["POST"])
+    )
     logger.info(
         "HTTP tool shim mounted: POST /api/tool/{name} "
-        f"({', '.join(sorted(_TOOL_REGISTRY))})"
+        f"({', '.join(sorted(_TOOL_REGISTRY))}); POST /api/progress_step"
     )
