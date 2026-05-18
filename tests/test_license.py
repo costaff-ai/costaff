@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core import license as license_mod
 from core.license import (
+    ACTIVATION_WINDOW_DAYS,
     LicenseInfo,
     LicenseManager,
     OSS_LIMITS,
@@ -196,7 +197,9 @@ def test_load_raises_when_license_expired(tmp_path, monkeypatch, test_keypair):
         LicenseManager.load()
 
 
-def test_load_raises_on_machine_id_mismatch(tmp_path, monkeypatch, test_keypair):
+def test_load_ignores_machine_id_mismatch(tmp_path, monkeypatch, test_keypair):
+    """Machine binding is no longer enforced at load(): a signed,
+    non-expired license loads even if machine_id does not match."""
     LicenseManager._license = None
     path = tmp_path / "license.yaml"
     _write_signed_license(path, {
@@ -209,8 +212,8 @@ def test_load_raises_on_machine_id_mismatch(tmp_path, monkeypatch, test_keypair)
     }, test_keypair)
     monkeypatch.setenv("COSTAFF_LICENSE_PATH", str(path))
     monkeypatch.setattr(license_mod, "get_machine_id", lambda: "not-the-licensed-one")
-    with pytest.raises(ValueError, match="bound to a different machine"):
-        LicenseManager.load()
+    info = LicenseManager.load()
+    assert info is not None and info.plan == "team"
 
 
 # ---------------------------------------------------------------------------
@@ -333,19 +336,29 @@ def test_reeval_drops_expired_cached_license_same_day(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# B: containerised licensing — machine-id env override + non-file path
+# 7-day activation window (apply-only) + non-file path degradation
 # ---------------------------------------------------------------------------
 
-def test_get_machine_id_honours_env_override(monkeypatch):
-    monkeypatch.setenv("COSTAFF_MACHINE_ID", "host-injected-id")
-    assert license_mod.get_machine_id() == "host-injected-id"
+def test_activation_window_allows_fresh_license():
+    today = date.today().isoformat()
+    LicenseManager.check_activation_window(today)  # issued today → ok
+    edge = (date.today() - timedelta(days=ACTIVATION_WINDOW_DAYS)).isoformat()
+    LicenseManager.check_activation_window(edge)  # exactly on deadline → ok
 
 
-def test_raw_machine_id_ignores_env_override(monkeypatch):
-    """The host must capture its TRUE id even if the env is already set
-    (otherwise `license apply` would persist the placeholder)."""
-    monkeypatch.setenv("COSTAFF_MACHINE_ID", "should-be-ignored")
-    assert license_mod._raw_machine_id() != "should-be-ignored"
+def test_activation_window_rejects_stale_license():
+    stale = (
+        date.today() - timedelta(days=ACTIVATION_WINDOW_DAYS + 1)
+    ).isoformat()
+    with pytest.raises(ValueError, match="Activation window expired"):
+        LicenseManager.check_activation_window(stale)
+
+
+def test_activation_window_rejects_missing_or_bad_issued_at():
+    with pytest.raises(ValueError, match="missing issued_at"):
+        LicenseManager.check_activation_window(None)
+    with pytest.raises(ValueError, match="not a valid date"):
+        LicenseManager.check_activation_window("not-a-date")
 
 
 def test_load_treats_non_file_path_as_no_license(monkeypatch, tmp_path):

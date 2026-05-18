@@ -9,7 +9,7 @@ import hashlib
 import base64
 import logging
 import yaml
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.exceptions import InvalidSignature
@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 # --- Public key (hardcoded — private key is kept by the licensor) ---
 _PUBLIC_KEY_B64 = "L2TjTtry0aSRj9nEBXWZ7CwYRZHPn0teBVE5PgdWT2Y="
+
+# Days after a license's issued_at that `costaff license apply` will still
+# accept it. Enforced ONLY at activation (apply), never at runtime/load —
+# once activated the license runs until expires_at. A stale/leaked license
+# can therefore only be activated within this window of being issued.
+ACTIVATION_WINDOW_DAYS = 7
 
 # --- OSS Plan limits ---
 OSS_LIMITS = {
@@ -28,27 +34,15 @@ OSS_LIMITS = {
 
 
 def get_machine_id() -> str:
+    """Hashed machine identifier — INFORMATIONAL ONLY.
+
+    Machine binding is no longer enforced at load() / runtime (a deliberate
+    posture: the container could never verify the host's identity without
+    trusting an injectable env var). This is kept solely so
+    `costaff license machine-id` can still display an id if a licensor
+    wants it for their own records. macOS: IOPlatformUUID via ioreg;
+    Linux: /etc/machine-id; SHA-256 hashed so the raw id is never exposed.
     """
-    Returns a stable, hashed machine identifier.
-
-    `COSTAFF_MACHINE_ID` env wins if set: the MCP core runs INSIDE a
-    container whose /etc/machine-id is the container's, not the licensed
-    host's, so the host CLI persists its real id into the core .env (see
-    `costaff license apply`) and the container inherits it. This keeps a
-    machine-bound license valid in-container WITHOUT changing the signed
-    canonical payload (no re-issue needed).
-    """
-    env_id = os.getenv("COSTAFF_MACHINE_ID", "").strip()
-    if env_id:
-        return env_id
-    return _raw_machine_id()
-
-
-def _raw_machine_id() -> str:
-    """Compute the machine id from the OS (no env override). Used on the
-    HOST to capture the true identifier to persist for containers.
-    macOS: IOPlatformUUID via ioreg. Linux: /etc/machine-id. SHA-256
-    hashed so the raw system id is never exposed."""
     try:
         system = platform.system()
         if system == "Darwin":
@@ -136,6 +130,33 @@ class LicenseManager:
 
     DEFAULT_PATH = os.path.join(os.path.expanduser("~"), ".costaff", "costaff-license.yaml")
 
+    @staticmethod
+    def check_activation_window(issued_at_raw) -> None:
+        """Raise ValueError if today is more than ACTIVATION_WINDOW_DAYS
+        past the license's issued_at. Call this ONLY from
+        `costaff license apply` — never from load() — so an activated
+        license keeps running until expires_at regardless of issue age.
+        """
+        if issued_at_raw is None or issued_at_raw == "null":
+            raise ValueError("License is missing issued_at; cannot activate.")
+        if isinstance(issued_at_raw, date):
+            issued = issued_at_raw
+        else:
+            try:
+                issued = date.fromisoformat(str(issued_at_raw).strip())
+            except ValueError:
+                raise ValueError(
+                    f"License issued_at is not a valid date: {issued_at_raw!r}"
+                )
+        deadline = issued + timedelta(days=ACTIVATION_WINDOW_DAYS)
+        if date.today() > deadline:
+            raise ValueError(
+                f"Activation window expired: this license was issued on "
+                f"{issued} and had to be activated within "
+                f"{ACTIVATION_WINDOW_DAYS} days (by {deadline}). "
+                "Request a freshly issued license from the licensor."
+            )
+
     @classmethod
     def load(cls, path: Optional[str] = None) -> Optional[LicenseInfo]:
         """
@@ -173,16 +194,12 @@ class LicenseManager:
         except Exception as e:
             raise ValueError(f"License verification failed: {e}")
 
-        # Verify machine ID (if license is bound to a machine)
-        licensed_machine = data.get("machine_id", "")
-        if licensed_machine:
-            current_machine = get_machine_id()
-            if current_machine != licensed_machine:
-                raise ValueError(
-                    f"This license is bound to a different machine. "
-                    f"Current machine ID: {current_machine}. "
-                    "Please contact simonliuyuwei@gmail.com to transfer your license."
-                )
+        # Machine binding is intentionally NOT enforced here. The signed
+        # `machine_id` field is left in _canonical() so existing licenses
+        # still verify, but runtime trusts only signature + expiry. The
+        # one-time-on-host control is the 7-day activation window enforced
+        # at `costaff license apply` (see check_activation_window), NOT a
+        # per-load machine check.
 
         # Parse expiry
         expires_raw = data.get("expires_at")

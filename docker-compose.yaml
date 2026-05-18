@@ -19,7 +19,6 @@ services:
       - MCP_SECRET_KEY=${MCP_SECRET_KEY}
       - API_HEADERS_KEY=${API_HEADERS_KEY}
       - COSTAFF_LICENSE_PATH=/app/costaff-license.yaml
-      - COSTAFF_MACHINE_ID=${COSTAFF_MACHINE_ID:-}
     command: python mcp_servers/server.py
 
   costaff-agent-costaff:
