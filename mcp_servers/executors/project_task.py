@@ -196,20 +196,19 @@ async def execute_project_task(task_id: str):
         try:
             result_text = await run_adk_prompt(app_name, task.user_id, task_session_id, spec)
 
-            # Verify the sub-agent's declared output files actually exist before
-            # marking the task done. This catches hallucinated paths and bad-path
-            # writes (e.g. sub-agent says it wrote /a/b.csv but actually wrote
-            # /a/outputs/b.csv) at the upstream agent's task boundary, rather
-            # than letting the downstream agent in a chain trip over the missing
-            # file 30+ seconds later.
-            # A file the sub-agent just wrote can lag becoming visible to
-            # THIS (executor) container: write flush + cross-container
-            # bind-mount visibility. A single eager check right after the
-            # A2A response returns false-fails successful tasks (observed
-            # on real BA/Coding runs — the file is on disk a second later).
-            # Re-check with a short grace before declaring failure.
+            # Declared-output verification — DISABLED by default.
+            # It repeatedly false-failed successful BA/Coding tasks (a file
+            # the sub-agent just wrote lags becoming visible to THIS executor
+            # container: write flush + cross-container bind-mount visibility)
+            # and became a pipeline bottleneck. We now only LOG the signal
+            # and let the task proceed. Set COSTAFF_VERIFY_DECLARED_OUTPUTS=1
+            # to restore hard failure (with the ~10s grace retry) once the
+            # underlying visibility lag is properly addressed.
+            _verify_enabled = os.getenv(
+                "COSTAFF_VERIFY_DECLARED_OUTPUTS", "0"
+            ).strip().lower() in ("1", "true", "yes")
             missing_outputs = _verify_declared_outputs(result_text, task.assigned_agent)
-            if missing_outputs:
+            if missing_outputs and _verify_enabled:
                 for _attempt in range(5):  # up to ~10s grace
                     await asyncio.sleep(2)
                     missing_outputs = _verify_declared_outputs(
@@ -223,13 +222,19 @@ async def execute_project_task(task_id: str):
                         )
                         break
             if missing_outputs:
-                logger.error(
-                    f"[execute_project_task] task {task_id} declared outputs "
-                    f"that do not exist on disk after grace retries: {missing_outputs}"
-                )
-                raise OutputVerificationError(
-                    "Sub-agent declared output files that are not on disk: "
-                    + ", ".join(missing_outputs)
+                if _verify_enabled:
+                    logger.error(
+                        f"[execute_project_task] task {task_id} declared outputs "
+                        f"that do not exist on disk after grace retries: {missing_outputs}"
+                    )
+                    raise OutputVerificationError(
+                        "Sub-agent declared output files that are not on disk: "
+                        + ", ".join(missing_outputs)
+                    )
+                logger.warning(
+                    f"[execute_project_task] task {task_id} declared outputs not "
+                    f"visible to executor (verification disabled, task NOT "
+                    f"failed): {missing_outputs}"
                 )
 
             task.status = "done"

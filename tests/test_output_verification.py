@@ -205,12 +205,19 @@ def _make_task(db_session, *, session_id=None):
 
 @pytest.mark.asyncio
 async def test_executor_marks_failed_when_verifier_returns_missing(db_session, monkeypatch):
-    """Headline contract: verifier flags missing in-slot outputs → executor
-    marks task failed (not done), records issue comment.
+    """Enabled-mode contract: with COSTAFF_VERIFY_DECLARED_OUTPUTS=1 the
+    verifier flagging missing in-slot outputs → executor marks task failed
+    (not done), records issue comment.
 
     We stub the verifier itself to isolate executor-wiring behaviour from
     the slot/regex logic (which is covered by the pure-helper tests above).
     """
+    monkeypatch.setenv("COSTAFF_VERIFY_DECLARED_OUTPUTS", "1")
+    # grace retry uses real `await asyncio.sleep`; no-op it so the test
+    # doesn't wait the ~10s grace before the (still-missing) raise.
+    async def _no_sleep(*_a, **_k):
+        return None
+    monkeypatch.setattr(executor_mod.asyncio, "sleep", _no_sleep)
     task = _make_task(db_session)
     monkeypatch.setattr(executor_mod, "SessionLocal", lambda: _NonClosingSession(db_session))
 
@@ -245,6 +252,45 @@ async def test_executor_marks_failed_when_verifier_returns_missing(db_session, m
     assert len(issues) == 1
     assert fake_missing in issues[0].content
     assert "OutputVerificationError" in issues[0].content
+
+
+@pytest.mark.asyncio
+async def test_executor_does_not_fail_when_verification_disabled(db_session, monkeypatch):
+    """New default contract: COSTAFF_VERIFY_DECLARED_OUTPUTS unset → missing
+    declared outputs only WARN; the task still completes (status != failed),
+    no OutputVerificationError issue comment. (Verification disabled because
+    it false-failed successful tasks and became a pipeline bottleneck.)
+    """
+    monkeypatch.delenv("COSTAFF_VERIFY_DECLARED_OUTPUTS", raising=False)
+    task = _make_task(db_session)
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: _NonClosingSession(db_session))
+    monkeypatch.setattr(
+        executor_mod, "_verify_declared_outputs",
+        lambda text, agent: ["/app/data/shared/costaff-agent-coding/p/ghost.csv"],
+    )
+
+    async def fake_run(app, uid, sid, prompt):
+        return "[RESULT_START] done [RESULT_END]"
+
+    async def fake_dispatch(channel, recipient, body, sid):
+        return None
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+    monkeypatch.setattr(executor_mod, "dispatch_notification", fake_dispatch)
+
+    await executor_mod.execute_project_task(task.id)
+    for t in list(asyncio.all_tasks()):
+        if t is not asyncio.current_task():
+            t.cancel()
+
+    db_session.refresh(task)
+    assert task.status != "failed", "Disabled verification must NOT fail the task"
+    issues = (
+        db_session.query(models.TaskComment)
+        .filter_by(task_id=task.id, type="issue")
+        .all()
+    )
+    assert not any("OutputVerificationError" in i.content for i in issues)
 
 
 @pytest.mark.asyncio
