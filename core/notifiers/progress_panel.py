@@ -20,6 +20,7 @@ panel must never affect task execution (the agent/executor wrap calls in
 try/except too — this is the second belt).
 """
 import asyncio
+import html
 import logging
 import os
 import re
@@ -107,9 +108,15 @@ def _resolve_task_title(key: str) -> str:
 
 
 def _render(state: dict) -> str:
+    steps = state["steps"]
+    nfail = sum(1 for e in steps if e[0] != _SEC and e[1] == "Failed")
     status = state["header"]
     if status == "Working":
         status = f"Working{'.' * (1 + state.get('phase', 0) % 3)}"
+    elif status == "Done":
+        status = f"Done · {nfail} failed (recovered)" if nfail else "Done"
+    elif status == "Failed":
+        status = f"Failed · {nfail} failed" if nfail else "Failed"
     title = state.get("task_title") or "—"
     lines = [
         f"[ {state['agent_disp']} ]",
@@ -120,11 +127,23 @@ def _render(state: dict) -> str:
         "",
         "Working Process:",
     ]
-    for label, st in state["steps"]:
+    # Collapse consecutive identical tool lines into one "× N" line
+    # (purely visual — state stays full so step matching is unaffected).
+    i = 0
+    n = len(steps)
+    while i < n:
+        label, st = steps[i]
         if label == _SEC:
             lines.append(f"- {st}")
-        else:
-            lines.append(f"  {label} - {st}")
+            i += 1
+            continue
+        j = i + 1
+        while j < n and steps[j][0] == label and steps[j][1] == st:
+            j += 1
+        run = j - i
+        suffix = f" ×{run}" if run > 1 else ""
+        lines.append(f"  {label} - {st}{suffix}")
+        i = j
     return "\n".join(lines)
 
 
@@ -171,11 +190,19 @@ def _trim(state: dict):
         steps.pop(0)
 
 
+# Render the panel as a Telegram monospace block so the indented tool
+# lines and the framed header align (proportional font would skew them).
+# HTML parse_mode + <pre> only needs &<> escaped (robust vs MarkdownV2).
+def _mono(text: str) -> str:
+    return f"<pre>{html.escape(text, quote=False)}</pre>"
+
+
 def _tg_send(token, chat_id, text):
     try:
         with httpx.Client(timeout=10.0) as c:
             r = c.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                       json={"chat_id": chat_id, "text": text})
+                       json={"chat_id": chat_id, "text": _mono(text),
+                             "parse_mode": "HTML"})
             if r.status_code == 200:
                 return r.json().get("result", {}).get("message_id")
             logger.warning(f"[panel] sendMessage {r.status_code}: {r.text[:200]}")
@@ -189,7 +216,7 @@ def _tg_edit(token, chat_id, message_id, text):
         with httpx.Client(timeout=10.0) as c:
             r = c.post(f"https://api.telegram.org/bot{token}/editMessageText",
                        json={"chat_id": chat_id, "message_id": message_id,
-                             "text": text})
+                             "text": _mono(text), "parse_mode": "HTML"})
             # 400 "message is not modified" is benign; rate-limit 429 ignored.
             if r.status_code not in (200, 400, 429):
                 logger.warning(f"[panel] editMessageText {r.status_code}: {r.text[:200]}")

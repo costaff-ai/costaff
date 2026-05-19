@@ -218,3 +218,35 @@ async def test_report_step_section_routes_to_panel_section():
     await report_step(session_id=K, step="[Coding] doing the thing",
                       status="section", channel="telegram", user_id="u1")
     assert pp._PANELS[K]["steps"] == [[pp._SEC, "[Action] doing the thing"]]
+
+
+def test_render_collapses_consecutive_dups_and_counts_failures():
+    state = {
+        "agent_disp": "Coding Agent", "header": "Done", "phase": 0,
+        "task_title": "T",
+        "steps": [
+            [pp._SEC, "[Action] agg"],
+            ["patch_file", "Done"], ["patch_file", "Done"],
+            ["patch_file", "Done"], ["patch_file", "Done"],
+            ["run_python_file", "Failed"], ["run_python_file", "Failed"],
+            ["run_python_file", "Done"],
+        ],
+    }
+    out = pp._render(state)
+    assert "  patch_file - Done ×4" in out
+    assert "  run_python_file - Failed ×2" in out
+    assert "  run_python_file - Done" in out
+    assert "run_python_file - Done ×" not in out  # run==1, no suffix
+    assert "2. status: Done · 2 failed (recovered)" in out
+
+
+def test_render_status_failed_with_count():
+    state = {"agent_disp": "BA", "header": "Failed", "phase": 0,
+             "task_title": "T", "steps": [["export_pdf", "Failed"]]}
+    assert "2. status: Failed · 1 failed" in pp._render(state)
+
+
+def test_mono_wraps_and_escapes():
+    m = pp._mono("a <b> & c")
+    assert m.startswith("<pre>") and m.endswith("</pre>")
+    assert "&lt;b&gt;" in m and "&amp;" in m
