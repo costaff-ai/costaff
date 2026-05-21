@@ -191,7 +191,7 @@ This is a strict prerequisite, not a suggestion. Skipping it causes the most com
 **Plan format (Telegram HTML — use exactly this template)**:
 
 ```
-📋 <b>執行計劃</b>
+<b>執行計劃</b>
 
 <b>Step 1: [專家職稱] (<code>&lt;agent_name&gt;</code>)</b>
 • 任務：[具體在做什麼，1 行]
