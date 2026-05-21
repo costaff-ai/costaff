@@ -1,6 +1,7 @@
 google-adk[a2a,extensions]==2.0.0
 google-cloud-storage
 python-multipart
+mcp
 litellm
 python-dotenv
 httpx
