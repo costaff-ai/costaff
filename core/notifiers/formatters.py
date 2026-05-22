@@ -43,6 +43,13 @@ _MD_BOLD_RE = re.compile(r'\*\*(.+?)\*\*', re.DOTALL)
 _MD_CODE_INLINE_RE = re.compile(r'`([^`\n]+?)`')
 _MD_CODE_FENCE_RE = re.compile(r'```(?:\w+)?\n(.*?)```', re.DOTALL)
 _MD_BULLET_RE = re.compile(r'^(\s*)-\s+', re.MULTILINE)
+# Literal `<code>` / `</code>` / `<pre>` / `</pre>` that the LLM put inside
+# its own backtick block (defensive double-encoding when it's unsure
+# whether the channel renders Markdown or HTML). Strip these before
+# wrapping in real <code>, otherwise we end up nesting them and leaving
+# an orphan closing tag after _escape_code_block_content's non-greedy
+# match.
+_INNER_CODE_TAG_RE = re.compile(r'</?(?:code|pre)>', re.IGNORECASE)
 # After md→html conversion, any `<` / `>` / `&` *inside* a <code> or <pre>
 # block must be HTML-escaped — Telegram's HTML parser is strict and chokes
 # on unescaped `<`/`>` (e.g. SQL operators like `<>`, `<=`), refusing the
@@ -105,10 +112,16 @@ def md_to_telegram_html(text: str) -> str:
         return text
     out = strip_result_envelope(text)
     # Fenced code blocks first (so inline-code regex doesn't mangle them).
-    out = _MD_CODE_FENCE_RE.sub(lambda m: f"<pre>{m.group(1).rstrip()}</pre>", out)
+    # Strip inner literal `<code>`/`<pre>` tags from the body — LLM
+    # double-wrapping defence; see _INNER_CODE_TAG_RE.
+    out = _MD_CODE_FENCE_RE.sub(
+        lambda m: f"<pre>{_INNER_CODE_TAG_RE.sub('', m.group(1)).rstrip()}</pre>", out
+    )
     out = _MD_HEADING_RE.sub(r'<b>\1</b>', out)
     out = _MD_BOLD_RE.sub(r'<b>\1</b>', out)
-    out = _MD_CODE_INLINE_RE.sub(r'<code>\1</code>', out)
+    out = _MD_CODE_INLINE_RE.sub(
+        lambda m: f"<code>{_INNER_CODE_TAG_RE.sub('', m.group(1))}</code>", out
+    )
     out = _MD_BULLET_RE.sub(r'\1• ', out)
     # Final pass: protect <code>/<pre> body from Telegram's strict HTML parser.
     out = _escape_code_block_content(out)
