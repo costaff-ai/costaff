@@ -14,6 +14,50 @@ logger = logging.getLogger(__name__)
 _FILE_EXTS = r"pdf|docx|md|txt|html|htm|png|jpg|jpeg|gif|csv|json|xlsx|xls|zip"
 _ABS_PATH_RE = re.compile(r"(/app/data/[\w./-]+\.(?:" + _FILE_EXTS + r"))", re.IGNORECASE)
 
+# Markdown -> Telegram HTML conversion. Telegram's HTML parse_mode supports
+# a narrow set (<b>, <i>, <u>, <s>, <code>, <pre>, <a href>, <blockquote>)
+# and notably has NO <h1..h6>. Agents (and specialist completion comments
+# from build_task_spec) routinely produce '## heading' / '**bold**' / '`code`'
+# Markdown that Telegram renders as literal text — so callbacks like the
+# project_task executor's synthetic-callback dispatch arrive as raw '##'.
+# Convert at the notifier boundary so every caller (executor, send_message_now,
+# Manager replies that forgot to convert) gets the same result.
+
+_MD_HEADING_RE = re.compile(r'^#{1,6}\s+(.+?)\s*$', re.MULTILINE)
+_MD_BOLD_RE = re.compile(r'\*\*(.+?)\*\*', re.DOTALL)
+_MD_CODE_INLINE_RE = re.compile(r'`([^`\n]+?)`')
+_MD_CODE_FENCE_RE = re.compile(r'```(?:\w+)?\n(.*?)```', re.DOTALL)
+_MD_BULLET_RE = re.compile(r'^(\s*)-\s+', re.MULTILINE)
+_RESULT_TAG_RE = re.compile(r'\s*\[RESULT_(?:START|END)\]\s*')
+
+
+def md_to_telegram_html(text: str) -> str:
+    """Convert agent-style Markdown to Telegram HTML.
+
+    Handles the patterns we actually see in the wild (verified 2026-05-22
+    on the sin/cos EDA run): `## heading`, `### heading`, `**bold**`,
+    `` `code` ``, fenced ```code``` blocks, leading `- bullet`, plus
+    strips `[RESULT_START]` / `[RESULT_END]` envelope markers.
+
+    Idempotent on Telegram-HTML input (raw `<b>...</b>` etc. has no
+    Markdown sigils, so the regex passes leave it untouched).
+
+    NOTE: we do NOT convert `*italic*` or `_italic_` — single-asterisk and
+    single-underscore patterns collide with real content (file paths like
+    `costaff_agent`, math like `2*pi`) too often to be safe without a real
+    Markdown parser.
+    """
+    if not text:
+        return text
+    out = _RESULT_TAG_RE.sub('', text)
+    # Fenced code blocks first (so inline-code regex doesn't mangle them).
+    out = _MD_CODE_FENCE_RE.sub(lambda m: f"<pre>{m.group(1).rstrip()}</pre>", out)
+    out = _MD_HEADING_RE.sub(r'<b>\1</b>', out)
+    out = _MD_BOLD_RE.sub(r'<b>\1</b>', out)
+    out = _MD_CODE_INLINE_RE.sub(r'<code>\1</code>', out)
+    out = _MD_BULLET_RE.sub(r'\1• ', out)
+    return out
+
 
 def extract_file_paths(text: str) -> list[str]:
     """Extract /app/data/... absolute file paths from a message body.
@@ -110,8 +154,12 @@ def send_telegram_notification(recipient_id: str, message: str, session_id: str 
     finally:
         db.close()
 
+    # Convert Markdown (##/###/**bold**/`code`/- bullets) to the Telegram
+    # HTML subset before sending — Telegram does NOT parse Markdown under
+    # parse_mode=HTML, so raw '## heading' would render literally.
+    message = md_to_telegram_html(message)
+
     # Telegram HTML mode does not support <br> — replace with newline
-    import re
     message = re.sub(r'<br\s*/?>', '\n', message, flags=re.IGNORECASE)
 
     # Telegram max message length is 4096 chars
