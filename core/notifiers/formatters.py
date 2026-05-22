@@ -43,6 +43,11 @@ _MD_BOLD_RE = re.compile(r'\*\*(.+?)\*\*', re.DOTALL)
 _MD_CODE_INLINE_RE = re.compile(r'`([^`\n]+?)`')
 _MD_CODE_FENCE_RE = re.compile(r'```(?:\w+)?\n(.*?)```', re.DOTALL)
 _MD_BULLET_RE = re.compile(r'^(\s*)-\s+', re.MULTILINE)
+# After md→html conversion, any `<` / `>` / `&` *inside* a <code> or <pre>
+# block must be HTML-escaped — Telegram's HTML parser is strict and chokes
+# on unescaped `<`/`>` (e.g. SQL operators like `<>`, `<=`), refusing the
+# whole message and falling back to plain text (raw <b> tags visible).
+_TG_CODE_BLOCK_RE = re.compile(r'<(code|pre)>(.*?)</\1>', re.DOTALL)
 
 
 def strip_result_envelope(text: str) -> str:
@@ -60,12 +65,38 @@ def strip_result_envelope(text: str) -> str:
 # ----- Telegram (HTML) ---------------------------------------------------
 
 
+_ENTITY_RE = re.compile(r'&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);')
+
+
+def _escape_code_block_content(text: str) -> str:
+    """HTML-escape `<`, `>`, `&` inside <code>...</code> and <pre>...</pre>.
+
+    Required because Telegram's HTML parser refuses the entire message on
+    a single unescaped `<` outside a known tag — SQL with `<>` / `<=` is
+    the common case. Tag names themselves stay intact; only the BODY
+    between opening and closing tags gets escaped.
+
+    Idempotent: an already-escaped `&lt;` doesn't get re-escaped to
+    `&amp;lt;`. We detect existing entities via _ENTITY_RE and skip them
+    when escaping `&`.
+    """
+    def _esc(m: re.Match) -> str:
+        tag, body = m.group(1), m.group(2)
+        # Step 1: escape bare `&` (but not `&` that's already starting an entity).
+        body = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)', '&amp;', body)
+        # Step 2: now safe to escape `<` and `>`.
+        body = body.replace("<", "&lt;").replace(">", "&gt;")
+        return f"<{tag}>{body}</{tag}>"
+    return _TG_CODE_BLOCK_RE.sub(_esc, text)
+
+
 def md_to_telegram_html(text: str) -> str:
     """Convert agent-style Markdown to the Telegram HTML subset.
 
     Handles `# / ## / ###` → `<b>`, `**bold**` → `<b>`, `` `code` `` →
     `<code>`, fenced ```code``` blocks → `<pre>`, leading `- ` → `• `,
-    and strips the result envelope.
+    strips the result envelope, and HTML-escapes special chars *inside*
+    code/pre blocks (so SQL operators like `<>` don't break the parser).
 
     Idempotent on already-converted Telegram HTML (raw `<b>` etc. has
     no Markdown sigils for the regex passes to touch).
@@ -79,6 +110,8 @@ def md_to_telegram_html(text: str) -> str:
     out = _MD_BOLD_RE.sub(r'<b>\1</b>', out)
     out = _MD_CODE_INLINE_RE.sub(r'<code>\1</code>', out)
     out = _MD_BULLET_RE.sub(r'\1• ', out)
+    # Final pass: protect <code>/<pre> body from Telegram's strict HTML parser.
+    out = _escape_code_block_content(out)
     return out
 
 
