@@ -235,9 +235,9 @@ def test_check_agent_limit_allows_under_limit():
 
 
 def test_check_agent_limit_raises_at_limit():
-    LicenseManager._license = None  # OSS limit is 1
+    LicenseManager._license = None  # OSS limit is 3 (bumped from 1 on 2026-05-23 for multi-agent demo)
     with pytest.raises(ValueError, match="Agent limit reached"):
-        LicenseManager.check_agent_limit(1)
+        LicenseManager.check_agent_limit(3)
 
 
 def test_check_user_limit_uses_db_count(db_session):
@@ -286,11 +286,11 @@ def _reset_license_state(monkeypatch, tmp_path):
 
 def test_usage_gate_blocks_when_oss_and_over_limit(monkeypatch, tmp_path):
     _reset_license_state(monkeypatch, tmp_path)
-    # Over OSS (agents 5 > 1) → blocked with an actionable message.
+    # Over OSS (agents 5 > 3) → blocked with an actionable message.
     msg = LicenseManager.usage_gate({"agents": 5, "users": 0, "skills": 0})
     assert msg is not None
     assert "exceeds OSS limits" in msg
-    assert "agents 5/1" in msg
+    assert "agents 5/3" in msg
 
 
 def test_usage_gate_allows_when_within_oss(monkeypatch, tmp_path):

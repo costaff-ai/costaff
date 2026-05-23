@@ -27,10 +27,33 @@ ACTIVATION_WINDOW_DAYS = 30
 
 # --- OSS Plan limits ---
 OSS_LIMITS = {
-    "max_agents": 1,
+    "max_agents": 3,
     "max_users":  1,
     "max_skills": 10,
 }
+
+# --- Upgrade pitch (shown when a limit is hit) ---
+PRICING_URL = "https://costaffs.app/pricing"
+CONTACT_EMAIL = "[email protected]"
+
+_TIER_SUMMARY = {
+    "max_agents": "Starter: 10  /  Pro: 25  /  Enterprise: unlimited",
+    "max_users":  "Starter: 5   /  Pro: 20  /  Enterprise: unlimited",
+    "max_skills": "Starter: 30  /  Pro: unlimited  /  Enterprise: unlimited",
+}
+
+
+def _upgrade_pitch(resource: str) -> str:
+    """Compose a friendly upgrade message shown when an OSS/paid limit is hit.
+
+    `resource` is one of: max_agents, max_users, max_skills.
+    """
+    return (
+        f"\n\nUpgrade options ({resource.replace('max_', '')}):\n"
+        f"  {_TIER_SUMMARY.get(resource, '')}\n"
+        f"  → DIY License pricing: {PRICING_URL}\n"
+        f"  → FDE / Premium Agents: {CONTACT_EMAIL}"
+    )
 
 
 def get_machine_id() -> str:
@@ -325,12 +348,16 @@ class LicenseManager:
             return None
         reason = cls._degraded_reason or "No active license (OSS plan)."
         return (
-            f"Service unavailable: {reason} The system has reverted to the "
-            f"free OSS plan, but current usage exceeds OSS limits "
-            f"({', '.join(over)}). Renew the license or reduce usage to "
-            f"within OSS limits (max_agents={OSS_LIMITS['max_agents']}, "
-            f"max_users={OSS_LIMITS['max_users']}, "
-            f"max_skills={OSS_LIMITS['max_skills']}) to continue."
+            f"Service unavailable: {reason}\n\n"
+            f"The system reverted to the free OSS plan, but current usage exceeds OSS limits: "
+            f"{', '.join(over)}.\n\n"
+            f"To continue:\n"
+            f"  → Renew or upgrade your license: {PRICING_URL}\n"
+            f"  → Contact us: {CONTACT_EMAIL}\n"
+            f"  → Or reduce usage to OSS limits "
+            f"(agents: {OSS_LIMITS['max_agents']}, "
+            f"users: {OSS_LIMITS['max_users']}, "
+            f"skills: {OSS_LIMITS['max_skills']})"
         )
 
     @classmethod
@@ -340,8 +367,8 @@ class LicenseManager:
         if current_count >= limit:
             plan = cls.get().plan.upper()
             raise ValueError(
-                f"Agent limit reached ({current_count}/{limit}) under the {plan} Plan. "
-                "Please upgrade to add more agents."
+                f"Agent limit reached ({current_count}/{limit}) under the {plan} plan."
+                + _upgrade_pitch("max_agents")
             )
 
     @classmethod
@@ -353,8 +380,8 @@ class LicenseManager:
         if count >= limit:
             plan = cls.get().plan.upper()
             raise ValueError(
-                f"User limit reached ({count}/{limit}) under the {plan} Plan. "
-                "Please upgrade to add more users."
+                f"User limit reached ({count}/{limit}) under the {plan} plan."
+                + _upgrade_pitch("max_users")
             )
 
     @classmethod
@@ -366,6 +393,6 @@ class LicenseManager:
         if count >= limit:
             plan = cls.get().plan.upper()
             raise ValueError(
-                f"Skill limit reached ({count}/{limit}) under the {plan} Plan. "
-                "Please upgrade your plan to add more Skills."
+                f"Skill limit reached ({count}/{limit}) under the {plan} plan."
+                + _upgrade_pitch("max_skills")
             )
