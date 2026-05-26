@@ -40,10 +40,17 @@ def _shared_secret() -> str:
 
 
 def _resolve_session_id(recipient: str, session_id: str | None) -> str | None:
-    """Find a WebChat-Enterprise session_id (`webent_<hash>...`) for the
-    given recipient. Prefers an explicit session_id; falls back to the
-    most recent identity_maps row that matches `recipient` as hashed_id."""
-    if session_id and (session_id.startswith("webent_") or session_id.startswith("web_")):
+    """Return a session_id WebChat Enterprise can use to look up the
+    conversation / user.
+
+    Channel routing has already happened upstream — by the time this
+    function runs, the dispatcher chose webchat. So we trust whatever
+    `session_id` was passed (post-thread refactor this is the ADK
+    session id stored on Conversation.adk_session_id). Falls back to an
+    IdentityMap lookup by recipient (hashed_id) when no session_id was
+    provided — typically Manager-side callbacks that only know the user.
+    """
+    if session_id:
         return session_id
     if not recipient:
         return None
@@ -94,8 +101,15 @@ def send_webchat_notification(
     task_id: str | None = None,
     step: str | None = None,
     status: str | None = None,
+    conversation_id: str | None = None,
 ) -> bool:
-    """Push a text message to the WebChat Enterprise channel."""
+    """Push a text message to the WebChat Enterprise channel.
+
+    `conversation_id` (when known — e.g. injected by Manager into
+    PROGRESS_CONTEXT and threaded through executor / sub-agent tools)
+    pins the push to one thread. Without it WebChat fans out to every
+    thread tab the user has open, which is louder than ideal but lands
+    somewhere visible."""
     sid = _resolve_session_id(recipient, session_id)
     if not sid and not recipient:
         logger.warning("[webchat] no session_id or recipient — dropping")
@@ -103,6 +117,7 @@ def send_webchat_notification(
     return _post({
         "session_id": sid,
         "hashed_id": recipient if not sid else None,
+        "conversation_id": conversation_id,
         "text": message,
         "agent": agent,
         "task_id": task_id,
@@ -117,6 +132,7 @@ def send_webchat_file(
     session_id: str | None = None,
     agent: str | None = None,
     task_id: str | None = None,
+    conversation_id: str | None = None,
 ) -> bool:
     """Deliver an /app/data/... file to the WebChat user. The WebChat side
     issues a download token bound to this user and pushes an agent_file
@@ -127,6 +143,7 @@ def send_webchat_file(
     return _post({
         "session_id": sid,
         "hashed_id": recipient if not sid else None,
+        "conversation_id": conversation_id,
         "text": "",
         "file_path": file_path,
         "agent": agent,

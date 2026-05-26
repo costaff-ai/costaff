@@ -149,12 +149,23 @@ def build_task_spec(task, db) -> str:
         channel = actual_channel
 
     if channel and recipient:
-        task_session_id = f"task_{task.id}"
+        # The session_id we expose to the sub-agent is the DELIVERY target,
+        # not the sub-agent's own ADK session (which is `task_<id>` and set
+        # by execute_project_task at run time). Using `task.session_id` —
+        # the user's session captured when the task was created — ensures
+        # progress lands in the right surface:
+        #   • Telegram: `tg_<chatid>` ⇒ Telegram notifier uses it directly
+        #   • WebChat Enterprise (post-thread refactor): `webent_<hash>` is
+        #     thread-scoped because real_id includes conversation_id, so
+        #     progress reaches the same thread the task was launched from
+        # When no origin session is recorded we fall back to a per-task
+        # synthetic id so the notifier's IdentityMap fallback still works.
+        deliver_session = task.session_id or f"task_{task.id}"
         lines.append(
             f"\n[PROGRESS_CONTEXT]\n"
             f"user_id={task.user_id}\n"
             f"channel={channel}\n"
-            f"session_id={task_session_id}"
+            f"session_id={deliver_session}"
         )
 
     return "\n".join(lines)
