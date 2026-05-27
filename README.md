@@ -423,10 +423,9 @@ type the same thing in plain text and get the same result.
 
 Dual-licensed under **AGPL v3** + **commercial license**.
 
-- **Personal use** (running CoStaff for yourself on your own hardware):
+- **Personal use** (running CoStaff for yourself on your own hardware,
+  within the OSS limits — 3 agents / 1 user / 10 skills):
   **free under AGPL v3**.
-- **Internal company use** (you and your colleagues, behind your firewall,
-  no external customers chatting with the bot): **free under AGPL v3**.
 - **Hosting CoStaff as a service for external / paying users** — e.g.
   reselling it, running it as a SaaS, or letting customers interact
   with a CoStaff instance you operate — triggers **AGPL §13**: you must
@@ -440,9 +439,9 @@ See [`LICENSE`](./LICENSE) for the full text.
 
 ## Commercial License
 
-The OSS tier covers personal use and small-team internal hosting under
-AGPL v3, with plan limits (3 agents / 1 user / 10 skills) intended to
-fit a single operator. Paid tiers unlock:
+The OSS tier is **personal-use only** — 3 agents / 1 user / 10 skills,
+intended for evaluation, demos, and your own AI assistant. For 2+ users
+or higher quotas, paid tiers unlock:
 
 - **Higher limits** — more agents, users, skills (Starter / Pro /
   Enterprise tiers).

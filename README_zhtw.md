@@ -285,8 +285,7 @@ costaff dashboard
 
 本專案採用 **AGPL v3 + 商業授權**雙授權模式。
 
-- **個人使用**（自己跑在自己的硬體上）：**AGPL v3，免費**。
-- **公司內部使用**（你跟同事使用，外部客戶不會直接跟 bot 互動）：**AGPL v3，免費**。
+- **個人使用**（自己跑在自己的硬體上，OSS 上限內 — 3 agents / 1 user / 10 skills）：**AGPL v3，免費**。
 - **對外提供 CoStaff 服務**（轉售、做成 SaaS、讓客戶跟你架的 CoStaff 對話）：觸發 **AGPL §13**，必須公開修改後的 source code（包含私有 skills / prompts / workflow code），**或**取得免除此義務的**商業授權**。
 - **散布修改版 CoStaff**（fork 出去交付給他人）：適用 AGPL v3 標準義務。
 
@@ -294,7 +293,7 @@ costaff dashboard
 
 ## 商業授權
 
-OSS tier 適用個人 + 小團隊內部使用（限制：3 agents / 1 user / 10 skills，設計上對應單一操作者）。付費 tier 解鎖：
+OSS tier 是**個人使用專屬** — 3 agents / 1 user / 10 skills，定位於評估、demo、自架個人 AI 助理。2+ users 或更高 quota 請看付費方案：
 
 - **更高 limits** — 更多 agents / users / skills（Starter / Pro / Enterprise 三檔）
 - **Enterprise WebChat** — 多租戶 Org × Team × CoStaff 路由、audit logs、SSO、檔案傳遞、sub-agent progress panel
