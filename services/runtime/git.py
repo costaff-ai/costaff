@@ -69,6 +69,33 @@ class Git:
         or SHA — that's expected for a pinned deployment."""
         self._run(["git", "checkout", ref], cwd=str(repo))
 
+    def list_remote_tags(self, repo: PathLike) -> list[str]:
+        """Return tag names visible on `origin`, freshest first.
+
+        Uses `git ls-remote --tags origin` so the local repo doesn't
+        need a prior fetch. The peeled refs (`<tag>^{}`) returned by
+        ls-remote are deduped — only the symbolic tag name appears in
+        the result. Sorted by version-ish ordering (newest first); we
+        rely on `git`'s `--sort=-v:refname` for that.
+        """
+        try:
+            out = self._run_capture(
+                ["git", "-c", "versionsort.suffix=-", "ls-remote",
+                 "--tags", "--refs", "--sort=-v:refname", "origin"],
+                cwd=str(repo),
+            )
+        except GitError:
+            # An empty remote, missing auth, or no tags at all — let the
+            # caller decide whether that's an error vs an empty list.
+            raise
+        tags: list[str] = []
+        for line in out.splitlines():
+            # Each line is "<sha>\trefs/tags/<name>"; we want <name>.
+            _, _, ref = line.partition("\t")
+            if ref.startswith("refs/tags/"):
+                tags.append(ref[len("refs/tags/"):])
+        return tags
+
     def current_ref(self, repo: PathLike) -> str:
         """Return whatever HEAD points at: a branch name if attached,
         otherwise the tag closest to HEAD, else the abbreviated SHA. The

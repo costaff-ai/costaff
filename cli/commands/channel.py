@@ -133,6 +133,40 @@ def channel_list():
     console.print(table)
 
 
+@channel_app.command("tags")
+def channel_tags(name: str = typer.Argument(..., help="Channel name to inspect tags for")):
+    """List available release tags on the channel's origin remote.
+
+    Use this before `costaff channel rebuild <name> --tag <tag>` to
+    discover what versions exist. The currently pinned ref (if any) is
+    annotated with ✓.
+    """
+    conf = ConfigManager.get_config()
+    if name not in conf.get("dynamic_channels", {}):
+        console.print(f"[red]Error: Channel '{name}' not found.[/red]")
+        raise typer.Exit(1)
+    chan_conf = conf["dynamic_channels"][name]
+    source_path = chan_conf.get("source_path")
+    if not source_path or not Git().is_repo(source_path):
+        console.print(f"[red]Error: No git source for channel '{name}'.[/red]")
+        raise typer.Exit(1)
+
+    try:
+        tags = Git().list_remote_tags(source_path)
+    except GitError as e:
+        console.print(f"[red]Failed to query tags: {e}[/red]")
+        raise typer.Exit(1)
+
+    pinned = chan_conf.get("ref")
+    console.print(f"Available tags for [bold cyan]{name}[/bold cyan]:")
+    if not tags:
+        console.print("  [yellow](no tags found on origin)[/yellow]")
+        return
+    for t in tags:
+        marker = "  [green]✓ pinned[/green]" if t == pinned else ""
+        console.print(f"  {t}{marker}")
+
+
 @channel_app.command("remove")
 def channel_remove(name: str = typer.Argument(...)):
     """Remove a dynamic channel."""

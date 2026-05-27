@@ -173,6 +173,49 @@ def test_current_ref_returns_exact_tag_on_detached_head(tmp_path):
     assert len(calls) == 2  # symbolic-ref + describe
 
 
+def test_list_remote_tags_parses_ls_remote_output(tmp_path):
+    """`git ls-remote --tags --refs origin` yields tab-separated
+    `<sha>\\trefs/tags/<name>` lines. We extract the name and preserve
+    git's `-v:refname` sort order (newest first)."""
+    output = (
+        "abc1234567890abc1234567890abc1234567890\trefs/tags/v0.2.0\n"
+        "1234567890abc1234567890abc1234567890abcd\trefs/tags/v0.1.0\n"
+        "fedcba0987654321fedcba0987654321fedcba09\trefs/tags/v0.1.0-alpha-1\n"
+    )
+    with patch("services.runtime.git.subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=output, stderr="")
+        tags = Git().list_remote_tags(tmp_path)
+    assert tags == ["v0.2.0", "v0.1.0", "v0.1.0-alpha-1"]
+
+
+def test_list_remote_tags_empty_when_remote_has_none(tmp_path):
+    """Empty stdout (remote has no tags) → empty list, not an error."""
+    with patch("services.runtime.git.subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        tags = Git().list_remote_tags(tmp_path)
+    assert tags == []
+
+
+def test_list_remote_tags_ignores_non_tag_refs(tmp_path):
+    """Defensive: even if `git` returns a branch ref by mistake, we
+    only keep entries under refs/tags/."""
+    output = (
+        "abc\trefs/tags/v0.1.0\n"
+        "def\trefs/heads/main\n"
+    )
+    with patch("services.runtime.git.subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=output, stderr="")
+        tags = Git().list_remote_tags(tmp_path)
+    assert tags == ["v0.1.0"]
+
+
+def test_list_remote_tags_raises_on_unreachable_remote(tmp_path):
+    err = subprocess.CalledProcessError(128, ["git", "ls-remote"], stderr="Could not read from remote repository.")
+    with patch("services.runtime.git.subprocess.run", side_effect=err):
+        with pytest.raises(GitError):
+            Git().list_remote_tags(tmp_path)
+
+
 def test_current_ref_falls_back_to_short_sha(tmp_path):
     """Detached HEAD without a matching tag → return short SHA."""
     calls = []

@@ -379,6 +379,89 @@ def test_channel_rebuild_force_removes_container_before_up(fake_git, fake_runtim
     assert call_log == ["rm:costaff-channel-telegram", "up"]
 
 
+# ----- `agent tags` / `channel tags` query commands -------------------
+
+def test_agent_tags_lists_origin_tags_with_pin_marker(capsys, fake_git):
+    from cli.commands import agent_container
+
+    conf = {
+        "external_agents": {
+            "ba": {
+                "type": "github",
+                "source_path": "/tmp/ba-src",
+                "ref": "v0.1.0-alpha-1",
+            }
+        }
+    }
+    fake_git.is_repo.return_value = True
+    fake_git.list_remote_tags.return_value = ["v0.2.0", "v0.1.0-alpha-1"]
+
+    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+         patch.object(agent_container, "Git", return_value=fake_git):
+        agent_container.agent_tags(name="ba")
+
+    out = capsys.readouterr().out
+    assert "v0.2.0" in out
+    assert "v0.1.0-alpha-1" in out
+    # The pinned tag is annotated with the pin marker.
+    pinned_line = next(line for line in out.splitlines() if "v0.1.0-alpha-1" in line)
+    assert "pinned" in pinned_line.lower()
+
+
+def test_agent_tags_empty_remote_prints_friendly_message(capsys, fake_git):
+    from cli.commands import agent_container
+
+    conf = {
+        "external_agents": {
+            "notion": {"type": "github", "source_path": "/tmp/notion-src"}
+        }
+    }
+    fake_git.is_repo.return_value = True
+    fake_git.list_remote_tags.return_value = []
+
+    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+         patch.object(agent_container, "Git", return_value=fake_git):
+        agent_container.agent_tags(name="notion")
+
+    out = capsys.readouterr().out
+    assert "no tags found" in out.lower()
+
+
+def test_agent_tags_missing_agent_exits_with_error():
+    """Unknown agent name → typer.Exit(1), nothing called downstream."""
+    import typer
+    from cli.commands import agent_container
+
+    with patch.object(agent_container.ConfigManager, "get_config", return_value={"external_agents": {}}):
+        with pytest.raises(typer.Exit):
+            agent_container.agent_tags(name="ghost")
+
+
+def test_channel_tags_lists_origin_tags(capsys, fake_git):
+    from cli.commands import channel as channel_cmd
+
+    conf = {
+        "dynamic_channels": {
+            "telegram": {
+                "type": "github",
+                "source_path": "/tmp/tg-src",
+                "ref": "v0.1.0-alpha-1",
+            }
+        }
+    }
+    fake_git.is_repo.return_value = True
+    fake_git.list_remote_tags.return_value = ["v0.2.0", "v0.1.0-alpha-1"]
+
+    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
+         patch.object(channel_cmd, "Git", return_value=fake_git):
+        channel_cmd.channel_tags(name="telegram")
+
+    out = capsys.readouterr().out
+    assert "v0.2.0" in out
+    pinned_line = next(line for line in out.splitlines() if "v0.1.0-alpha-1" in line)
+    assert "pinned" in pinned_line.lower()
+
+
 def test_force_remove_idempotent_on_missing_container(tmp_path):
     """The Runtime impl must NOT raise when the container doesn't exist
     — that's the whole point of force_remove being safe to call before

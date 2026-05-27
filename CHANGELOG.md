@@ -40,6 +40,22 @@ This repository is **private** — for internal / paid-tier consumption only.
   use`. The pre-up rm is idempotent — no-op when the name is unused —
   and matches operator intent: "rebuild" should rebuild, not fail on
   stale state.
+- `costaff agent rebuild --tag <ref>` / `channel rebuild --tag <ref>`
+  no longer persist the new `ref` to `config.json` when the underlying
+  `git checkout <ref>` fails (e.g. the tag doesn't exist on origin).
+  Previously the working tree would stay on whatever HEAD was already
+  there while config claimed the new pin — a confusing lie. Now config
+  is only written when the checkout actually succeeds.
+
+### Discoverability
+
+- New `costaff agent tags <name>` and `costaff channel tags <name>`
+  commands. Lists release tags on the plugin's origin remote via
+  `git ls-remote --tags`, sorted newest first, with the currently
+  pinned ref annotated `✓ pinned`. Use this before `rebuild --tag`
+  to discover what versions exist — saves a round-trip to GitHub.
+  Empty remote prints `(no tags found on origin)` so the gap is
+  obvious.
 
 ## [0.1.0-alpha-1] - 2026-05-27
 

@@ -57,6 +57,42 @@ def agent_list():
     console.print(table)
 
 
+@agent_app.command("tags")
+def agent_tags(name: str = typer.Argument(..., help="Agent name to inspect tags for")):
+    """List available release tags on the agent's origin remote.
+
+    Use this to discover what versions exist before pinning via
+    `costaff agent rebuild <name> --tag <tag>`. Tags are queried via
+    `git ls-remote` against the existing local clone's origin URL, so
+    no fetch is required and the network round-trip is light. The
+    currently pinned ref (if any) is annotated with a ✓ mark.
+    """
+    conf = ConfigManager.get_config()
+    if name not in conf.get("external_agents", {}):
+        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        raise typer.Exit(1)
+    agent_conf = conf["external_agents"][name]
+    source_path = agent_conf.get("source_path")
+    if not source_path or not Git().is_repo(source_path):
+        console.print(f"[red]Error: No git source for agent '{name}' (type={agent_conf.get('type')}).[/red]")
+        raise typer.Exit(1)
+
+    try:
+        tags = Git().list_remote_tags(source_path)
+    except GitError as e:
+        console.print(f"[red]Failed to query tags: {e}[/red]")
+        raise typer.Exit(1)
+
+    pinned = agent_conf.get("ref")
+    console.print(f"Available tags for [bold cyan]{name}[/bold cyan]:")
+    if not tags:
+        console.print("  [yellow](no tags found on origin)[/yellow]")
+        return
+    for t in tags:
+        marker = "  [green]✓ pinned[/green]" if t == pinned else ""
+        console.print(f"  {t}{marker}")
+
+
 @agent_app.command("restart")
 def agent_restart(name: str = typer.Argument(..., help="Agent name to restart")):
     """Restart a local agent's containers without rebuilding."""
