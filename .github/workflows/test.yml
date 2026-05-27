@@ -32,6 +32,6 @@ jobs:
         env:
           # `core.database` refuses to import without a DB URI; the
           # host-side tests use in-memory SQLite via conftest fixtures.
-          ADK_SESSION_SERVICE_URI: sqlite:///:memory:
+          ADK_SESSION_SERVICE_URI: "sqlite:///:memory:"
         run: |
           python -m pytest -q

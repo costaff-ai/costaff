@@ -71,6 +71,9 @@ when that might change.
 
 ## Install
 
+> **In a hurry?** [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) gets you
+> chatting in 5 minutes (the same install steps + a guided first chat).
+
 One command, on macOS or Ubuntu:
 
 ```bash
