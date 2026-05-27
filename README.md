@@ -423,17 +423,39 @@ type the same thing in plain text and get the same result.
 
 Dual-licensed under **AGPL v3** + **commercial license**.
 
-- Personal use, internal company use, and modifications you keep to
-  yourself: **free under AGPL v3**.
-- Re-distributing the software, or running a modified version as a
-  network service for others: **AGPL v3 obligations apply** (you must
-  release your modifications under AGPL v3).
-- If AGPL v3 doesn't work for your use case, contact us for a
-  commercial license.
+- **Personal use** (running CoStaff for yourself on your own hardware):
+  **free under AGPL v3**.
+- **Internal company use** (you and your colleagues, behind your firewall,
+  no external customers chatting with the bot): **free under AGPL v3**.
+- **Hosting CoStaff as a service for external / paying users** — e.g.
+  reselling it, running it as a SaaS, or letting customers interact
+  with a CoStaff instance you operate — triggers **AGPL §13**: you must
+  release your modifications (including private skills, prompts, and
+  workflow code) under AGPL v3, OR acquire a **commercial license**
+  that waives that obligation.
+- **Redistributing modified CoStaff** (forking and shipping your fork
+  to others): standard AGPL v3 obligations apply.
 
 See [`LICENSE`](./LICENSE) for the full text.
 
-For commercial licensing inquiries: **https://costaffs.app**
+## Commercial License
+
+The OSS tier covers personal use and small-team internal hosting under
+AGPL v3, with plan limits (3 agents / 1 user / 10 skills) intended to
+fit a single operator. Paid tiers unlock:
+
+- **Higher limits** — more agents, users, skills (Starter / Pro /
+  Enterprise tiers).
+- **Enterprise WebChat** — multi-tenant Org × Team × CoStaff routing,
+  audit logs, SSO, file delivery, sub-agent progress panels.
+- **Premium Agents** — production-grade specialists for specific
+  verticals.
+- **Field deployment engagement** — onboarding, customization, and
+  integration support.
+- **AGPL §13 waiver** — host CoStaff for external users without the
+  source-disclosure obligation.
+
+Pricing tiers, comparison, and how to start: **https://costaffs.app**
 
 ---
 
