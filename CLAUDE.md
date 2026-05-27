@@ -86,11 +86,11 @@ costaff/
 ### 2.1 通用層次
 - **CLI → services/**：CLI 命令只負責參數解析與輸出，業務邏輯在 `services/` 層；`services/runtime/` 是 docker 抽象，CLI 不該直接 `subprocess.run(["docker", ...])`。
 - **`config.json` 由 `services/config.py` 讀寫**，gitignored；`.env` 與 `config.json` 不會被 `git reset` 覆蓋，所以可以放心 `git pull` / `git reset --hard` 而不弄丟 secrets。
-- **MCP 工具命名**：`mcp_servers/tools/` 下的工具命名規範同 `skill/costaff-agent/MCP_TOOLS_SKILL.md`（檔名不得與 Python 標準庫或 sub-agent 自己的 MCP tool 衝突；之前踩過 `list_workspace`，已改名 `list_data_files`）。
+- **MCP 工具命名**：`mcp_servers/tools/` 下的工具名不得與 Python 標準庫或 sub-agent 自己的 MCP tool 衝突（之前踩過 `list_workspace`，已改名 `list_data_files`）。
 - **通知器**：`core/notifiers/` 各平台通知器；`core/notifiers/dispatcher.py` 統一 dispatch 介面，executor 與 manager agent 都從這個 dispatcher 出。
 
 ### 2.2 Manager Agent 特有
-- **AgentTool 不是 sub_agents**：`agents/costaff_agent/agent.py` 的 manager 用 `tools=[*mcp_toolsets, skills, *AgentTool(remote)]`、`sub_agents=[]`。`sub_agents/__init__.py` 的 `load_all_remote_agent_tools()` 包 `AgentTool(agent=RemoteA2aAgent(...))`。**禁止**改回 `sub_agents=[RemoteA2aAgent(...)]` + `transfer_to_agent` — 那會把 session history 含 user 「OK」 一起送給 sub-agent，造成 sub-agent 進入對話模式不執行。詳見 `skill/costaff-agent/A2A_SERVER_SKILL.md` Section 3 + `tests/test_remote_agent_tools.py`（10 個 regression test 鎖住此契約）。
+- **AgentTool 不是 sub_agents**：`agents/costaff_agent/agent.py` 的 manager 用 `tools=[*mcp_toolsets, skills, *AgentTool(remote)]`、`sub_agents=[]`。`sub_agents/__init__.py` 的 `load_all_remote_agent_tools()` 包 `AgentTool(agent=RemoteA2aAgent(...))`。**禁止**改回 `sub_agents=[RemoteA2aAgent(...)]` + `transfer_to_agent` — 那會把 session history 含 user 「OK」 一起送給 sub-agent，造成 sub-agent 進入對話模式不執行。`tests/test_remote_agent_tools.py` 有 10 個 regression test 鎖住此契約。
 - **MCP whitelist**：plugin agent 連 manager core MCP 時透過 `config.json` 的 `agent_mcp_filters` 限制可見 tool（見 Section 2.3）。
 - **Sub-agent 控制權自動回**：透過 A2A `RemoteA2aAgent` wrapper 自動把 sub-agent 的 return value 帶回 manager turn，hub-and-spoke flow 是「manager → A → manager → B → manager → user」。
 

@@ -1,4 +1,16 @@
 -r requirements.txt
-pytest
-pytest-asyncio
-pytest-cov
+
+# Test runner
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+
+# Strict-mode manifest validation (services.agent_protocol uses jsonschema
+# when --strict is passed; lenient mode doesn't need it).
+jsonschema==4.23.0
+
+# `tests/test_remote_agent_tools.py` imports `agents/costaff_agent/sub_agents/`,
+# which depends on the same ADK that the Manager Agent container runs.
+# Keeping the test version pinned in lockstep with `agents/requirements.txt`
+# means `python -m pytest` works without a separate container build.
+google-adk[a2a,extensions]==2.0.0
