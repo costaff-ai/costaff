@@ -39,18 +39,27 @@ def _shared_secret() -> str:
     return os.getenv("WEBCHAT_ENT_INTERNAL_SECRET", "")
 
 
+# A valid session_id starts with a known channel prefix. Sub-agent LLMs
+# have been observed passing the raw hashed_id (`4d0d9234bc031246`) or a
+# bare ADK UUID into the session_id slot — those don't match anything on
+# WebChat Enterprise's resolver and progress goes silent. We treat them
+# as "missing" and fall through to the IdentityMap lookup.
+_VALID_SESSION_PREFIXES = ("tg_", "dc_", "line_", "web_", "webent_")
+
+
 def _resolve_session_id(recipient: str, session_id: str | None) -> str | None:
     """Return a session_id WebChat Enterprise can use to look up the
     conversation / user.
 
     Channel routing has already happened upstream — by the time this
-    function runs, the dispatcher chose webchat. So we trust whatever
-    `session_id` was passed (post-thread refactor this is the ADK
-    session id stored on Conversation.adk_session_id). Falls back to an
-    IdentityMap lookup by recipient (hashed_id) when no session_id was
-    provided — typically Manager-side callbacks that only know the user.
+    function runs, the dispatcher chose webchat. So we trust a
+    `session_id` that *looks* like one (has a channel prefix); otherwise
+    we treat it as missing and look up via IdentityMap by recipient
+    (hashed_id). This second case covers both pure "session_id omitted"
+    callbacks AND the more common "sub-agent LLM stripped the
+    `webent_` prefix" failure mode.
     """
-    if session_id:
+    if session_id and session_id.startswith(_VALID_SESSION_PREFIXES):
         return session_id
     if not recipient:
         return None
