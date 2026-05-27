@@ -37,6 +37,7 @@ def channel_add(
     name: str = typer.Argument(..., help="Channel name (e.g. telegram, webchat)"),
     local: Optional[str] = typer.Option(None, "--local", help="Local project path"),
     github: Optional[str] = typer.Option(None, "--github", help="GitHub repository URL"),
+    tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin clone to a release tag, branch, or commit (e.g. v0.1.0-alpha-1). Recorded in config and respected by `channel rebuild`."),
     env: Optional[List[str]] = typer.Option(None, "--env", "-e", help="Set environment variables"),
 ):
     """Add a communication channel (Auto-discovery, Local, or GitHub mode)."""
@@ -75,9 +76,14 @@ def channel_add(
             shutil.rmtree(target_src)
 
         os.makedirs(os.path.dirname(target_src), exist_ok=True)
-        console.print(f"Cloning channel [bold cyan]{github}[/bold cyan]...")
+        if tag:
+            console.print(f"Cloning channel [bold cyan]{github}[/bold cyan] @ [bold]{tag}[/bold]...")
+        else:
+            console.print(f"Cloning channel [bold cyan]{github}[/bold cyan]...")
         try:
-            Git().clone(github, target_src)
+            # Tagged clones need full history so `git checkout` can move
+            # between refs on rebuild.
+            Git().clone(github, target_src, ref=tag, depth=0 if tag else 1)
             local = target_src
         except GitError as e:
             console.print(f"[red]Git clone failed: {e}[/red]")
@@ -87,6 +93,8 @@ def channel_add(
         try:
             # We'll implement _deploy_local_channel in helpers.py
             entry = _deploy_local_channel(name, local, conf, predefined_envs=predefined_envs)
+            if tag:
+                entry["ref"] = tag
             conf["dynamic_channels"][name] = entry
             ConfigManager.save_config(conf)
             ConfigManager.update_external_agents_env()
@@ -107,6 +115,7 @@ def channel_list():
         return
     table = Table(title="Dynamic Channels")
     table.add_column("Name", style="cyan")
+    table.add_column("Ref", style="magenta")
     table.add_column("Port", justify="center")
     table.add_column("Health", justify="center")
     table.add_column("Enabled", justify="center")
@@ -119,7 +128,8 @@ def channel_list():
                 health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
             except Exception:
                 health = "[red]●[/red]"
-        table.add_row(name, str(port) if port else "N/A", health, "✓" if info.get("enabled") else "✗")
+        ref = info.get("ref") or "—"
+        table.add_row(name, ref, str(port) if port else "N/A", health, "✓" if info.get("enabled") else "✗")
     console.print(table)
 
 
@@ -159,7 +169,8 @@ def channel_remove(name: str = typer.Argument(...)):
 def channel_rebuild(
     name: str = typer.Argument(..., help="Channel name to rebuild"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without Docker layer cache"),
-    pull: bool = typer.Option(True, "--pull/--no-pull", help="Git pull before rebuilding"),
+    pull: bool = typer.Option(True, "--pull/--no-pull", help="Sync source from origin before rebuilding"),
+    tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin to a different release tag / branch / commit. Persisted to config."),
 ):
     """Rebuild Docker images and restart a local channel from source."""
     conf = ConfigManager.get_config()
@@ -173,13 +184,27 @@ def channel_rebuild(
     source_path = chan_conf.get("source_path", "(unknown)")
     load_dotenv(PATHS["env"], override=True)
 
+    effective_ref = tag or chan_conf.get("ref")
+
     git = Git()
     if pull and git.is_repo(source_path):
-        console.print(f"Pulling latest code for [bold]{name}[/bold]...")
-        try:
-            git.pull_ff_only(source_path)
-        except GitError as e:
-            console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
+        if effective_ref:
+            console.print(f"Syncing [bold]{name}[/bold] to [bold cyan]{effective_ref}[/bold cyan]...")
+            try:
+                git.fetch_tags(source_path)
+                git.checkout(source_path, effective_ref)
+            except GitError as e:
+                console.print(f"[yellow]Ref sync failed ({e}); rebuilding with current source.[/yellow]")
+        else:
+            console.print(f"Pulling latest code for [bold]{name}[/bold]...")
+            try:
+                git.pull_ff_only(source_path)
+            except GitError as e:
+                console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
+
+    if tag and tag != chan_conf.get("ref"):
+        chan_conf["ref"] = tag
+        ConfigManager.save_config(conf)
 
     # Regenerate compose-fragment.yaml from source so any docker-compose.yaml
     # changes (env vars, volumes, etc.) are picked up on rebuild.

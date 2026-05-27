@@ -80,6 +80,7 @@ def agent_add(
     url: Optional[str] = typer.Option(None, "--url", help="Remote A2A endpoint URL"),
     local: Optional[str] = typer.Option(None, "--local", help="Local project path (CoStaff Agent Convention)"),
     github: Optional[str] = typer.Option(None, "--github", help="GitHub repository URL to clone and deploy"),
+    tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin --github clone to a release tag, branch, or commit (e.g. v0.1.0-alpha-1). Recorded in config and respected by `agent rebuild`."),
     env: Optional[list[str]] = typer.Option(None, "--env", "-e", help="Set environment variables (e.g. KEY=VALUE)"),
     description: str = typer.Option("", "--description", "-d", help="Short description"),
     strict: bool = typer.Option(False, "--strict", help="Reject the manifest if it does not pass the full Agent Protocol JSON Schema"),
@@ -135,9 +136,15 @@ def agent_add(
             shutil.rmtree(target_src)
 
         os.makedirs(os.path.dirname(target_src), exist_ok=True)
-        console.print(f"Cloning [bold cyan]{github}[/bold cyan] to [bold]{target_src}[/bold]...")
+        if tag:
+            console.print(f"Cloning [bold cyan]{github}[/bold cyan] @ [bold]{tag}[/bold] to [bold]{target_src}[/bold]...")
+        else:
+            console.print(f"Cloning [bold cyan]{github}[/bold cyan] to [bold]{target_src}[/bold]...")
         try:
-            Git().clone(github, target_src)
+            # Tagged clones need full history so `git checkout` later can
+            # move between refs; shallow clone with --branch <tag> works
+            # but `agent rebuild --tag <other>` would then fail.
+            Git().clone(github, target_src, ref=tag, depth=0 if tag else 1)
             local = target_src
         except GitError as e:
             console.print(f"[red]Git clone failed: {e}[/red]")
@@ -153,6 +160,9 @@ def agent_add(
             raise typer.Exit(1)
     else:
         entry = {"type": "url", "a2a_url": url, "description": description, "enabled": True}
+
+    if tag:
+        entry["ref"] = tag
 
     conf.setdefault("external_agents", {})[name] = entry
 

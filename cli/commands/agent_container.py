@@ -9,6 +9,7 @@ Decorators register against the `agent_app` Typer instance defined in
 fire at startup.
 """
 import os
+from typing import Optional
 
 import httpx
 import typer
@@ -37,6 +38,7 @@ def agent_list():
     table = Table(title="External Agents")
     table.add_column("Name", style="cyan")
     table.add_column("Type", style="blue")
+    table.add_column("Ref", style="magenta")
     table.add_column("A2A URL")
     table.add_column("Health", justify="center")
     table.add_column("Enabled", justify="center")
@@ -49,7 +51,8 @@ def agent_list():
                 health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
             except Exception:
                 health = "[red]●[/red]"
-        table.add_row(name, agent.get("type", "url"), agent.get("a2a_url", ""), health,
+        ref = agent.get("ref") or "—"
+        table.add_row(name, agent.get("type", "url"), ref, agent.get("a2a_url", ""), health,
                       "✓" if agent.get("enabled") else "✗", (agent.get("description", "") or "")[:50])
     console.print(table)
 
@@ -87,7 +90,8 @@ def agent_restart(name: str = typer.Argument(..., help="Agent name to restart"))
 def agent_rebuild(
     name: str = typer.Argument(..., help="Agent name to rebuild"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without Docker layer cache"),
-    pull: bool = typer.Option(True, "--pull/--no-pull", help="Git pull before rebuilding"),
+    pull: bool = typer.Option(True, "--pull/--no-pull", help="Sync source from origin before rebuilding (pull for branch pin, fetch+checkout for tag/commit pin)"),
+    tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin to a different release tag / branch / commit. Persisted to config so the next rebuild stays on this ref."),
 ):
     """Rebuild Docker images and restart a local agent from source."""
     conf = ConfigManager.get_config()
@@ -105,13 +109,32 @@ def agent_rebuild(
     load_dotenv(PATHS["env"], override=True)
     runtime = get_runtime()
 
+    # Effective ref: --tag overrides any persisted pin; otherwise stay on
+    # whatever the entry has. None means "track default branch" — same as
+    # the historical pre-tag behaviour.
+    effective_ref = tag or agent_conf.get("ref")
+
     git = Git()
     if pull and git.is_repo(source_path):
-        console.print(f"Pulling latest code for [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
-        try:
-            git.pull_ff_only(source_path)
-        except GitError as e:
-            console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
+        if effective_ref:
+            console.print(f"Syncing [bold]{name}[/bold] to [bold cyan]{effective_ref}[/bold cyan] in [cyan]{source_path}[/cyan]...")
+            try:
+                git.fetch_tags(source_path)
+                git.checkout(source_path, effective_ref)
+            except GitError as e:
+                console.print(f"[yellow]Ref sync failed ({e}); rebuilding with current source.[/yellow]")
+        else:
+            console.print(f"Pulling latest code for [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
+            try:
+                git.pull_ff_only(source_path)
+            except GitError as e:
+                console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
+
+    # Persist a new pin only when --tag was explicit; never auto-write a
+    # pin just because a previous one existed.
+    if tag and tag != agent_conf.get("ref"):
+        agent_conf["ref"] = tag
+        ConfigManager.save_config(conf)
 
     console.print(f"Building [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
     try:

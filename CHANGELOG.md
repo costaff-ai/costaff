@@ -8,6 +8,27 @@ This repository is **private** — for internal / paid-tier consumption only.
 
 ## [Unreleased]
 
+### Added
+
+- **Tag-aware CLI** — `costaff agent add` / `channel add` accept
+  `--tag` (alias `--ref`) to pin clones to a release tag, branch, or
+  commit. `costaff agent rebuild` / `channel rebuild` read the
+  persisted pin from `config.json` and switch the working tree via
+  `git fetch --tags && git checkout <ref>` instead of `pull --ff-only`.
+  `--tag <new>` on rebuild overwrites the pin. `costaff update --tag`
+  pins the core repo itself. `agent list` / `channel list` show the
+  current pinned ref in a new "Ref" column.
+- `Git` wrapper gained `clone(..., ref=...)`, `fetch_tags()`,
+  `checkout()`, and `current_ref()` methods. 10 new unit tests in
+  `tests/test_git.py`; 8 new CLI-integration tests in
+  `tests/test_cli_tag_flow.py`.
+
+### Changed
+
+- `external_agents[name]` and `dynamic_channels[name]` entries in
+  `config.json` may now carry an optional `ref` field. Absence
+  preserves the legacy "track default branch" behaviour.
+
 ## [0.1.0-alpha-1] - 2026-05-27
 
 First tagged pre-release of the CoStaff platform core. Snapshots the
