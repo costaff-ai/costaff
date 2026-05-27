@@ -187,12 +187,14 @@ def channel_rebuild(
     effective_ref = tag or chan_conf.get("ref")
 
     git = Git()
+    ref_sync_ok = False
     if pull and git.is_repo(source_path):
         if effective_ref:
             console.print(f"Syncing [bold]{name}[/bold] to [bold cyan]{effective_ref}[/bold cyan]...")
             try:
                 git.fetch_tags(source_path)
                 git.checkout(source_path, effective_ref)
+                ref_sync_ok = True
             except GitError as e:
                 console.print(f"[yellow]Ref sync failed ({e}); rebuilding with current source.[/yellow]")
         else:
@@ -202,7 +204,9 @@ def channel_rebuild(
             except GitError as e:
                 console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
 
-    if tag and tag != chan_conf.get("ref"):
+    # Persist a new pin only when --tag was explicit AND the checkout
+    # actually succeeded (else config would lie about what's on disk).
+    if tag and tag != chan_conf.get("ref") and ref_sync_ok:
         chan_conf["ref"] = tag
         ConfigManager.save_config(conf)
 

@@ -98,6 +98,42 @@ def test_agent_rebuild_without_pin_falls_back_to_pull(fake_git, fake_runtime):
     fake_git.checkout.assert_not_called()
 
 
+def test_agent_rebuild_skips_pin_persist_when_checkout_fails(fake_git, fake_runtime):
+    """Regression: if --tag was supplied but checkout(<ref>) raises
+    (e.g. tag doesn't exist on the remote), DO NOT persist the new ref
+    to config — otherwise config would lie about what's on disk."""
+    from cli.commands import agent_container
+    from services.runtime.git import GitError
+
+    conf = {
+        "external_agents": {
+            "ba": {
+                "type": "github",
+                "fragment_path": "/tmp/frag.yaml",
+                "source_path": "/tmp/ba-src",
+                "container_names": ["costaff-agent-ba"],
+            }
+        }
+    }
+    fake_git.is_repo.return_value = True
+    # fetch_tags is fine, but checkout blows up — exactly the
+    # `git checkout v9.9.9` "did not match any file(s) known to git" case.
+    fake_git.checkout.side_effect = GitError("pathspec 'v9.9.9' did not match any file(s)")
+
+    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+         patch.object(agent_container.ConfigManager, "save_config") as save_mock, \
+         patch.object(agent_container, "Git", return_value=fake_git), \
+         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "load_dotenv"):
+        agent_container.agent_rebuild(name="ba", no_cache=False, pull=True, tag="v9.9.9")
+
+    fake_git.fetch_tags.assert_called_once_with("/tmp/ba-src")
+    fake_git.checkout.assert_called_once_with("/tmp/ba-src", "v9.9.9")
+    # Critical: config.json must NOT be told we're now on v9.9.9.
+    save_mock.assert_not_called()
+    assert "ref" not in conf["external_agents"]["ba"]
+
+
 def test_agent_rebuild_tag_override_writes_new_pin(fake_git, fake_runtime):
     """`--tag v0.2.0` on a repo that was previously pinned to alpha-1
     should: (a) checkout v0.2.0, and (b) persist the new ref to config."""

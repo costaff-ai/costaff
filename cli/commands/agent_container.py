@@ -115,12 +115,14 @@ def agent_rebuild(
     effective_ref = tag or agent_conf.get("ref")
 
     git = Git()
+    ref_sync_ok = False
     if pull and git.is_repo(source_path):
         if effective_ref:
             console.print(f"Syncing [bold]{name}[/bold] to [bold cyan]{effective_ref}[/bold cyan] in [cyan]{source_path}[/cyan]...")
             try:
                 git.fetch_tags(source_path)
                 git.checkout(source_path, effective_ref)
+                ref_sync_ok = True
             except GitError as e:
                 console.print(f"[yellow]Ref sync failed ({e}); rebuilding with current source.[/yellow]")
         else:
@@ -130,9 +132,11 @@ def agent_rebuild(
             except GitError as e:
                 console.print(f"[yellow]Pull failed ({e}); rebuilding with current source.[/yellow]")
 
-    # Persist a new pin only when --tag was explicit; never auto-write a
-    # pin just because a previous one existed.
-    if tag and tag != agent_conf.get("ref"):
+    # Persist a new pin only when --tag was explicit AND the checkout
+    # actually succeeded. Otherwise we'd lie in config.json about what's
+    # on disk — the operator would see "ref: v0.1.0-alpha-1" but the
+    # source tree would still be on whatever ref it was before.
+    if tag and tag != agent_conf.get("ref") and ref_sync_ok:
         agent_conf["ref"] = tag
         ConfigManager.save_config(conf)
 
