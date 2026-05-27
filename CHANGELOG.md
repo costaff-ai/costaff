@@ -29,6 +29,18 @@ This repository is **private** — for internal / paid-tier consumption only.
   `config.json` may now carry an optional `ref` field. Absence
   preserves the legacy "track default branch" behaviour.
 
+### Fixed
+
+- `costaff agent rebuild` / `channel rebuild` now `force_remove` each
+  declared container before `compose up --force-recreate`. compose's
+  --force-recreate only recovers containers in the **same** project
+  label, so any container created under a different project (very
+  common across one host with mixed deploy histories) used to make
+  rebuild fail with `Conflict. The container name "/X" is already in
+  use`. The pre-up rm is idempotent — no-op when the name is unused —
+  and matches operator intent: "rebuild" should rebuild, not fail on
+  stale state.
+
 ## [0.1.0-alpha-1] - 2026-05-27
 
 First tagged pre-release of the CoStaff platform core. Snapshots the

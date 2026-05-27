@@ -143,6 +143,16 @@ def agent_rebuild(
         console.print(f"[red]Build failed for agent '{name}'.[/red]")
         raise typer.Exit(1)
 
+    # Remove any existing containers by name before `up`. compose's
+    # --force-recreate only recovers containers in the SAME project
+    # label; a container created under a different project keeps its
+    # name and blocks the new container with a name-conflict error.
+    # force_remove_container is idempotent — no-op if the name is unused.
+    if container_names:
+        console.print(f"Removing any old containers: [dim]{', '.join(container_names)}[/dim]")
+        for cname in container_names:
+            runtime.force_remove_container(cname)
+
     console.print(f"Starting rebuilt containers for [bold]{name}[/bold]...")
     try:
         runtime.up(container_names, fragment=fragment_path, force_recreate=True)

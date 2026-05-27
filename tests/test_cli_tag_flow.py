@@ -267,3 +267,97 @@ def test_update_without_tag_still_does_pull_ff_only():
         if c.args and c.args[0][:3] == ["git", "pull", "--ff-only"]
     ]
     assert len(pull_calls) == 1
+
+
+# ----- force-remove before recreate -----------------------------------
+
+def test_agent_rebuild_force_removes_containers_before_up(fake_git, fake_runtime):
+    """The conflict guard: rebuild must call force_remove_container for
+    every entry in container_names BEFORE runtime.up runs. This is what
+    keeps `rebuild` reliable even when the existing container was
+    started by a different compose project label."""
+    from cli.commands import agent_container
+
+    conf = {
+        "external_agents": {
+            "ba": {
+                "type": "github",
+                "fragment_path": "/tmp/frag.yaml",
+                "source_path": "/tmp/ba-src",
+                "container_names": ["costaff-agent-ba", "costaff-mcp-ba"],
+            }
+        }
+    }
+    fake_git.is_repo.return_value = True
+
+    # Track call order so we can assert rm happened before up.
+    call_log: list[str] = []
+    fake_runtime.force_remove_container.side_effect = lambda n: call_log.append(f"rm:{n}")
+    fake_runtime.up.side_effect = lambda *a, **kw: call_log.append("up")
+
+    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+         patch.object(agent_container.ConfigManager, "save_config"), \
+         patch.object(agent_container, "Git", return_value=fake_git), \
+         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "load_dotenv"):
+        agent_container.agent_rebuild(name="ba", no_cache=False, pull=False, tag=None)
+
+    # Both container names removed.
+    assert fake_runtime.force_remove_container.call_count == 2
+    fake_runtime.force_remove_container.assert_any_call("costaff-agent-ba")
+    fake_runtime.force_remove_container.assert_any_call("costaff-mcp-ba")
+    # Order: all rm calls come strictly before the up call.
+    assert call_log == ["rm:costaff-agent-ba", "rm:costaff-mcp-ba", "up"]
+
+
+def test_channel_rebuild_force_removes_container_before_up(fake_git, fake_runtime):
+    from cli.commands import channel as channel_cmd
+
+    conf = {
+        "dynamic_channels": {
+            "telegram": {
+                "type": "github",
+                "fragment_path": "/tmp/frag.yaml",
+                "source_path": "/tmp/tg-src",
+                "container_names": ["costaff-channel-telegram"],
+                "public_port": 18090,
+            }
+        }
+    }
+    fake_git.is_repo.return_value = True
+    fake_fragment_writer = MagicMock(return_value=("/tmp/frag.yaml", ["costaff-channel-telegram"], None))
+
+    call_log: list[str] = []
+    fake_runtime.force_remove_container.side_effect = lambda n: call_log.append(f"rm:{n}")
+    fake_runtime.up.side_effect = lambda *a, **kw: call_log.append("up")
+
+    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
+         patch.object(channel_cmd.ConfigManager, "save_config"), \
+         patch.object(channel_cmd, "Git", return_value=fake_git), \
+         patch.object(channel_cmd, "_write_channel_fragment", fake_fragment_writer), \
+         patch.object(channel_cmd, "load_dotenv"), \
+         patch.object(channel_cmd, "get_runtime", return_value=fake_runtime):
+        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=False, tag=None)
+
+    fake_runtime.force_remove_container.assert_called_once_with("costaff-channel-telegram")
+    assert call_log == ["rm:costaff-channel-telegram", "up"]
+
+
+def test_force_remove_idempotent_on_missing_container(tmp_path):
+    """The Runtime impl must NOT raise when the container doesn't exist
+    — that's the whole point of force_remove being safe to call before
+    up. We verify by hitting the real DockerRuntime with subprocess
+    mocked to return non-zero (which is what `docker stop NOTHING` does)."""
+    from services.runtime.docker import DockerRuntime
+    import subprocess as _sp
+
+    with patch("services.runtime.docker.subprocess.run") as mock_run:
+        # docker stop / docker rm both return non-zero for missing container.
+        mock_run.return_value = _sp.CompletedProcess(args=[], returncode=1, stdout="", stderr="No such container")
+        # Should not raise:
+        rt = DockerRuntime(compose_cwd=str(tmp_path))
+        rt.force_remove_container("does-not-exist")
+        # Both `docker stop` and `docker rm` were attempted.
+        cmds = [c.args[0] for c in mock_run.call_args_list]
+        assert ["docker", "stop", "does-not-exist"] in cmds
+        assert ["docker", "rm", "does-not-exist"] in cmds
