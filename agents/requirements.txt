@@ -16,7 +16,8 @@ python-multipart==0.0.27
 mcp==1.9.4
 
 # LiteLLM — pluggable non-Google LLM backend.
-litellm==1.50.4
+# Must stay within google-adk[extensions]==2.0.0's range (>=1.83.7,<=1.83.14).
+litellm==1.83.14
 
 # Config + HTTP + DB drivers (loaded lazily by ADK / chatbot SDK based
 # on ADK_SESSION_SERVICE_URI scheme).
