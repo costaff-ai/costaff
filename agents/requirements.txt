@@ -13,7 +13,11 @@ google-cloud-storage==2.18.2
 python-multipart==0.0.27
 
 # Model Context Protocol — manager agent consumes MCP tools.
-mcp==1.9.4
+# Must be >=1.27 (the version prod-test runs): google-adk 2.0.0's
+# mcp_tool/__init__.py imports StreamableHTTPConnectionParams etc. from this
+# package inside a try/except — too-old mcp (e.g. 1.9.4) makes that import fail
+# silently, so McpToolset is never re-exported and the Manager fails to load.
+mcp==1.27.1
 
 # LiteLLM — pluggable non-Google LLM backend.
 # Must stay within google-adk[extensions]==2.0.0's range (>=1.83.7,<=1.83.14).
@@ -23,7 +27,7 @@ litellm==1.83.14
 # on ADK_SESSION_SERVICE_URI scheme).
 python-dotenv==1.2.2
 # httpx 0.28.1: required exactly by litellm 1.83.14 (==0.28.1) and accepted by
-# google-adk 2.0.0 (<1,>=0.27) + mcp 1.9.4 (>=0.27). Pinning 0.27.2 collided
+# google-adk 2.0.0 (<1,>=0.27) + mcp 1.27.1 (>=0.27). Pinning 0.27.2 collided
 # with litellm and made the Manager image unbuildable (pip ResolutionImpossible).
 httpx==0.28.1
 aiosqlite==0.21.0
