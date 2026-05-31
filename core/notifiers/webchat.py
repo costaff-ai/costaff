@@ -102,6 +102,47 @@ def _post(payload: dict) -> bool:
         return False
 
 
+def _post_file(file_path: str, session_id: str | None, hashed_id: str | None,
+               conversation_id: str | None = None, agent: str | None = None,
+               task_id: str | None = None) -> bool:
+    """Upload a file's BYTES to the enterprise `/api/internal/push-file`.
+
+    Needed for the multi-machine federation: a remote CoStaff node's file
+    lives on ITS disk, so the enterprise (on another host) can't serve a bare
+    path. We stream the bytes; the enterprise saves them locally and issues a
+    download token. Only used when WEBCHAT_ENT_PUSH_URL is set (remote node)."""
+    secret = _shared_secret()
+    if not secret:
+        return False
+    url = _push_url().rsplit("/push", 1)[0] + "/push-file"
+    data = {k: v for k, v in {
+        "session_id": session_id, "hashed_id": hashed_id,
+        "conversation_id": conversation_id, "agent": agent, "task_id": task_id,
+    }.items() if v}
+    try:
+        with open(file_path, "rb") as fh, httpx.Client(timeout=30.0) as client:
+            r = client.post(
+                url, data=data,
+                files={"file": (os.path.basename(file_path), fh)},
+                headers={"X-Internal-Token": secret},
+            )
+        if r.status_code >= 400:
+            logger.warning("[webchat] push-file %s rejected: %s %s", url, r.status_code, r.text[:200])
+            return False
+        return True
+    except Exception as e:
+        logger.warning("[webchat] push-file failed: %s", e)
+        return False
+
+
+def _extract_data_paths(text: str) -> list:
+    """/app/data/... file paths with known extensions (ordered, de-duped)."""
+    import re
+    exts = r"pdf|docx|doc|pptx|ppt|md|txt|html|htm|png|jpg|jpeg|gif|webp|svg|csv|json|xlsx|xls|zip"
+    pat = re.compile(rf"/app/data/[\w./\-]+\.(?:{exts})", re.IGNORECASE)
+    return list(dict.fromkeys(pat.findall(text or "")))
+
+
 def send_webchat_notification(
     recipient: str,
     message: str,
@@ -123,6 +164,15 @@ def send_webchat_notification(
     if not sid and not recipient:
         logger.warning("[webchat] no session_id or recipient — dropping")
         return False
+    # Remote federation node: the enterprise host can't read THIS machine's
+    # disk, so its in-text /app/data path extraction would find nothing.
+    # Proactively upload the bytes of any referenced file so it still renders
+    # as a download card alongside the text.
+    if os.getenv("WEBCHAT_ENT_PUSH_URL"):
+        for _p in _extract_data_paths(message):
+            if os.path.exists(_p):
+                _post_file(_p, sid, recipient if not sid else None,
+                           conversation_id=conversation_id, agent=agent, task_id=task_id)
     return _post({
         "session_id": sid,
         "hashed_id": recipient if not sid else None,
@@ -149,6 +199,11 @@ def send_webchat_file(
     sid = _resolve_session_id(recipient, session_id)
     if not sid and not recipient:
         return False
+    # Remote federation node: upload the bytes (the enterprise can't read a
+    # bare path on another machine's disk).
+    if os.getenv("WEBCHAT_ENT_PUSH_URL") and os.path.exists(file_path):
+        return _post_file(file_path, sid, recipient if not sid else None,
+                          conversation_id=conversation_id, agent=agent, task_id=task_id)
     return _post({
         "session_id": sid,
         "hashed_id": recipient if not sid else None,
