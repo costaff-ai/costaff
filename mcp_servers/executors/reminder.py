@@ -15,50 +15,28 @@ async def execute_reminder(reminder_id: str):
         if not reminder or reminder.status != "pending":
             return
 
+        # Authoritative channel: resolve from the user's IdentityMap (where the
+        # user actually is), not the stored channel — which create_reminder may
+        # have defaulted to "telegram" before webchat was a recognised branch.
+        # Mirrors execute_regular_work. dispatch_notification handles every
+        # channel (telegram / discord / line / email / webchat-enterprise) plus
+        # the hashed_id → real_id resolution, so we no longer dispatch by hand.
+        from mcp_servers.task_helpers import get_user_channel_info
+        from core.notifiers.dispatcher import dispatch_notification
+
         chan = (reminder.channel or "").lower()
-        if "line" in chan:
-            chan = "line"
-        elif "discord" in chan or "dc" in chan:
-            chan = "discord"
-        elif "email" in chan:
-            chan = "email"
-        else:
-            chan = "telegram"
+        recipient = reminder.recipient or reminder.user_id
+        resolved_chan, resolved_recipient = get_user_channel_info(reminder.user_id, db)
+        if resolved_chan:
+            chan = resolved_chan
+            recipient = resolved_recipient or recipient
 
         logger.info(f"Sending reminder {reminder_id} via {chan}")
 
         success = False
         try:
-            db2 = SessionLocal()
-            # Try recipient first; if it doesn't resolve to a real_id (e.g. LLM
-            # accidentally stored a display name like "Simon"), fall back to user_id.
-            target_id = reminder.recipient
-            mapping = db2.query(models.IdentityMap).filter(
-                (models.IdentityMap.hashed_id == target_id) |
-                (models.IdentityMap.session_id == target_id)
-            ).first()
-            if not mapping and reminder.user_id and reminder.user_id != target_id:
-                logger.warning(
-                    f"Reminder {reminder_id}: recipient '{target_id}' not in IdentityMap, "
-                    f"falling back to user_id '{reminder.user_id}'"
-                )
-                target_id = reminder.user_id
-                mapping = db2.query(models.IdentityMap).filter(
-                    (models.IdentityMap.hashed_id == target_id) |
-                    (models.IdentityMap.session_id == target_id)
-                ).first()
-            if mapping:
-                target_id = mapping.real_id
-            db2.close()
-
-            if chan == "telegram":
-                success = send_telegram_notification(target_id, reminder.message)
-            elif chan == "discord":
-                success = send_discord_notification(target_id, reminder.message, session_id=reminder.session_id)
-            elif chan == "line":
-                success = await send_line_notification(target_id, reminder.message)
-            elif chan == "email":
-                success = send_email_notification(target_id, reminder.message, "CoStaff Reminder")
+            await dispatch_notification(chan, recipient, reminder.message, session_id=reminder.session_id)
+            success = True
         except Exception as e:
             logger.error(f"Reminder send error {reminder_id}: {e}")
 

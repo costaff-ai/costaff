@@ -26,10 +26,21 @@ async def create_reminder_tool(
     """
     db = SessionLocal()
     try:
-        chan = (channel or "").lower()
-        if "line" in chan: chan = "line"
-        elif "discord" in chan or "dc" in chan: chan = "discord"
-        else: chan = "telegram"
+        # Prefer the user's actual channel from IdentityMap (webchat/webent →
+        # webchat, tg_ → telegram, …); fall back to normalizing whatever the
+        # LLM passed. Without this, webchat-enterprise users had their reminder
+        # silently routed to telegram (no webchat branch existed here).
+        from mcp_servers.task_helpers import get_user_channel_info
+        resolved_chan, _ = get_user_channel_info(user_id, db)
+        if resolved_chan:
+            chan = resolved_chan
+        else:
+            chan = (channel or "").lower()
+            if "line" in chan: chan = "line"
+            elif "discord" in chan or "dc" in chan: chan = "discord"
+            elif "webchat" in chan or "webent" in chan or "web" in chan: chan = "webchat"
+            elif "email" in chan: chan = "email"
+            else: chan = "telegram"
 
         try:
             run_dt = datetime.fromisoformat(run_at)
