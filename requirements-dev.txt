@@ -14,4 +14,4 @@ jsonschema==4.23.0
 # which depends on the same ADK that the Manager Agent container runs.
 # Keeping the test version pinned in lockstep with `agents/requirements.txt`
 # means `python -m pytest` works without a separate container build.
-google-adk[a2a,extensions]==2.0.0
+google-adk[a2a,extensions]==2.1.0
