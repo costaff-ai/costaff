@@ -61,6 +61,14 @@ async def _run_for_user(regular_work_id: str, work, user_id: str):
             f"(System Context: Your ADK session user_id is '{user_id}'. "
             "Use this EXACT value whenever a tool requires a user_id parameter — "
             "do not invent placeholder values like 'abcdef1234567890'.)\n\n"
+            "(AUTOMATED EXECUTION — NObody is watching this session to approve "
+            "anything. This is ONE scheduled run of a task whose schedule ALREADY "
+            "EXISTS; you are NOT being asked to set up or modify a schedule. You MUST "
+            "carry out the steps below right now and return the finished result. Do "
+            "NOT emit a plan / '執行計劃', do NOT ask the user to reply 'OK' or for any "
+            "confirmation, and do NOT call create_regular_work / create_reminder or "
+            "otherwise (re)register any scheduled job. Treat the text below as work to "
+            "DO now, not as a request to schedule.)\n\n"
             + work.spec
         )
         if channel and recipient:
