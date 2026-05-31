@@ -73,6 +73,24 @@ def init_db():
                         "ALTER TABLE identity_maps ADD COLUMN updated_at TIMESTAMP"
                     ))
                     conn.commit()
+                # active_session_id / last_message_id are defined on the
+                # IdentityMap model but only get auto-created by create_all on a
+                # brand-new table; an identity_maps created by an older build
+                # (or by a non-enterprise install that never ran the WebChat
+                # Enterprise alembic) lacks them, and require_approved /
+                # get_user_channel_info / project_task SELECT these columns ->
+                # psycopg2 UndefinedColumn -> the Manager improvises a
+                # "maintenance" excuse. Backfill them idempotently here.
+                if "active_session_id" not in cols:
+                    conn.execute(text(
+                        "ALTER TABLE identity_maps ADD COLUMN active_session_id VARCHAR"
+                    ))
+                    conn.commit()
+                if "last_message_id" not in cols:
+                    conn.execute(text(
+                        "ALTER TABLE identity_maps ADD COLUMN last_message_id VARCHAR"
+                    ))
+                    conn.commit()
 
         # api_configs / skill_configs: add agent_ids if missing
         for tbl in ("api_configs", "skill_configs"):
