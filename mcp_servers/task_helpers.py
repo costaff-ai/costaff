@@ -30,6 +30,17 @@ def get_user_channel_info(user_id: str, db) -> tuple:
         .first()
     )
     if not mapping:
+        # No local identity. On a remote CoStaff machine in the WebChat-
+        # Enterprise federation the user's identity lives in the UI host's
+        # enterprise DB, not in THIS machine's identity_maps — so the lookup
+        # finds nothing and async progress / project-task results would
+        # default to telegram and never reach the user. If this machine is
+        # wired to push to an enterprise WebChat (WEBCHAT_ENT_PUSH_URL set),
+        # treat the user as a WebChat user: the push lands on the enterprise
+        # container, which resolves the hashed_id against ITS own IdentityMap
+        # and delivers to the right conversation.
+        if os.getenv("WEBCHAT_ENT_PUSH_URL"):
+            return "webchat", user_id
         return None, None
     sid = mapping.session_id or ""
     if sid.startswith("tg_"):
@@ -42,6 +53,9 @@ def get_user_channel_info(user_id: str, db) -> tuple:
     # WebChat notifier — they share the HTTP push protocol over the
     # docker network.
     if sid.startswith("webent_") or sid.startswith("web_"):
+        return "webchat", user_id
+    # Unknown prefix: same enterprise-federation fallback as no-mapping above.
+    if os.getenv("WEBCHAT_ENT_PUSH_URL"):
         return "webchat", user_id
     return None, None
 
