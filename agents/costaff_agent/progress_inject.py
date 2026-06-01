@@ -67,6 +67,24 @@ async def before_tool_callback(tool, args, tool_context):
         tool_name = getattr(tool, "name", "")
         if isinstance(args, dict) and tool_name in _SESSION_OVERRIDE_TOOLS:
             sid = _current_session_id(tool_context)
+            # DIAGNOSTIC (2026-06-01): dump every candidate session source so we
+            # can see which (if any) carries the conversation adk_session_id UUID
+            # vs the user hashed_id, for the cross-machine federation routing fix.
+            try:
+                ic = getattr(tool_context, "_invocation_context", None)
+                sess_obj = getattr(tool_context, "session", None)
+                logger.info(
+                    "[session-diag] tool=%s llm_arg_session_id=%r | tc.session.id=%r | "
+                    "session.user_id=%r | invocation_id=%r | ic.session.id=%r",
+                    tool_name,
+                    args.get("session_id"),
+                    getattr(sess_obj, "id", None),
+                    getattr(sess_obj, "user_id", None),
+                    getattr(tool_context, "invocation_id", None),
+                    getattr(getattr(ic, "session", None), "id", None) if ic else None,
+                )
+            except Exception:
+                logger.info("[session-diag] dump failed", exc_info=True)
             if sid and args.get("session_id") != sid:
                 prev = args.get("session_id")
                 args["session_id"] = sid
