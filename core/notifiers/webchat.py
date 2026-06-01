@@ -61,6 +61,31 @@ def _resolve_session_id(recipient: str, session_id: str | None) -> str | None:
     """
     if session_id and session_id.startswith(_VALID_SESSION_PREFIXES):
         return session_id
+    # Live progress (report_step / panel_step) arrives with session_id =
+    # `task_<task_id>` — that's the Telegram panel key, NOT a conversation.
+    # For WebChat Enterprise we must resolve it to the ORIGIN conversation's
+    # adk_session_id (stored on the task by the Manager's session-pin
+    # before_tool_callback). Without this the push has no real session, falls
+    # through to "latest active conv", and live tool-call progress leaks into
+    # whatever thread the user opened mid-task (e.g. pressing New).
+    if session_id and session_id.startswith("task_"):
+        task_id = session_id[len("task_"):]
+        db = SessionLocal()
+        try:
+            task = (
+                db.query(models.ProjectTask)
+                .filter(models.ProjectTask.id == task_id)
+                .first()
+            )
+            sid = getattr(task, "session_id", None) if task else None
+            # Only use it if it's a real conversation session (UUID-ish), not
+            # another task_/hash value.
+            if sid and not sid.startswith("task_"):
+                return sid
+        except Exception:
+            logger.exception("[webchat] task->session resolve failed")
+        finally:
+            db.close()
     if not recipient:
         return None
     db = SessionLocal()
