@@ -45,6 +45,9 @@ def _content_text(content) -> str:
 _SESSION_OVERRIDE_TOOLS = {
     "create_project_task",
     "dispatch_task",
+    "dispatch_plan",          # multi-step plan dispatch — the real path the
+                              # Manager uses for "查X並出PDF" (observed 2026-06-01);
+                              # was missing → session_id stayed the user hash.
     "update_task_queue",
     "create_project_with_tasks",
     "create_reminder_tool",
