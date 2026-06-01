@@ -36,7 +36,47 @@ def _content_text(content) -> str:
         return ""
 
 
+# Task-creation/dispatch tools whose `session_id` arg is the DELIVERY target
+# for async progress + result. The Manager LLM fills this unreliably (observed
+# 2026-06-01: it passed the user hashed_id instead of the conversation's
+# adk_session_id, so WebChat Enterprise couldn't match it to the originating
+# conversation and progress leaked into whatever thread the user last opened).
+# The real session is on the ADK tool_context — override deterministically.
+_SESSION_OVERRIDE_TOOLS = {
+    "create_project_task",
+    "dispatch_task",
+    "update_task_queue",
+    "create_project_with_tasks",
+    "create_reminder_tool",
+    "create_regular_work",
+}
+
+
+def _current_session_id(tool_context) -> str | None:
+    try:
+        sess = getattr(tool_context, "session", None)
+        return getattr(sess, "id", None)
+    except Exception:
+        return None
+
+
 async def before_tool_callback(tool, args, tool_context):
+    # --- Deterministic session_id pinning for task/delivery tools ---
+    # Runs BEFORE the PROGRESS_CONTEXT block below and is independent of it.
+    try:
+        tool_name = getattr(tool, "name", "")
+        if isinstance(args, dict) and tool_name in _SESSION_OVERRIDE_TOOLS:
+            sid = _current_session_id(tool_context)
+            if sid and args.get("session_id") != sid:
+                prev = args.get("session_id")
+                args["session_id"] = sid
+                logger.info(
+                    "[session-pin] %s session_id %r -> %r (ADK tool_context)",
+                    tool_name, prev, sid,
+                )
+    except Exception:
+        logger.info("[session-pin] failed", exc_info=True)
+
     try:
         if not isinstance(args, dict):
             return None

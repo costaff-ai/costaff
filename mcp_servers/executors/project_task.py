@@ -361,8 +361,16 @@ async def execute_project_task(task_id: str):
                         )
 
                 if not callback_delivered:
+                    # Deliver on the ORIGIN session (the user's conversation
+                    # adk_session_id, now reliably pinned by the Manager's
+                    # before_tool_callback) so WebChat Enterprise matches it to
+                    # the originating conversation. `task_session_id`
+                    # (`task_<id>`) is the sub-agent's own run session and
+                    # never matches any conversation → would leak to the user's
+                    # last-opened thread via the broadcast fallback.
+                    delivery_session_id = task.session_id or task_session_id
                     await dispatch_notification(
-                        channel, recipient, result_text, task_session_id
+                        channel, recipient, result_text, delivery_session_id
                     )
 
             # Advance queue and wake up dependents
