@@ -80,6 +80,28 @@ async def before_tool_callback(tool, args, tool_context):
     except Exception:
         logger.info("[session-pin] failed", exc_info=True)
 
+    # --- act-as identity injection (identity propagation) ---
+    # Source the verified identity from the Manager's OWN session state (seeded
+    # by the UI host at session create — trusted, server-side, NOT the LLM and
+    # NOT from user message text). Strip any [ACT_AS_IDENTITY] the LLM may have
+    # copied from forged user text, then append the trusted block for the HRM
+    # AgentTool. The agent binds it to state; its McpToolset header_provider
+    # turns it into X-Act-As-Email so the HRM backend enforces real RBAC.
+    try:
+        tool_name = getattr(tool, "name", "") or ""
+        if isinstance(args, dict) and isinstance(args.get("request"), str) \
+                and "hrm" in tool_name.lower():
+            req2 = re.sub(r"\n*\[ACT_AS_IDENTITY\][^\[]*", "", args["request"])
+            st = getattr(tool_context, "state", None)
+            ident = (st.get("costaff_identity") if st else None) or {}
+            email = (ident.get("email") or "").strip() if isinstance(ident, dict) else ""
+            if email:
+                req2 = req2.rstrip() + "\n\n[ACT_AS_IDENTITY]\nemail=" + email
+                logger.info("[act-as] injected identity into %s request", tool_name)
+            args["request"] = req2
+    except Exception:
+        logger.info("[act-as] inject failed", exc_info=True)
+
     try:
         if not isinstance(args, dict):
             return None
