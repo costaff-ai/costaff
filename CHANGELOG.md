@@ -8,6 +8,8 @@ This repository is **private** — for internal / paid-tier consumption only.
 
 ## [Unreleased]
 
+## [0.1.0-alpha-2] - 2026-06-14
+
 ### Added
 
 - **`costaff start` preflight check** — validates `.env` (model API
