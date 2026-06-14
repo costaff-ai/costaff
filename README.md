@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Docker Support](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
-[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.0-orange.svg)](https://github.com/google/adk-python)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.1-orange.svg)](https://github.com/google/adk-python)
 [![MCP](https://img.shields.io/badge/MCP-enabled-green.svg)](https://modelcontextprotocol.io/)
 [![A2A Protocol](https://img.shields.io/badge/A2A-protocol-violet.svg)](https://github.com/google/A2A)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -92,6 +92,11 @@ The installer:
 If the installer prints **"manual steps"** at the end (e.g. "log out and
 log back in for Docker group membership"), follow them, then run
 `costaff onboard` yourself.
+
+> **Headless / CI install?** `costaff bootstrap` is the non-interactive
+> equivalent of `onboard` — it reads config from environment variables
+> and auto-generates the security secrets, so you can provision a host
+> without the wizard.
 
 ---
 
@@ -192,16 +197,22 @@ with the Postgres volume — see **`costaff database backup`**.
 | `costaff invoke <message>` | Send one message and exit (handy for scripts) |
 | `costaff doctor` | Diagnose common issues; writes a timestamped report |
 | `costaff update` | Pull the latest CoStaff release from GitHub |
+| `costaff update --tag <ref>` | Pin the core to a specific release tag (or roll back) |
+| `costaff core-rebuild` | Rebuild + recreate just the core stack (after a core update) |
 
 ### Managing agents
 
 ```bash
-costaff agent list                                  # Show registered agents
+costaff agent list                                  # Show registered agents (with pinned Ref)
 costaff agent add <name> --github <repo URL>        # Clone + deploy a GitHub agent
+costaff agent add <name> --github <url> --tag <ref> # Clone pinned to a release tag
 costaff agent add <name> --local <path>             # Deploy a local agent project
 costaff agent add <name> --url <a2a URL>            # Register a remote A2A endpoint
+costaff agent tags <name>                           # List release tags on the agent's origin
 costaff agent restart <name>                        # Restart an agent's containers
 costaff agent rebuild <name>                        # Rebuild + restart (after code changes)
+costaff agent rebuild <name> --tag <ref>            # Rebuild and re-pin to a new tag
+costaff agent enable <name> / disable <name>        # Toggle an agent on or off
 costaff agent remove <name>                         # Remove an agent
 costaff agent model                                 # Inspect/set the per-agent model
 ```
@@ -209,17 +220,38 @@ costaff agent model                                 # Inspect/set the per-agent 
 ### Managing channels
 
 ```bash
-costaff channel list             # Show registered channels with health
+costaff channel list             # Show registered channels with health + pinned Ref
 costaff channel add <name>       # Add a channel (interactive, official channels auto-resolved)
-costaff channel rebuild <name>   # Rebuild + restart a channel
+costaff channel add <name> --tag <ref>   # Add a channel pinned to a release tag
+costaff channel tags <name>      # List release tags on the channel's origin
+costaff channel rebuild <name>   # Rebuild + restart a channel (--tag <ref> to re-pin)
 costaff channel remove <name>    # Remove a channel
+```
+
+### Managing business platforms
+
+Beyond agents and channels, CoStaff can stand up the optional **business
+platform suite** (ERP, CRM, SCM, HRM, accounting, …) — each a separate
+Docker project that shares one PostgreSQL and the Account Manager (OIDC
+single sign-on):
+
+```bash
+costaff platform list            # Show platforms with health, in dependency order
+costaff platform add <name>      # Official names auto-resolve to their repo; wires shared DB + OIDC
+costaff platform rebuild <name>  # Rebuild + restart a platform
+costaff platform start | stop    # Start/stop the whole suite in dependency order (db first)
+costaff platform provision       # (Re)provision the shared DB roles/databases (idempotent)
+costaff platform remove <name>   # Remove a platform (add --purge to drop its volume too)
 ```
 
 ### Other
 
 ```bash
 costaff config validate          # Validate config.json against the schema
+costaff database info            # Show the database connection + a table summary
 costaff database backup          # Dump the Postgres database to a file
+costaff database restore <file>  # Restore the database from a dump
+costaff database clean           # Drop + recreate the schema (destructive)
 costaff license                  # Manage your CoStaff license
 ```
 
@@ -228,20 +260,31 @@ costaff license                  # Manage your CoStaff license
 ## Update
 
 ```bash
-costaff update
+costaff update                       # Fast-forward the core to the latest release
+costaff update --tag v0.1.0-alpha-2  # Pin the core to a specific release (or roll back)
 ```
 
-Pulls the latest release from GitHub and reinstalls the CLI. Your
-`.env`, `config.json`, and database are untouched.
+`costaff update` pulls the latest core release and reinstalls the CLI.
+Your `.env`, `config.json`, and database are untouched.
 
-If you want to update by version (or roll back), pin the release tag:
+### Pinning versions (reproducible deploys)
+
+Every plugin can be pinned to a release tag, so a host runs an exact,
+reproducible set of versions instead of tracking each repo's `main`:
 
 ```bash
-cd ~/.costaff/costaff
-git fetch --tags
-git checkout v0.2.0           # or any tagged release
-pip install -e .
+costaff agent tags business-analysis                # Discover which release tags exist
+costaff agent add business-analysis \
+  --github <url> --tag v0.1.0-alpha-2               # Clone pinned to a tag
+costaff agent rebuild business-analysis --tag v0.1.0-alpha-2   # Re-pin + rebuild
+costaff channel tags telegram                       # Same flow for channels
+costaff update --tag v0.1.0-alpha-2                 # Pin the core itself
 ```
+
+`agent list` / `channel list` show each plugin's current pinned **Ref**.
+The pin is persisted in `config.json` and honoured on every rebuild — see
+the latest [Releases](https://github.com/costaff-ai/costaff/releases) for
+available tags.
 
 ---
 

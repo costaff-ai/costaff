@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Docker Support](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
-[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.0-orange.svg)](https://github.com/google/adk-python)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.1-orange.svg)](https://github.com/google/adk-python)
 [![MCP](https://img.shields.io/badge/MCP-enabled-green.svg)](https://modelcontextprotocol.io/)
 [![A2A Protocol](https://img.shields.io/badge/A2A-protocol-violet.svg)](https://github.com/google/A2A)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -116,7 +116,10 @@ CoStaff 支援部署和管理透過 **A2A 協議**溝通的外部 Agent。
 
 ```bash
 # 部署本地 Agent 專案
-costaff agent deploy --local /path/to/my-agent
+costaff agent add my-agent --local /path/to/my-agent
+
+# 從 GitHub clone 並部署（可用 --tag 釘選 release）
+costaff agent add my-agent --github https://github.com/you/my-agent --tag v0.1.0-alpha-2
 
 # 新增遠端 URL Agent
 costaff agent add my-agent --url http://my-agent.example.com
@@ -167,7 +170,7 @@ Channel 是獨立的 Bot 或 HTTP 伺服器，負責：
 
 ```bash
 # 登記本地 Agent 專案
-costaff agent deploy --local /path/to/my-agent
+costaff agent add my-agent --local /path/to/my-agent
 
 # 登記遠端 Agent
 costaff agent add my-agent --url http://my-agent.internal
@@ -243,24 +246,76 @@ costaff dashboard
 
 ## CLI 指令參考
 
+### 日常操作
+
 | 指令 | 說明 |
 |------|------|
 | `costaff onboard` | 互動式設定精靈 |
-| `costaff start` | 建置並啟動所有服務 |
+| `costaff bootstrap` | 非互動設定（讀環境變數、自動產生密鑰，供 CI / headless 用） |
+| `costaff start` | 依正確順序建置並啟動所有服務 |
 | `costaff start --no-build` | 不重建映像直接啟動 |
 | `costaff stop` | 停止所有服務 |
 | `costaff restart` | 重啟所有服務 |
-| `costaff ps` | 顯示運行中服務的狀態 |
+| `costaff status` | 顯示運行中服務的狀態 |
+| `costaff logs <service>` | 串流單一服務（或全部）的日誌 |
 | `costaff dashboard` | 開啟 Web 儀表板 |
-| `costaff chat` | CLI 模式與 Agent 對話 |
-| `costaff agent deploy --local <path>` | 部署本地 Agent 專案 |
-| `costaff agent add <name> --url <url>` | 登記遠端 URL Agent |
-| `costaff agent list` | 列出所有已登記的 Agent |
-| `costaff agent remove <name>` | 移除已登記的 Agent |
-| `costaff config show` | 顯示當前設定 |
-| `costaff database backup` | 備份資料庫 |
-| `costaff database restore` | 從備份還原 |
-| `costaff version` | 顯示 CLI 版本 |
+| `costaff chat` | 在終端機與 Agent 對話 |
+| `costaff invoke <message>` | 送一則訊息後結束（適合腳本） |
+| `costaff doctor` | 診斷常見問題，結尾列出建議修復步驟 |
+| `costaff update` | 從 GitHub 拉取最新 core 版本 |
+| `costaff update --tag <ref>` | 將 core 釘選到指定 release tag（或回退） |
+| `costaff core-rebuild` | 只重建並重新建立 core stack |
+
+### 管理 Agent
+
+```bash
+costaff agent list                                  # 列出 Agent（含釘選的 Ref）
+costaff agent add <name> --github <url>             # 從 GitHub clone 並部署
+costaff agent add <name> --github <url> --tag <ref> # clone 時釘選到 release tag
+costaff agent add <name> --local <path>             # 部署本地 Agent 專案
+costaff agent add <name> --url <a2a URL>            # 登記遠端 A2A 端點
+costaff agent tags <name>                           # 列出該 Agent origin 上的 release tags
+costaff agent rebuild <name> [--tag <ref>]          # 重建並重啟（可重新釘選）
+costaff agent enable <name> / disable <name>        # 啟用 / 停用 Agent
+costaff agent remove <name>                         # 移除 Agent
+costaff agent model                                 # 查看 / 設定逐 Agent 模型
+```
+
+### 管理 Channel
+
+```bash
+costaff channel list                    # 列出 Channel（含健康狀態與釘選 Ref）
+costaff channel add <name> [--tag <ref>] # 新增 Channel（官方名稱自動解析 GitHub URL）
+costaff channel tags <name>             # 列出該 Channel origin 上的 release tags
+costaff channel rebuild <name> [--tag <ref>]  # 重建並重啟（可重新釘選）
+costaff channel remove <name>           # 移除 Channel
+```
+
+### 管理商業平台
+
+ERP / CRM / SCM / HRM / 會計等商業平台套件，各自為獨立 Docker 專案，共用同一個 PostgreSQL 與 Account Manager（OIDC SSO）：
+
+```bash
+costaff platform list             # 依相依順序列出平台與健康狀態
+costaff platform add <name>       # 官方名稱自動解析 repo，並接好共用 DB + OIDC
+costaff platform rebuild <name>   # 重建並重啟平台
+costaff platform start | stop     # 依相依順序（db 先）啟停整套
+costaff platform provision        # 重跑共用 DB 的 role/database 佈建（冪等）
+costaff platform remove <name>    # 移除平台（加 --purge 連 volume 一起刪）
+```
+
+### 其他
+
+```bash
+costaff config validate           # 依 schema 驗證 config.json
+costaff database info             # 顯示資料庫連線與資料表摘要
+costaff database backup           # 匯出 PostgreSQL 資料庫
+costaff database restore <file>   # 從 dump 還原資料庫
+costaff database clean            # 刪除並重建 schema（破壞性）
+costaff license                   # 管理 CoStaff 授權
+```
+
+> **版本釘選**：每個 plugin 都可釘選到 release tag，讓主機跑的是一組可重現的版本，而非各自追 `main`。釘選會寫進 `config.json`，每次 rebuild 都會沿用。可用的 tag 見 [Releases](https://github.com/costaff-ai/costaff/releases)。
 
 ---
 
