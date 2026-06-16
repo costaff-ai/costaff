@@ -19,6 +19,12 @@ data leaves your hardware.
 > your laptop, on a home server, or on a VPS you own — we don't host
 > anything for you.
 
+## ▶ See it in 30 seconds
+
+[![CoStaff — 30-second intro](https://img.youtube.com/vi/QVZ4cOzvb18/maxresdefault.jpg)](https://youtu.be/QVZ4cOzvb18)
+
+> Hand off a task in chat — your specialist agents collaborate and the finished file lands right back in your conversation. ([watch on YouTube](https://youtu.be/QVZ4cOzvb18))
+
 ---
 
 ## Who is this for

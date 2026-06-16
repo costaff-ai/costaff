@@ -13,6 +13,12 @@
 
 外部 Agent（如 [`costaff-agent-coding`](https://github.com/costaff-ai/costaff-agent-coding) 和 [`costaff-agent-business-analysis`](https://github.com/costaff-ai/costaff-agent-business-analysis)）透過 **A2A 協議**整合，在不修改核心的情況下擴展平台能力。
 
+## ▶ 30 秒看懂 CoStaff
+
+[![CoStaff — 30 秒產品介紹](https://img.youtube.com/vi/QVZ4cOzvb18/maxresdefault.jpg)](https://youtu.be/QVZ4cOzvb18)
+
+> 在通訊軟體裡一句話交辦，專家 Agent 協作完成，成品直接回到你的聊天視窗。（[在 YouTube 觀看](https://youtu.be/QVZ4cOzvb18)）
+
 ---
 
 ## 目錄
