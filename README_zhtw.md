@@ -109,8 +109,11 @@ graph TD
 | **Users** | 身份對應表與使用者檔案詳情面板 |
 | **Sessions** | 瀏覽對話 Session；事件日誌顯示完整的 Function Call / Response 追蹤 |
 | **Channels** | 設定 Telegram / Discord / Line Bot Token |
+| **Platforms** | 列出、健康檢查、啟停 AI Agent 可操作的企業平台（ERP / CRM / HRM / …）；部署與版本釘選仍走 CLI |
 | **Config** | 主題、模型提供者、審核閘門設定 |
 | **Logs** | 即時串流任意服務的容器日誌 |
+
+> **多 CoStaff 切換器。** 當同一台主機註冊了一個以上的 CoStaff core 時，儀表板頂部會出現 core 切換下拉。選一個 core，整個控制台就跟著它走——每個分頁（Users、Sessions、Agents、Channels、MCPs、Logs、Chat）**以及每個寫入**（新增／停用 Agent、MCP 指派、使用者核准…）都作用在該 core 自己的資料庫、Manager 與設定上；每次寫入只會重建該 core 的 Manager。單一 core 安裝時自動隱藏，行為與以往完全相同。
 
 ---
 

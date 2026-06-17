@@ -444,8 +444,17 @@ ADK pipeline.
 | **Users** | Identity Map; per-user profile (name, role, company, preferences) |
 | **Sessions** | Browse chat sessions; full function call / response traces |
 | **Channels** | Manage Telegram / Discord / LINE bot tokens |
+| **Platforms** | List, health-check and start/stop the agent-operable business platforms (ERP / CRM / HRM / …); deploy & version-pin stay on the CLI |
 | **Config** | Theme, model provider, approval-gate toggle |
 | **Logs** | Stream container logs from any service |
+
+> **Multi-CoStaff switcher.** When more than one CoStaff core is registered on
+> the same host, a core selector appears in the dashboard header. Pick a core
+> and the whole console follows it — every tab (Users, Sessions, Agents,
+> Channels, MCPs, Logs, Chat) **and** every write (add/disable agents, MCP
+> assignment, user approval, …) targets that core's own database, manager and
+> config; each write recreates only that core's manager. Hidden on single-core
+> installs, which behave exactly as before.
 
 ---
 
