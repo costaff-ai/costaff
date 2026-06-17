@@ -151,7 +151,8 @@ def set_require_approval(req: dict, auth: bool = Depends(AuthManager.verify_toke
     license_path = os.path.join(costaff_dir, "costaff-license.yaml")
     if not os.path.exists(license_path):
         raise HTTPException(status_code=403, detail="User approval gate is an Enterprise feature. OSS installations cannot enable this setting.")
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     conf["require_approval"] = bool(req.get("enabled", True))
-    ConfigManager.save_config(conf)
+    core.write_config(conf)
     return {"status": "ok", "require_approval": conf["require_approval"]}

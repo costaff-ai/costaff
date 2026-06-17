@@ -74,7 +74,8 @@ def add_external_agent(req: ExternalAgentAddRequest, auth: bool = Depends(AuthMa
         _validate_a2a_url(req.a2a_url)
     except ValueError as e:
         raise HTTPException(400, f"Invalid a2a_url: {e}")
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if name in conf.get("external_agents", {}):
         raise HTTPException(400, f"Agent '{name}' already exists.")
     conf.setdefault("external_agents", {})[name] = {
@@ -83,16 +84,17 @@ def add_external_agent(req: ExternalAgentAddRequest, auth: bool = Depends(AuthMa
         "description": req.description or "",
         "enabled": True,
     }
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    threading.Thread(target=DockerManager.run_action, args=(active_core().cn("agent-costaff"), "restart"), daemon=True).start()
-    audit("agent.add", name=name, url=req.a2a_url)
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    threading.Thread(target=core.recreate_manager, daemon=True).start()
+    audit("agent.add", name=name, url=req.a2a_url, core=core.name)
     return {"status": "ok", "name": name}
 
 
 @router.patch("/api/external-agents/{name}")
 def update_external_agent(name: str, req: ExternalAgentUpdateRequest, auth: bool = Depends(AuthManager.verify_token)):
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
         raise HTTPException(404, f"Agent '{name}' not found.")
     agent = conf["external_agents"][name]
@@ -108,25 +110,26 @@ def update_external_agent(name: str, req: ExternalAgentUpdateRequest, auth: bool
         agent["enabled"] = req.enabled
         if name == "costaff-agent-coding":
             conf["coding_agent_enabled"] = req.enabled
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    threading.Thread(target=DockerManager.run_action, args=(active_core().cn("agent-costaff"), "restart"), daemon=True).start()
-    audit("agent.update", name=name, changes={k: v for k, v in req.dict(exclude_unset=True).items()})
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    threading.Thread(target=core.recreate_manager, daemon=True).start()
+    audit("agent.update", name=name, changes={k: v for k, v in req.dict(exclude_unset=True).items()}, core=core.name)
     return {"status": "ok"}
 
 
 @router.delete("/api/external-agents/{name}")
 def remove_external_agent(name: str, auth: bool = Depends(AuthManager.verify_token)):
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
         raise HTTPException(404, f"Agent '{name}' not found.")
     if conf["external_agents"][name].get("type") == "github":
         raise HTTPException(400, "GitHub-deployed agents must be removed via CLI: costaff agent remove")
     del conf["external_agents"][name]
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    threading.Thread(target=DockerManager.run_action, args=(active_core().cn("agent-costaff"), "restart"), daemon=True).start()
-    audit("agent.delete", name=name)
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    threading.Thread(target=core.recreate_manager, daemon=True).start()
+    audit("agent.delete", name=name, core=core.name)
     return {"status": "ok"}
 
 

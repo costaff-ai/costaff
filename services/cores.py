@@ -43,6 +43,10 @@ class CoreContext:
         self.manager_port = int(data.get("manager_port") or os.getenv("COSTAFF_AGENT_PORT", "18080"))
         self._db_uri = data.get("db_uri") or os.getenv("ADK_SESSION_SERVICE_URI", "")
         self.config_path = os.path.expanduser(data.get("config_path") or PATHS["config"])
+        self.env_path = os.path.expanduser(data.get("env_path") or PATHS["env"])
+        self.compose_file = data.get("compose_file") or ""
+        self.compose_project = data.get("compose_project") or ""
+        self.manager_service = data.get("manager_service") or self.cn("agent-costaff")
 
     # --- containers ---
     def cn(self, suffix: str) -> str:
@@ -77,6 +81,32 @@ class CoreContext:
                 return json.load(f)
         except Exception:
             return {}
+
+    # --- writes (Full / per-core) ---
+    def write_config(self, conf: dict):
+        ConfigManager.save_config(conf, self.config_path)
+
+    def regen_external_agents_env(self):
+        ConfigManager.update_external_agents_env(self.config_path, self.env_path)
+
+    def regen_mcp_urls(self):
+        ConfigManager.update_mcp_urls(self.config_path, self.env_path, self.prefix)
+
+    def recreate_manager(self):
+        """Recreate ONLY the manager container so it reloads regenerated env.
+
+        Uses `docker compose up -d --force-recreate --no-deps <service>` scoped to
+        this core's compose project. Falls back to a plain restart for the
+        synthetic single-core default (no compose metadata)."""
+        import subprocess
+        from services.docker import DockerManager
+        if self.compose_file and self.compose_project:
+            cmd = (DockerManager.get_cmd()
+                   + ["-p", self.compose_project, "-f", self.compose_file,
+                      "up", "-d", "--force-recreate", "--no-deps", self.manager_service])
+            subprocess.run(cmd, check=False, cwd=os.path.dirname(self.compose_file))
+        else:
+            DockerManager.run_action(self.cn("agent-costaff"), "restart")
 
     def to_public(self, active: bool) -> dict:
         return {
@@ -148,18 +178,19 @@ def discover() -> dict:
         proj = pj.get("Name", "")
         if not proj.endswith("-core"):
             continue
-        src = os.path.dirname(pj.get("ConfigFiles", "").split(",")[0])
+        compose_file = pj.get("ConfigFiles", "").split(",")[0]
+        src = os.path.dirname(compose_file)
         rows = subprocess.check_output(
             ["docker", "ps", "--filter", f"label=com.docker.compose.project={proj}",
-             "--format", "{{.Names}}|{{.Ports}}"]).decode().splitlines()
+             "--format", '{{.Names}}|{{.Label "com.docker.compose.service"}}|{{.Ports}}']).decode().splitlines()
         agent = next((r for r in rows if r.split("|")[0].endswith("-agent-costaff")), None)
         pg = next((r for r in rows if r.split("|")[0].endswith("-postgres")), None)
         if not agent:
             continue
-        aname, aports = agent.split("|", 1)
+        aname, aservice, aports = agent.split("|", 2)
         prefix = aname[:-len("-agent-costaff")]
         manager_port = _host_port(aports, "8080")
-        pg_port = _host_port(pg.split("|", 1)[1], "5432") if pg else None
+        pg_port = _host_port(pg.split("|", 2)[2], "5432") if pg else None
 
         # DB uri from this core's own .env, rewritten to host-reachable port
         db_uri = ""
@@ -178,6 +209,9 @@ def discover() -> dict:
             "manager_port": manager_port or int(os.getenv("COSTAFF_AGENT_PORT", "18080")),
             "db_uri": db_uri,
             "config_path": os.path.join(src, "config.json"),
+            "env_path": os.path.join(src, ".env"),
+            "compose_file": compose_file,
             "compose_project": proj,
+            "manager_service": aservice,
         }
     return cores

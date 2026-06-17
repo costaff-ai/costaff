@@ -32,7 +32,8 @@ def get_api_config(auth: bool = Depends(AuthManager.verify_token)):
 
 @router.post("/api/config/costaff-agent-coding")
 def set_coding_agent(req: dict, auth: bool = Depends(AuthManager.verify_token)):
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     enabled_changed = "enabled" in req
     if enabled_changed:
         enabled = bool(req["enabled"])
@@ -46,8 +47,8 @@ def set_coding_agent(req: dict, auth: bool = Depends(AuthManager.verify_token)):
             "container_names": ["costaff-agent-coding", "costaff-mcp-coding"],
         })["enabled"] = enabled
         conf["external_agents"]["costaff-agent-coding"]["a2a_url"] = coding_a2a_url
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
+    core.write_config(conf)
+    core.regen_external_agents_env()
 
     return {"status": "ok", "coding_agent_enabled": conf["coding_agent_enabled"]}
 
@@ -59,23 +60,25 @@ def save_gateway(req: GatewayUpdateRequest, auth: bool = Depends(AuthManager.ver
     p = req.platform
     if p not in token_env_map:
         raise HTTPException(status_code=400, detail="Unknown platform.")
-    # Save token to .env
+    # Save token to the active core's .env
+    core = active_core()
     if token := req.config.get("token"):
-        set_key(PATHS["env"], token_env_map[p], token)
+        set_key(core.env_path, token_env_map[p], token)
     if secret := req.config.get("secret"):
         if p in secret_env_map:
-            set_key(PATHS["env"], secret_env_map[p], secret)
+            set_key(core.env_path, secret_env_map[p], secret)
     # Add to channels if not already present
-    conf = ConfigManager.get_config()
+    conf = core.core_config()
     if p not in conf.get("channels", []):
         conf.setdefault("channels", []).append(p)
-    ConfigManager.save_config(conf)
+    core.write_config(conf)
     return {"status": "ok"}
 
 
 @router.post("/api/mcp")
 def add_mcp(req: AddMCPRequest, auth: bool = Depends(AuthManager.verify_token)):
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if req.is_external:
         # Accept Dive-format object or legacy plain URL string
         if req.config and isinstance(req.config, dict) and "url" in req.config:
@@ -106,14 +109,14 @@ def add_mcp(req: AddMCPRequest, auth: bool = Depends(AuthManager.verify_token)):
         if req.name in conf["external_mcp"]:
             del conf["external_mcp"][req.name]
 
-    ConfigManager.save_config(conf)
+    core.write_config(conf)
     if req.config and req.name == "costaff":
         path = os.path.join("mcp_servers", "costaff", "server.json")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(req.config, f, indent=2)
 
-    ConfigManager.update_mcp_urls()
+    core.regen_mcp_urls()
     return {"status": "success"}
 
 
@@ -138,15 +141,16 @@ def get_mcp_config(name: str, auth: bool = Depends(AuthManager.verify_token)):
 @router.post("/api/mcp/{name}/config")
 async def update_mcp_config(name: str, request: Request, auth: bool = Depends(AuthManager.verify_token)):
     body = await request.json()
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if name in conf.get("external_mcp", {}):
         existing = conf["external_mcp"][name]
         if isinstance(existing, str):
             existing = {"url": existing, "transport": "sse" if "/mcp" in existing else "streamable", "enabled": True, "headers": {}}
         existing.update({k: v for k, v in body.items() if k in ("url", "transport", "enabled", "headers", "description")})
         conf["external_mcp"][name] = existing
-        ConfigManager.save_config(conf)
-        ConfigManager.update_mcp_urls()
+        core.write_config(conf)
+        core.regen_mcp_urls()
     elif name == "costaff":
         # Built-in MCP: update server.json (only costaff core MCP has a local config)
         path = os.path.join("mcp_servers", "costaff", "server.json")
@@ -165,13 +169,14 @@ async def update_mcp_config(name: str, request: Request, auth: bool = Depends(Au
 def delete_mcp(name: str, auth: bool = Depends(AuthManager.verify_token)):
     if name == "costaff":
         raise HTTPException(status_code=400, detail="Cannot delete core MCP.")
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     if name in conf["mcp"]:
         conf["mcp"].remove(name)
     if name in conf["external_mcp"]:
         del conf["external_mcp"][name]
-    ConfigManager.save_config(conf)
-    ConfigManager.update_mcp_urls()
+    core.write_config(conf)
+    core.regen_mcp_urls()
     return {"status": "success"}
 
 
@@ -200,12 +205,13 @@ def get_agent_mcp_config(auth: bool = Depends(AuthManager.verify_token)):
 
 @router.post("/api/agent-mcp-config")
 def update_agent_mcp_config(req: AgentMCPConfigRequest, auth: bool = Depends(AuthManager.verify_token)):
-    conf = ConfigManager.get_config()
+    core = active_core()
+    conf = core.core_config()
     agent_mcps = conf.get("agent_mcps", {})
     agent_mcps[req.agent_id] = req.mcps
     conf["agent_mcps"] = agent_mcps
-    ConfigManager.save_config(conf)
-    ConfigManager.update_mcp_urls()
+    core.write_config(conf)
+    core.regen_mcp_urls()
 
     # Find if this is a github-type external agent (has its own compose fragment)
     agent_id_to_name = {n.replace("-", "_"): n for n in conf.get("external_agents", {})}
@@ -213,23 +219,22 @@ def update_agent_mcp_config(req: AgentMCPConfigRequest, auth: bool = Depends(Aut
     ext_agent_conf = conf.get("external_agents", {}).get(ext_name) if ext_name else None
 
     if ext_agent_conf and ext_agent_conf.get("type") == "github" and ext_agent_conf.get("fragment_path"):
-        # Restart using the compose fragment so service definition is available
-        main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
+        # Recreate the sub-agent (active core's compose project + its fragment)
         fragment_path = ext_agent_conf["fragment_path"]
         primary_service = ext_agent_conf.get("container_names", [ext_name])[0]
         def _restart_ext_agent():
-            load_dotenv(PATHS["env"], override=True)
-            stop_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "stop", primary_service]
-            subprocess.run(stop_cmd, check=False, cwd=_project_root)
-            up_cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--force-recreate", primary_service]
-            subprocess.run(up_cmd, check=False, cwd=_project_root)
-            print(f"[MCP] Restarted external agent {ext_name} ({primary_service})")
+            load_dotenv(core.env_path, override=True)
+            base = DockerManager.get_cmd()
+            if core.compose_project:
+                base += ["-p", core.compose_project]
+            if core.compose_file:
+                base += ["-f", core.compose_file]
+            base += ["-f", fragment_path]
+            cwd = os.path.dirname(core.compose_file) if core.compose_file else _project_root
+            subprocess.run(base + ["up", "-d", "--force-recreate", "--no-deps", primary_service], check=False, cwd=cwd)
+            print(f"[MCP] Recreated external agent {ext_name} ({primary_service}) on core {core.name}")
         threading.Thread(target=_restart_ext_agent, daemon=True).start()
-    else:
-        # Internal agent (costaff-agent, costaff-agent-coding legacy, etc.)
-        docker_name_map = {"costaff_agent": "costaff-agent-costaff", "coding_agent": "costaff-agent-coding"}
-        docker_service = docker_name_map.get(req.agent_id)
-        if docker_service:
-            threading.Thread(target=DockerManager.run_action, args=(docker_service, "restart"), daemon=True).start()
+    elif req.agent_id == "costaff_agent":
+        threading.Thread(target=core.recreate_manager, daemon=True).start()
 
     return {"status": "success", "agent_id": req.agent_id, "mcps": req.mcps}

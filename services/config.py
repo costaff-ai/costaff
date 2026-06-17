@@ -18,10 +18,11 @@ CORE_PLUGIN_MCP_TOOLS = (
 
 class ConfigManager:
     @staticmethod
-    def get_config() -> Dict[str, Any]:
-        if os.path.exists(PATHS["config"]):
+    def get_config(config_path: str = None) -> Dict[str, Any]:
+        cp = config_path or PATHS["config"]
+        if os.path.exists(cp):
             try:
-                with open(PATHS["config"], "r") as f:
+                with open(cp, "r") as f:
                     conf = json.load(f)
                     conf.setdefault("external_mcp", {})
                     conf.setdefault("gateways_config", {})
@@ -36,7 +37,7 @@ class ConfigManager:
                     migrated = ConfigManager._migrate_coding_agent(conf)
                     migrated |= ConfigManager._migrate_channel_container_names(conf)
                     if migrated:
-                        ConfigManager.save_config(conf)
+                        ConfigManager.save_config(conf, cp)
                     ConfigManager._warn_if_invalid(conf)
                     return conf
             except Exception:
@@ -87,17 +88,20 @@ class ConfigManager:
         return True
 
     @staticmethod
-    def save_config(config: Dict[str, Any]):
-        os.makedirs(os.path.dirname(PATHS["config"]), exist_ok=True)
-        with open(PATHS["config"], "w") as f:
+    def save_config(config: Dict[str, Any], config_path: str = None):
+        cp = config_path or PATHS["config"]
+        os.makedirs(os.path.dirname(cp), exist_ok=True)
+        with open(cp, "w") as f:
             json.dump(config, f, indent=2)
 
     @staticmethod
-    def update_mcp_urls():
-        conf = ConfigManager.get_config()
+    def update_mcp_urls(config_path: str = None, env_path: str = None, prefix: str = "costaff"):
+        cp = config_path or PATHS["config"]
+        ep = env_path or PATHS["env"]
+        conf = ConfigManager.get_config(cp)
         urls = {}
 
-        load_dotenv(PATHS["env"], override=True)
+        load_dotenv(ep, override=True)
         mcp_secret = os.getenv("MCP_SECRET_KEY", "").strip()
 
         # 1. Gather all MCP servers
@@ -123,7 +127,7 @@ class ConfigManager:
             elif m == "coding": default_port = 8082
             elif m == "business-analysis": default_port = 8083
 
-            url = custom_url or f"http://costaff-mcp-{m}:{default_port}/mcp"
+            url = custom_url or f"http://{prefix}-mcp-{m}:{default_port}/mcp"
 
             if mcp_secret:
                 urls[m] = {
@@ -142,8 +146,8 @@ class ConfigManager:
                 if url := val.get("url"):
                     urls[name] = {k: v for k, v in val.items() if k not in ("enabled", "description")}
 
-        os.makedirs(os.path.dirname(PATHS["env"]), exist_ok=True)
-        set_key(PATHS["env"], "MCP_SERVER_URLS", json.dumps(urls), quote_mode="never")
+        os.makedirs(os.path.dirname(ep), exist_ok=True)
+        set_key(ep, "MCP_SERVER_URLS", json.dumps(urls), quote_mode="never")
 
         # 2. Map MCPs to Agents
         agent_mcps = conf.get("agent_mcps", {})
@@ -177,7 +181,7 @@ class ConfigManager:
         # single-quoted values to empty (its `${VAR}` interpolation does parse
         # them, hence manager works while sub-agents loaded via env_file get
         # empty). Write JSON raw so both parsers agree.
-        set_key(PATHS["env"], "COSTAFF_AGENT_MCP_URLS", json.dumps(costaff_urls), quote_mode="never")
+        set_key(ep, "COSTAFF_AGENT_MCP_URLS", json.dumps(costaff_urls), quote_mode="never")
 
         # Per-agent MCP tool whitelists. Schema in config.json:
         #   "agent_mcp_filters": {
@@ -232,7 +236,7 @@ class ConfigManager:
                 else:
                     extra_urls[k] = v
 
-            set_key(PATHS["env"], env_var, json.dumps(extra_urls), quote_mode="never")
+            set_key(ep, env_var, json.dumps(extra_urls), quote_mode="never")
             filter_summary = {k: len(filters_for_agent[k]) for k in filters_for_agent if k in extra_urls}
             if filter_summary:
                 print(f"[MCP] Wrote {env_var}: {list(extra_urls.keys())} (filters: {filter_summary})")
@@ -241,12 +245,13 @@ class ConfigManager:
 
         # Important: Allow a small window for disk sync and reload env
         time.sleep(0.5)
-        load_dotenv(PATHS["env"], override=True)
+        load_dotenv(ep, override=True)
 
     @staticmethod
-    def update_external_agents_env():
+    def update_external_agents_env(config_path: str = None, env_path: str = None):
         """Serialize enabled external_agents into EXTERNAL_AGENTS_CONFIG env var."""
-        conf = ConfigManager.get_config()
+        ep = env_path or PATHS["env"]
+        conf = ConfigManager.get_config(config_path)
         agents_config = {}
         transfer_names = []
         for name, agent in conf.get("external_agents", {}).items():
@@ -261,9 +266,9 @@ class ConfigManager:
                 # decide AgentTool (default) vs sub_agents/transfer wiring.
                 if agent.get("transfer"):
                     transfer_names.append(name)
-        set_key(PATHS["env"], "EXTERNAL_AGENTS_CONFIG", json.dumps(agents_config))
+        set_key(ep, "EXTERNAL_AGENTS_CONFIG", json.dumps(agents_config))
         set_key(
-            PATHS["env"], "COSTAFF_TRANSFER_AGENTS",
+            ep, "COSTAFF_TRANSFER_AGENTS",
             ",".join(sorted(transfer_names)), quote_mode="never",
         )
-        load_dotenv(PATHS["env"], override=True)
+        load_dotenv(ep, override=True)
