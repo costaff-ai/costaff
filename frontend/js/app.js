@@ -85,14 +85,14 @@ const App = {
         const overlay = document.getElementById('auth-overlay');
         const sidebar = document.getElementById('sidebar');
         const main = document.getElementById('main-view');
-        
+
         if (overlay) overlay.classList.add('hidden');
         if (sidebar) sidebar.classList.remove('hidden');
         if (main) main.classList.remove('hidden');
-        
+
         // Initial tab load
         await this.switchMainTab('dashboard');
-        
+
         // Polling sync — skip sessions tab (user-driven, not auto-refreshed)
         setInterval(() => { if (this.state.activeTab !== 'sessions') this.refresh(); }, 5000);
     },
@@ -100,7 +100,7 @@ const App = {
     async switchMainTab(tabId) {
         if (!tabId) return;
         this.state.activeTab = tabId;
-        
+
         // UI: Sidebar active state
         document.querySelectorAll('.sidebar-item').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabId);
@@ -121,12 +121,13 @@ const App = {
                 });
                 container.innerHTML = html;
                 this.state.loadedViews.add(tabId);
-                
+
                 // One-time initialization for specific tabs
                 if (tabId === 'chat') await UI.initChat();
                 if (tabId === 'tasks') await Projects.init();
                 if (tabId === 'cronjobs' && typeof RegularWork !== 'undefined') await RegularWork.init();
                 if (tabId === 'apis') Apis.init();
+                if (tabId === 'platforms') Platforms.init();
                 if (tabId === 'skills') Skills.init();
                 if (tabId === 'diary') Diary.init();
                 if (tabId === 'config') { UI.updateThemeUI(localStorage.getItem('costaff_theme') || 'light'); await UI.initApprovalToggle(); }
@@ -170,14 +171,14 @@ const App = {
             const activeBtn = document.querySelector(`.sidebar-item[data-tab="${tabId}"]`);
             titleEl.innerText = activeBtn ? activeBtn.innerText.trim() : tabId.toUpperCase();
         }
-        
+
         // Immediate sync
         this.refresh();
     },
 
     async switchSubTab(parent, subId) {
         this.state.subTabs[parent] = subId;
-        
+
         // UI: Tab Buttons - Use correct light theme active classes
         document.querySelectorAll(`#view-${parent} .tab-btn`).forEach(b => {
             const isActive = b.dataset.subtab === subId;
@@ -227,7 +228,7 @@ const App = {
                 UI.renderLicense(license);
                 UI.renderAITeam(aiTeam);
             }
-            
+
             if (tab === 'sessions') {
                 if (this.state.subTabs.sessions === 'explorer') {
                     const sessions = await API.fetch('/api/chat/sessions');

@@ -1,0 +1,15 @@
+<div class="p-8">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+            <h3 class="text-lg font-black uppercase tracking-widest text-slate-900">Business Platforms</h3>
+            <p class="text-xs text-slate-400 mt-1 font-mono">Self-hosted ERP / CRM / HRM / … · shared PostgreSQL · dependency order (db → account-manager → rest)</p>
+        </div>
+        <button onclick="Platforms.load()" class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+            <i class="fas fa-rotate-right mr-2"></i>Refresh
+        </button>
+    </div>
+    <div class="mb-5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-700 font-mono leading-relaxed">
+        Read-only ops view. Deploy / rebuild / remove / version-pin remain CLI-only — use <code class="font-bold">costaff platform add | rebuild | remove</code>.
+    </div>
+    <div id="platforms-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+</div>

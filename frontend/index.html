@@ -66,7 +66,7 @@
                 <h2 class="text-4xl font-bold text-slate-900 tracking-tight mb-1">CoStaff</h2>
                 <p class="text-slate-500 text-sm font-medium">Your AI Staff, Ready to Work.</p>
             </div>
-            
+
             <form id="auth-form" class="space-y-5 w-full">
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-slate-500 uppercase ml-1">Account</label>
@@ -91,7 +91,7 @@
                 <span class="text-2xl font-bold text-slate-900 tracking-tight">CoStaff</span>
             </div>
         </div>
-        
+
         <nav id="main-nav" class="flex-1 pb-10">
             <div class="sidebar-group-label">Dashboard</div>
             <button data-tab="dashboard" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
@@ -137,6 +137,9 @@
             <button data-tab="gateways" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
                 <i class="fas fa-network-wired w-5 text-center"></i> Channels
             </button>
+            <button data-tab="platforms" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
+                <i class="fas fa-cubes w-5 text-center"></i> Platforms
+            </button>
             <button data-tab="sessions" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
                 <i class="fas fa-history w-5 text-center"></i> Sessions
             </button>
@@ -169,6 +172,7 @@
             <div id="view-users" class="main-tab-view hidden"></div>
             <div id="view-tasks" class="main-tab-view hidden h-full"></div>
             <div id="view-gateways" class="main-tab-view hidden"></div>
+            <div id="view-platforms" class="main-tab-view hidden"></div>
             <div id="view-sessions" class="main-tab-view hidden"></div>
             <div id="view-information" class="main-tab-view hidden"></div>
             <div id="view-cronjobs" class="main-tab-view hidden"></div>
@@ -229,6 +233,7 @@
     <script src="js/ui-chat.js?v=1"></script>
     <script src="js/ui-mcp.js?v=1"></script>
     <script src="js/ui-gateways.js?v=1"></script>
+    <script src="js/ui-platforms.js?v=1"></script>
     <script src="js/ui-agents.js?v=1"></script>
     <script src="js/ui-logs.js?v=1"></script>
     <script src="js/ui-cronjobs.js?v=1"></script>

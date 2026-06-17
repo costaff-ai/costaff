@@ -31,6 +31,12 @@ from rich.table import Table
 
 from services.config import ConfigManager
 from services.runtime.git import Git, GitError
+from services.platform_ops import (
+    DB_CONTAINER, DB_NETWORK,
+    start_order as _start_order,
+    compose as _compose,
+    ensure_networks as _ensure_networks,
+)
 from utils.paths import _base_dir
 
 console = Console()
@@ -58,9 +64,6 @@ OFFICIAL_PLATFORMS = {
     "expense":         {"github": f"{_GH}/costaff-platform-expense.git", "prefix": "EXPENSE", "oidc": "EXPENSE", "port": 18750},
     "helpdesk":        {"github": f"{_GH}/costaff-platform-helpdesk.git", "prefix": "HELPDESK", "oidc": "HELPDESK", "port": 18770},
 }
-
-DB_CONTAINER = "costaff-platform-postgres"
-DB_NETWORK = "costaff_platform_db"
 
 # Keys whose empty values get a random secret on env bootstrap.
 _SECRET_KEY_RE = re.compile(r"_(PASSWORD|SECRET|KEY|SALT)$")
@@ -163,38 +166,14 @@ def _sync_oidc_secret(oidc: str, prefix: str, platform_env: str, am_env: Optiona
     return value if am_env else None
 
 
-def _start_order(platforms: dict) -> List[str]:
-    """Shared DB first, Account Manager (IdP) second, the rest sorted."""
-    names = list(platforms.keys())
-    head = [n for n in ("db", "account-manager") if n in names]
-    tail = sorted(n for n in names if n not in ("db", "account-manager"))
-    return head + tail
-
-
 # --------------------------------------------------------------------------
-# compose plumbing
+# compose plumbing  (_start_order / _compose / _ensure_networks live in
+# services.platform_ops so the dashboard router can reuse them)
 # --------------------------------------------------------------------------
 
 
 def _platform_src(name: str) -> str:
     return os.path.join(_base_dir, "costaff-platform", name, "src")
-
-
-def _compose(src: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    """Run `docker compose <args>` inside the platform's source dir (its
-    .env is picked up automatically from the cwd)."""
-    from services.docker import DockerManager
-
-    cmd = DockerManager.get_cmd() + ["-f", os.path.join(src, "docker-compose.yaml")] + list(args)
-    return subprocess.run(cmd, cwd=src, check=check)
-
-
-def _ensure_networks() -> None:
-    for net in ("costaff_default", DB_NETWORK):
-        subprocess.run(
-            ["docker", "network", "create", net],
-            capture_output=True, check=False,
-        )
 
 
 def _container_names(src: str) -> List[str]:
