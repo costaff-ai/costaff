@@ -24,6 +24,7 @@ import os
 import json
 import re
 import subprocess
+import threading
 
 from sqlalchemy import create_engine
 
@@ -31,6 +32,15 @@ from services.config import ConfigManager
 from utils.paths import PATHS
 
 DEFAULT_PREFIX = "costaff"
+
+# SQLAlchemy engines own a connection pool and are meant to be long-lived and
+# shared. `active_core()` builds a fresh CoreContext per request, so caching on
+# the instance would not help; cache engines module-wide keyed by resolved URI.
+# Without this, every dashboard request (incl. the 5s pollers) created a new
+# engine that was never .dispose()'d -> connections leaked until GC and the
+# shared Postgres eventually refused new connections.
+_ENGINES: dict = {}
+_ENGINES_LOCK = threading.Lock()
 
 
 class CoreContext:
@@ -69,10 +79,21 @@ class CoreContext:
         uri = uri.replace("postgresql+asyncpg://", "postgresql://")
         if "postgres:5432" in uri:  # container hostname → host-reachable
             uri = uri.replace("postgres:5432", "localhost:5432")
-        try:
-            return create_engine(uri, pool_pre_ping=True)
-        except Exception:
-            return None
+        cached = _ENGINES.get(uri)
+        if cached is not None:
+            return cached
+        with _ENGINES_LOCK:
+            cached = _ENGINES.get(uri)  # re-check inside lock (avoid dup build)
+            if cached is not None:
+                return cached
+            try:
+                # pool_recycle drops connections Postgres may have closed while
+                # idle; pool_pre_ping validates a connection before handing it out.
+                eng = create_engine(uri, pool_pre_ping=True, pool_recycle=1800)
+            except Exception:
+                return None
+            _ENGINES[uri] = eng
+            return eng
 
     # --- this core's own config.json (external_agents / channels / mcp / filters) ---
     def core_config(self) -> dict:

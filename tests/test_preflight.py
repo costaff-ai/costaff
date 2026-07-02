@@ -91,7 +91,10 @@ def test_ensure_security_keys_generates_missing(tmp_path):
     values = dotenv_values(env_file)
     assert values["ID_SALT"] != DEFAULT_ID_SALT
     assert len(values["MCP_SECRET_KEY"]) == 64
-    assert len(values["API_HEADERS_KEY"]) == 64
+    # API_HEADERS_KEY must be a *valid Fernet key* (urlsafe-base64 32 bytes),
+    # not token_hex(32) — the latter silently disabled header encryption.
+    from cryptography.fernet import Fernet
+    Fernet(values["API_HEADERS_KEY"].encode())  # raises if not a valid key
 
 
 def test_ensure_security_keys_idempotent(tmp_path):

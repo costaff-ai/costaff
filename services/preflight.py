@@ -121,9 +121,17 @@ def ensure_security_keys(env_path: str | None = None) -> list[str]:
     existing = dotenv_values(env_path) if os.path.exists(env_path) else {}
     generated: list[str] = []
 
+    from cryptography.fernet import Fernet
+
     for key in ("MCP_SECRET_KEY", "API_HEADERS_KEY"):
         if not _val(existing, key):
-            set_key(env_path, key, _secrets.token_hex(32))
+            # API_HEADERS_KEY encrypts integration headers via Fernet, which
+            # requires a urlsafe-base64 32-byte key — token_hex(32) is NOT one
+            # and silently disabled encryption (plaintext storage). See
+            # utils/crypto.py. MCP_SECRET_KEY is an opaque bearer secret.
+            value = (Fernet.generate_key().decode() if key == "API_HEADERS_KEY"
+                     else _secrets.token_hex(32))
+            set_key(env_path, key, value)
             generated.append(key)
 
     if _val(existing, "ID_SALT") in ("", DEFAULT_ID_SALT):

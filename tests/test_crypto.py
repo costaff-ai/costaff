@@ -43,11 +43,15 @@ def test_decrypt_garbage_returns_empty_dict(fernet_key):
     assert crypto.decrypt_headers("not-json-not-fernet") == {}
 
 
-def test_invalid_key_disables_encryption(monkeypatch):
-    monkeypatch.setenv("API_HEADERS_KEY", "not-a-valid-fernet-key")
-    headers = {"k": "v"}
-    result = crypto.encrypt_headers(headers)
-    assert json.loads(result) == headers
+def test_non_fernet_key_is_derived_and_still_encrypts(monkeypatch):
+    # A present-but-not-Fernet key (e.g. the historical token_hex(32) bug)
+    # must NOT fall back to plaintext — it is derived into a valid Fernet key
+    # and encryption round-trips. Only an absent key disables encryption.
+    monkeypatch.setenv("API_HEADERS_KEY", "c" * 64)  # 64 hex chars, not a Fernet key
+    headers = {"Authorization": "Bearer secret"}
+    encrypted = crypto.encrypt_headers(headers)
+    assert encrypted != json.dumps(headers)
+    assert crypto.decrypt_headers(encrypted) == headers
 
 
 def test_round_trip_with_unicode_values(fernet_key):
