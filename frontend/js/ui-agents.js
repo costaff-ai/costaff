@@ -8,10 +8,10 @@ Object.assign(UI, {
         const list = document.getElementById('agents-list'); if (!list) return;
         list.innerHTML = agents.map(a => {
             const up = a.status.includes('Up');
-            return `<div onclick="UI.loadAgentDetail('${a.name}')"
+            return `<div onclick="UI.loadAgentDetail('${escapeHtml(a.name)}')"
                  class="p-5 cursor-pointer hover:bg-slate-50 transition-all ${App.state.activeAgent===a.name?'bg-blue-50 border-l-4 border-l-blue-600':''}">
                 <div class="flex justify-between items-center mb-1"><div class="text-sm font-headline font-bold text-slate-900 uppercase tracking-tight">costaff agent</div><div class="w-2 h-2 rounded-full ${up?'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)] animate-pulse':'bg-slate-200'}"></div></div>
-                <div class="text-[10px] text-slate-400 font-mono uppercase tracking-tighter italic">${a.status}</div></div>`;
+                <div class="text-[10px] text-slate-400 font-mono uppercase tracking-tighter italic">${escapeHtml(a.status)}</div></div>`;
         }).join('');
     },
 
@@ -33,11 +33,11 @@ Object.assign(UI, {
                 return `<div onclick="UI.loadExtAgentDetail(${JSON.stringify(a).replace(/"/g, '&quot;')})"
                     class="p-5 cursor-pointer hover:bg-slate-50 transition-all ${isActive ? 'bg-violet-50 border-l-4 border-l-violet-500' : ''}">
                     <div class="flex justify-between items-center mb-1">
-                        <div class="text-sm font-headline font-bold text-slate-900 uppercase tracking-tight">${a.name}</div>
+                        <div class="text-sm font-headline font-bold text-slate-900 uppercase tracking-tight">${escapeHtml(a.name)}</div>
                         <div class="w-2 h-2 rounded-full ${healthDot}"></div>
                     </div>
                     <div class="flex items-center gap-2 mt-1">
-                        <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${typeColor}">${a.type}</span>
+                        <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${typeColor}">${escapeHtml(a.type)}</span>
                         ${!a.enabled ? '<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">disabled</span>' : ''}
                     </div>
                 </div>`;
@@ -82,8 +82,8 @@ Object.assign(UI, {
         const toggleLabel = agent.enabled ? 'DISABLE' : 'ENABLE';
         const toggleClass = agent.enabled ? 'bg-slate-100 text-rose-500' : 'bg-blue-600 text-white hover:bg-blue-700';
         actions.innerHTML = `
-            <button onclick="UI.toggleExtAgent('${agent.name}', ${!agent.enabled})" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${toggleClass}">${toggleLabel}</button>
-            ${agent.type === 'url' ? `<button onclick="UI.removeExtAgent('${agent.name}')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-rose-200 text-rose-500 hover:bg-rose-50 transition-all">REMOVE</button>` : ''}
+            <button onclick="UI.toggleExtAgent('${escapeHtml(agent.name)}', ${!agent.enabled})" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${toggleClass}">${toggleLabel}</button>
+            ${agent.type === 'url' ? `<button onclick="UI.removeExtAgent('${escapeHtml(agent.name)}')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-rose-200 text-rose-500 hover:bg-rose-50 transition-all">REMOVE</button>` : ''}
         `;
 
         const mcpSection = document.getElementById('ext-agent-mcp-section');
@@ -121,9 +121,9 @@ Object.assign(UI, {
             box.innerHTML = available.map(mcp => {
                 const checked = assigned.includes(mcp);
                 return `<label class="flex items-center gap-3 p-3 rounded-xl border ${checked ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-white'} cursor-pointer hover:border-blue-200 transition-all">
-                    <input type="checkbox" value="${mcp}" ${checked ? 'checked' : ''} data-agent="${agentKey}"
+                    <input type="checkbox" value="${escapeHtml(mcp)}" ${checked ? 'checked' : ''} data-agent="${escapeHtml(agentKey)}"
                         class="w-4 h-4 accent-blue-600 rounded" onchange="UI._updateMCPCheckStyle(this)">
-                    <span class="text-xs font-bold text-slate-700">${mcp}</span>
+                    <span class="text-xs font-bold text-slate-700">${escapeHtml(mcp)}</span>
                 </label>`;
             }).join('') || '<p class="text-[11px] text-slate-400 col-span-2">No MCP extensions configured yet.</p>';
         } catch(e) {
@@ -236,10 +236,10 @@ Object.assign(UI, {
                 const checked = assigned.includes(mcp);
                 const isCore = (agentId === 'costaff_agent' && mcp === 'costaff') || (agentId === 'coding_agent' && mcp === 'coding');
                 return `<label class="flex items-center gap-3 p-3 rounded-xl border ${checked ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-white'} cursor-pointer hover:border-blue-200 transition-all">
-                    <input type="checkbox" value="${mcp}" ${checked ? 'checked' : ''} ${isCore ? 'disabled' : ''}
+                    <input type="checkbox" value="${escapeHtml(mcp)}" ${checked ? 'checked' : ''} ${isCore ? 'disabled' : ''}
                         class="w-4 h-4 accent-blue-600 rounded" onchange="UI._updateMCPCheckStyle(this)">
                     <div>
-                        <span class="text-xs font-bold text-slate-700">${mcp}</span>
+                        <span class="text-xs font-bold text-slate-700">${escapeHtml(mcp)}</span>
                         ${isCore ? '<span class="ml-2 text-[9px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Core</span>' : ''}
                     </div>
                 </label>`;
@@ -322,7 +322,7 @@ Object.assign(UI, {
         const agent = svcs.find(s => s.name === name); if (!agent) return;
         const up = agent.status.includes('Up');
         const svc = this._dockerServiceName(agent.name);
-        el.innerHTML = `<button onclick="UI.serviceAction('${svc}', 'restart')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white transition-all">REBOOT</button><button onclick="UI.serviceAction('${svc}', '${up?'stop':'start'}')" class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${up?'bg-slate-100 text-rose-500':'bg-blue-600 text-white hover:bg-blue-700'} transition-all">${up?'STOP':'START'}</button>`;
+        el.innerHTML = `<button onclick="UI.serviceAction('${escapeHtml(svc)}', 'restart')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white transition-all">REBOOT</button><button onclick="UI.serviceAction('${escapeHtml(svc)}', '${up?'stop':'start'}')" class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${up?'bg-slate-100 text-rose-500':'bg-blue-600 text-white hover:bg-blue-700'} transition-all">${up?'STOP':'START'}</button>`;
     },
 
     async loadAgentLogs() {

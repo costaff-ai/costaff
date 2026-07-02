@@ -72,31 +72,31 @@ const RegularWork = {
 
         list.innerHTML = this.items.map(w => {
             const isPaused = w.status === 'paused';
-            const agentBadge = w.agent_id ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${w.agent_id}</span>` : '';
-            const channelBadge = w.channel ? `<span class="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${w.channel.toUpperCase()}</span>` : '';
-            return `<div class="px-6 py-5 flex items-center gap-4 hover:bg-slate-50/50 transition-all group cursor-pointer" onclick="RegularWork.openDetail('${w.id}')">
+            const agentBadge = w.agent_id ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml(w.agent_id)}</span>` : '';
+            const channelBadge = w.channel ? `<span class="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml(w.channel.toUpperCase())}</span>` : '';
+            return `<div class="px-6 py-5 flex items-center gap-4 hover:bg-slate-50/50 transition-all group cursor-pointer" onclick="RegularWork.openDetail('${escapeHtml(w.id)}')">
                 <div class="w-10 h-10 rounded-xl ${isPaused ? 'bg-slate-100' : 'bg-blue-50'} flex items-center justify-center shrink-0">
                     <i class="fas fa-sync-alt text-sm ${isPaused ? 'text-slate-400' : 'text-blue-500'}"></i>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="font-bold text-slate-900 text-sm truncate">${w.title}</span>
+                        <span class="font-bold text-slate-900 text-sm truncate">${escapeHtml(w.title)}</span>
                         ${isPaused ? '<span class="bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">PAUSED</span>' : ''}
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-mono text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold">${w.cron}</span>
+                        <span class="font-mono text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold">${escapeHtml(w.cron)}</span>
                         ${agentBadge}${channelBadge}
                         ${w.last_run ? `<span class="text-[10px] text-slate-400">Last: ${new Date(w.last_run).toLocaleString()}</span>` : ''}
                     </div>
                 </div>
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onclick="event.stopPropagation();RegularWork.toggleWork('${w.id}')" title="${isPaused ? 'Resume' : 'Pause'}" class="w-8 h-8 rounded-full ${isPaused ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'} flex items-center justify-center hover:scale-110 transition-all">
+                    <button onclick="event.stopPropagation();RegularWork.toggleWork('${escapeHtml(w.id)}')" title="${isPaused ? 'Resume' : 'Pause'}" class="w-8 h-8 rounded-full ${isPaused ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'} flex items-center justify-center hover:scale-110 transition-all">
                         <i class="fas fa-${isPaused ? 'play' : 'pause'} text-[10px]"></i>
                     </button>
-                    <button onclick="event.stopPropagation();RegularWork.editWork('${w.id}')" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:scale-110 transition-all">
+                    <button onclick="event.stopPropagation();RegularWork.editWork('${escapeHtml(w.id)}')" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:scale-110 transition-all">
                         <i class="fas fa-edit text-[10px]"></i>
                     </button>
-                    <button onclick="event.stopPropagation();RegularWork.deleteWork('${w.id}')" class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:scale-110 transition-all">
+                    <button onclick="event.stopPropagation();RegularWork.deleteWork('${escapeHtml(w.id)}')" class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:scale-110 transition-all">
                         <i class="fas fa-trash-alt text-[10px]"></i>
                     </button>
                 </div>
@@ -132,10 +132,10 @@ const RegularWork = {
         el.innerHTML = logs.map(log => `
             <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] font-black ${log.status === 'success' ? 'text-green-500' : 'text-red-500'} uppercase tracking-widest">${log.status}</span>
+                    <span class="text-[10px] font-black ${log.status === 'success' ? 'text-green-500' : 'text-red-500'} uppercase tracking-widest">${escapeHtml(log.status)}</span>
                     <span class="text-[10px] text-slate-400 font-bold">${new Date(log.created_at).toLocaleString()}</span>
                 </div>
-                <div class="bg-slate-50 p-3 rounded-lg text-[11px] text-slate-600 font-mono whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">${log.output || '(No Output)'}</div>
+                <div class="bg-slate-50 p-3 rounded-lg text-[11px] text-slate-600 font-mono whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">${escapeHtml(log.output || '(No Output)')}</div>
             </div>`).join('');
     },
 

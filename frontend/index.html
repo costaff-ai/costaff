@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Content Security Policy: the dashboard renders untrusted content
+         (docker logs, chat/session history, agent output) so an injected
+         payload is a real risk. connect-src/img-src 'self' block the practical
+         harm — exfiltrating the admin token to an external host — while the
+         allow-listed CDNs keep tailwind/marked/DOMPurify/font-awesome working.
+         (script-src keeps 'unsafe-inline'/'unsafe-eval' because the app relies
+         on inline onclick handlers and the tailwind Play CDN.) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; font-src 'self' data: https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>CoStaff Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -212,7 +220,11 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Pinned + SRI: floating "marked/marked.min.js" could ship a breaking
+         major or a compromised build silently. DOMPurify sanitizes the HTML
+         marked emits (see UI.parseMarkdown). -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -227,25 +239,25 @@
             }
         }
     </script>
-    <script src="js/config.js?v=2"></script>
-    <script src="js/httpClient.js?v=2"></script>
-    <script src="js/ui-core.js?v=1"></script>
-    <script src="js/ui-dashboard.js?v=1"></script>
-    <script src="js/ui-users.js?v=1"></script>
-    <script src="js/ui-sessions.js?v=1"></script>
-    <script src="js/ui-chat.js?v=2"></script>
-    <script src="js/ui-mcp.js?v=1"></script>
-    <script src="js/ui-gateways.js?v=1"></script>
-    <script src="js/ui-platforms.js?v=1"></script>
-    <script src="js/ui-agents.js?v=2"></script>
-    <script src="js/ui-logs.js?v=1"></script>
-    <script src="js/ui-cronjobs.js?v=1"></script>
-    <script src="js/projects.js?v=1"></script>
-    <script src="js/regular-work.js?v=1"></script>
-    <script src="js/apisView.js?v=2"></script>
-    <script src="js/skills.js?v=2"></script>
-    <script src="js/diary.js?v=1"></script>
-    <script src="js/cores.js?v=2"></script>
-    <script src="js/app.js?v=4"></script>
+    <script src="js/config.js?v=5"></script>
+    <script src="js/httpClient.js?v=5"></script>
+    <script src="js/ui-core.js?v=5"></script>
+    <script src="js/ui-dashboard.js?v=5"></script>
+    <script src="js/ui-users.js?v=5"></script>
+    <script src="js/ui-sessions.js?v=5"></script>
+    <script src="js/ui-chat.js?v=5"></script>
+    <script src="js/ui-mcp.js?v=5"></script>
+    <script src="js/ui-gateways.js?v=5"></script>
+    <script src="js/ui-platforms.js?v=5"></script>
+    <script src="js/ui-agents.js?v=5"></script>
+    <script src="js/ui-logs.js?v=5"></script>
+    <script src="js/ui-cronjobs.js?v=5"></script>
+    <script src="js/projects.js?v=5"></script>
+    <script src="js/regular-work.js?v=5"></script>
+    <script src="js/apisView.js?v=5"></script>
+    <script src="js/skills.js?v=5"></script>
+    <script src="js/diary.js?v=5"></script>
+    <script src="js/cores.js?v=5"></script>
+    <script src="js/app.js?v=5"></script>
 </body>
 </html>

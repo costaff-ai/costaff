@@ -87,13 +87,13 @@ const Projects = {
             const sc = statusColor[epic.status] || 'bg-slate-100 text-slate-500';
             const escapedTitle = JSON.stringify(epic.title).replace(/"/g, '&quot;');
             const escapedDesc = JSON.stringify(epic.description || '').replace(/"/g, '&quot;');
-            return `<div onclick="Projects.selectEpic('${epic.id}', ${escapedTitle}, ${escapedDesc})"
+            return `<div onclick="Projects.selectEpic('${escapeHtml(epic.id)}', ${escapedTitle}, ${escapedDesc})"
                 class="p-4 cursor-pointer hover:bg-slate-50 transition-all border-l-4 ${isActive ? 'bg-blue-50 border-l-blue-600' : 'border-l-transparent'}">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-bold truncate flex-1 mr-2 ${isActive ? 'text-blue-700' : 'text-slate-900'}">${epic.title}</span>
+                    <span class="text-sm font-bold truncate flex-1 mr-2 ${isActive ? 'text-blue-700' : 'text-slate-900'}">${escapeHtml(epic.title)}</span>
                     <div class="flex items-center gap-1 shrink-0">
-                        <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${sc}">${epic.status}</span>
-                        <button onclick="event.stopPropagation();Projects.deleteEpic('${epic.id}')" class="text-slate-200 hover:text-red-500 p-0.5 transition-colors"><i class="fas fa-trash-alt text-[8px]"></i></button>
+                        <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${sc}">${escapeHtml(epic.status)}</span>
+                        <button onclick="event.stopPropagation();Projects.deleteEpic('${escapeHtml(epic.id)}')" class="text-slate-200 hover:text-red-500 p-0.5 transition-colors"><i class="fas fa-trash-alt text-[8px]"></i></button>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 mb-1.5">
@@ -170,16 +170,16 @@ const Projects = {
                 : tasks.map(t => {
                     const stColor = { backlog: 'text-slate-400', queued: 'text-amber-500', doing: 'text-blue-500', done: 'text-green-500', failed: 'text-red-500' };
                     const sc = stColor[t.status] || 'text-slate-400';
-                    const agentBadge = t.assigned_agent ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${t.assigned_agent}</span>` : '';
-                    return `<div class="bg-white border border-slate-100 rounded-xl p-3 flex items-center justify-between gap-3 hover:shadow-sm transition-all cursor-pointer group" onclick="Projects.openTaskDetail('${t.id}')">
+                    const agentBadge = t.assigned_agent ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml(t.assigned_agent)}</span>` : '';
+                    return `<div class="bg-white border border-slate-100 rounded-xl p-3 flex items-center justify-between gap-3 hover:shadow-sm transition-all cursor-pointer group" onclick="Projects.openTaskDetail('${escapeHtml(t.id)}')">
                         <div class="flex items-center gap-3 min-w-0">
                             <span class="w-2 h-2 rounded-full ${dot} shrink-0"></span>
-                            <span class="text-sm font-medium text-slate-800 truncate">${t.title}</span>
+                            <span class="text-sm font-medium text-slate-800 truncate">${escapeHtml(t.title)}</span>
                             ${agentBadge}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <span class="text-[10px] font-bold uppercase ${sc}">${t.status}</span>
-                            <button onclick="event.stopPropagation();Projects.deleteTask('${t.id}','${epicId}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all p-1"><i class="fas fa-trash-alt text-xs"></i></button>
+                            <span class="text-[10px] font-bold uppercase ${sc}">${escapeHtml(t.status)}</span>
+                            <button onclick="event.stopPropagation();Projects.deleteTask('${escapeHtml(t.id)}','${escapeHtml(epicId)}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all p-1"><i class="fas fa-trash-alt text-xs"></i></button>
                         </div>
                     </div>`;
                 }).join('');
@@ -187,12 +187,12 @@ const Projects = {
                 <div class="p-4 flex items-center justify-between bg-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
                         <span class="w-2.5 h-2.5 rounded-full ${dot}"></span>
-                        <span class="font-bold text-slate-800 text-sm">${story.title}</span>
-                        <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${story.priority}</span>
+                        <span class="font-bold text-slate-800 text-sm">${escapeHtml(story.title)}</span>
+                        <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">${escapeHtml(story.priority)}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] text-slate-400 font-bold">${tasks.length} tasks</span>
-                        <button onclick="Projects.deleteStory('${story.id}','${epicId}')" class="text-slate-300 hover:text-red-500 p-1"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                        <button onclick="Projects.deleteStory('${escapeHtml(story.id)}','${escapeHtml(epicId)}')" class="text-slate-300 hover:text-red-500 p-1"><i class="fas fa-trash-alt text-[10px]"></i></button>
                     </div>
                 </div>
                 <div class="p-3 space-y-2">${taskHtml}</div>
@@ -256,7 +256,7 @@ const Projects = {
                 const escapedId = o.id.replace(/'/g, "\\'");
                 return `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-[10px] font-bold text-slate-700 whitespace-nowrap">
                     <input type="checkbox" ${checked} onchange="Projects.toggleFilter('${key}','${escapedId}')" class="accent-blue-500 w-3 h-3">
-                    ${o.label}
+                    ${escapeHtml(o.label)}
                 </label>`;
             }).join('');
             return `<details class="relative kanban-filter-details" onclick="event.stopPropagation()">
@@ -298,13 +298,13 @@ const Projects = {
                 const cards = colTasks.length === 0
                     ? `<div class="text-center text-slate-300 text-[10px] font-bold py-8 uppercase tracking-widest">Empty</div>`
                     : colTasks.map(t => {
-                        const agentBadge = t.assigned_agent ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold mt-1 inline-block">${t.assigned_agent}</span>` : '';
-                        return `<div class="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="Projects.openTaskDetail('${t.id}')">
+                        const agentBadge = t.assigned_agent ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold mt-1 inline-block">${escapeHtml(t.assigned_agent)}</span>` : '';
+                        return `<div class="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="Projects.openTaskDetail('${escapeHtml(t.id)}')">
                             <div class="flex items-start gap-2 mb-1">
                                 <span class="w-2 h-2 rounded-full ${col.dot} mt-1 shrink-0"></span>
-                                <span class="text-xs font-semibold text-slate-800 leading-tight">${t.title}</span>
+                                <span class="text-xs font-semibold text-slate-800 leading-tight">${escapeHtml(t.title)}</span>
                             </div>
-                            <p class="text-[10px] text-slate-400 ml-4 mb-1">${t.storyTitle}</p>
+                            <p class="text-[10px] text-slate-400 ml-4 mb-1">${escapeHtml(t.storyTitle)}</p>
                             ${agentBadge ? `<div class="ml-4">${agentBadge}</div>` : ''}
                         </div>`;
                     }).join('');
@@ -398,7 +398,7 @@ const Projects = {
             const raw = t.spec || '*(No spec provided)*';
             if (typeof marked !== 'undefined') {
                 marked.setOptions({ gfm: true, breaks: true });
-                specEl.innerHTML = marked.parse(raw);
+                specEl.innerHTML = UI.parseMarkdown(raw);
             } else {
                 specEl.textContent = raw;
             }
@@ -432,10 +432,10 @@ const Projects = {
             const tc = typeColor[c.type] || 'text-slate-500';
             return `<div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] font-black ${tc} uppercase tracking-widest">${c.type} · ${c.author}</span>
+                    <span class="text-[10px] font-black ${tc} uppercase tracking-widest">${escapeHtml(c.type)} · ${escapeHtml(c.author)}</span>
                     <span class="text-[10px] text-slate-400 font-bold">${new Date(c.created_at).toLocaleString()}</span>
                 </div>
-                <div class="prose prose-xs prose-slate max-w-none text-xs leading-relaxed markdown-body">${typeof marked !== 'undefined' ? marked.parse(c.content || '') : (c.content || '').replace(/\n/g, '<br>')}</div>
+                <div class="prose prose-xs prose-slate max-w-none text-xs leading-relaxed markdown-body">${UI.parseMarkdown(c.content || '')}</div>
             </div>`;
         }).join('');
     },

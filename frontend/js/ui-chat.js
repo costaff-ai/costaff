@@ -41,13 +41,13 @@ Object.assign(UI, {
             return;
         }
         list.innerHTML = webSessions.map(s => `
-            <div onclick="UI.loadChatHistory('${s.id}')"
+            <div onclick="UI.loadChatHistory('${escapeHtml(s.id)}')"
                  class="p-5 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-all group ${App.state.activeSession===s.id?'bg-blue-50 border-l-4 border-l-blue-600':''}">
                 <div class="flex items-center justify-between mb-1">
                     <div class="text-[10px] text-slate-400 font-mono tracking-tighter">${new Date(s.update_time).toLocaleDateString()}</div>
                     ${App.state.activeSession===s.id ? '<span class="status-badge badge-live" style="font-size:8px;padding:2px 6px"><span class="badge-dot"></span>Active</span>' : ''}
                 </div>
-                <div class="text-xs font-mono truncate text-slate-500 group-hover:text-blue-600 transition-colors">${s.id}</div>
+                <div class="text-xs font-mono truncate text-slate-500 group-hover:text-blue-600 transition-colors">${escapeHtml(s.id)}</div>
             </div>`).join('');
     },
 
@@ -207,7 +207,8 @@ Object.assign(UI, {
             : isToolRes ? 'bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl shadow-sm'
             : 'bg-white text-black border border-slate-200 shadow-sm';
         const content = (isToolCall || isToolRes) ? text
-            : (author === 'agent' && !text.includes('typing-dots')) ? this.parseMarkdown(text) : text;
+            : (author === 'agent' && !text.includes('typing-dots')) ? this.parseMarkdown(text)
+            : (author === 'user') ? escapeHtml(text) : text;
         div.innerHTML = `
             <div class="px-6 py-4 max-w-[85%] ${bubbleClass} break-words">
                 <div class="chat-content text-[15px] leading-relaxed">${content}</div>

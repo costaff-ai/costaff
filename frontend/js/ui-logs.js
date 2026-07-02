@@ -10,7 +10,7 @@ Object.assign(UI, {
             .filter(s => s.name.toLowerCase().startsWith('costaff-'))
             .sort((a, b) => a.name.localeCompare(b.name));
         sel.innerHTML = `<option value="">-- SELECT NODE --</option>`
-            + filtered.map(s => `<option value="${s.name}" ${s.name===cur?'selected':''}>${s.name.toUpperCase()}</option>`).join('');
+            + filtered.map(s => `<option value="${escapeHtml(s.name)}" ${s.name===cur?'selected':''}>${escapeHtml(s.name.toUpperCase())}</option>`).join('');
     },
 
     async renderLogs() {
@@ -27,7 +27,7 @@ Object.assign(UI, {
             else if (line.includes('WARN')) color = 'text-amber-400';
             else if (line.includes('SUCCESS')) color = 'text-emerald-400 font-bold';
             const lineContent = line.replace(/\[\d+m/g, '');
-            return `<div class="${color} mb-1 flex gap-4"><span class="text-slate-600 shrink-0 select-none">[${new Date().toLocaleTimeString([], {hour12:false})}]</span><span class="break-all">${lineContent}</span></div>`;
+            return `<div class="${color} mb-1 flex gap-4"><span class="text-slate-600 shrink-0 select-none">[${new Date().toLocaleTimeString([], {hour12:false})}]</span><span class="break-all">${escapeHtml(lineContent)}</span></div>`;
         }).join('');
         if (document.getElementById('log-autoscroll').checked) box.scrollTop = box.scrollHeight;
     },

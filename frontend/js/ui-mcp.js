@@ -15,7 +15,7 @@ Object.assign(UI, {
             const labelText = m.isCore ? 'System Core' : (m.isExternal ? 'Remote Extension' : 'Local Runtime');
             const labelColor = m.isCore ? 'text-blue-500' : (m.isExternal ? 'text-blue-400' : 'text-slate-400');
             const icon = m.isCore ? 'fa-shield-alt' : (m.isExternal ? 'fa-cloud' : 'fa-terminal');
-            return `<div onclick="UI.loadMCPDetail('${m.name}', ${JSON.stringify(svcs).replace(/"/g, '&quot;')})"
+            return `<div onclick="UI.loadMCPDetail('${escapeHtml(m.name)}', ${JSON.stringify(svcs).replace(/"/g, '&quot;')})"
                  class="p-6 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-all group ${App.state.activeMCP === m.name ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}">
                 <div class="flex items-center gap-5">
                     <div class="w-12 h-12 rounded-xl ${m.isCore ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-slate-50 border border-slate-100 text-blue-600 group-hover:scale-110'} flex items-center justify-center transition-transform">
@@ -23,7 +23,7 @@ Object.assign(UI, {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-center mb-1">
-                            <div class="text-base font-headline font-bold text-slate-900 truncate tracking-tight uppercase">${m.name}</div>
+                            <div class="text-base font-headline font-bold text-slate-900 truncate tracking-tight uppercase">${escapeHtml(m.name)}</div>
                             <div class="w-2 h-2 rounded-full ${up ? 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)] animate-pulse' : 'bg-slate-200'}"></div>
                         </div>
                         <span class="text-[9px] font-mono font-bold ${labelColor} uppercase tracking-widest">${labelText}</span>
@@ -112,8 +112,8 @@ Object.assign(UI, {
         const row = document.createElement('div');
         row.className = 'flex items-center gap-2';
         row.innerHTML = `
-            <input type="text" placeholder="Key" value="${key}" class="flex-1 bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20">
-            <input type="text" placeholder="Value" value="${value}" class="flex-1 bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20">
+            <input type="text" placeholder="Key" value="${escapeHtml(key)}" class="flex-1 bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20">
+            <input type="text" placeholder="Value" value="${escapeHtml(value)}" class="flex-1 bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20">
             <button onclick="this.parentElement.remove()" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-rose-400 transition-colors shrink-0"><i class="fas fa-times text-xs"></i></button>`;
         container.appendChild(row);
     },
@@ -135,7 +135,7 @@ Object.assign(UI, {
             el.innerHTML = `<span class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">System Core</span>`;
             return;
         }
-        if (isExt) el.innerHTML = `<button onclick="UI.deleteItem('mcp', '${name}')" class="px-6 py-2 rounded-xl text-xs font-black bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest border border-rose-100">Remove Link</button>`;
-        else el.innerHTML = `<div class="flex items-center gap-3"><button onclick="UI.deleteItem('mcp', '${name}')" class="p-2.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100"><i class="fas fa-trash-alt text-xs"></i></button><button onclick="UI.serviceAction('${svc}', '${isUp?'stop':'start'}')" class="px-6 py-2 rounded-xl text-xs font-black transition-all ${isUp?'bg-slate-100 text-rose-500 hover:bg-rose-500 hover:text-white':'bg-blue-600 text-white hover:bg-blue-700'} uppercase tracking-widest">${isUp?'STOP':'START'}</button></div>`;
+        if (isExt) el.innerHTML = `<button onclick="UI.deleteItem('mcp', '${escapeHtml(name)}')" class="px-6 py-2 rounded-xl text-xs font-black bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest border border-rose-100">Remove Link</button>`;
+        else el.innerHTML = `<div class="flex items-center gap-3"><button onclick="UI.deleteItem('mcp', '${escapeHtml(name)}')" class="p-2.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100"><i class="fas fa-trash-alt text-xs"></i></button><button onclick="UI.serviceAction('${escapeHtml(svc)}', '${isUp?'stop':'start'}')" class="px-6 py-2 rounded-xl text-xs font-black transition-all ${isUp?'bg-slate-100 text-rose-500 hover:bg-rose-500 hover:text-white':'bg-blue-600 text-white hover:bg-blue-700'} uppercase tracking-widest">${isUp?'STOP':'START'}</button></div>`;
     },
 });

@@ -67,7 +67,7 @@ const Skills = {
                     const newSkill = skills.find(s => s.id === res.id);
                     if (newSkill) this.selectItem(newSkill);
                 } else if (!editId) {
-                   this.selectItem(null); 
+                   this.selectItem(null);
                 }
             } else {
                 alert('Failed to save: ' + (res.detail || JSON.stringify(res)));
@@ -109,11 +109,11 @@ const Skills = {
                         <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             <i class="fas fa-bolt text-xs"></i>
                         </div>
-                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${skill.name}</span>
+                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${escapeHtml(skill.name)}</span>
                     </div>
                     ${!skill.is_active ? '<span class="text-[8px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded uppercase">Disabled</span>' : ''}
                 </div>
-                <p class="text-[11px] text-slate-400 line-clamp-1 ml-11">${skill.description || 'No description'}</p>
+                <p class="text-[11px] text-slate-400 line-clamp-1 ml-11">${escapeHtml(skill.description || 'No description')}</p>
             </div>
         `).join('');
     },
@@ -133,7 +133,7 @@ const Skills = {
             content.classList.remove('hidden');
             header.innerText = "New Skill";
             actions.innerHTML = "";
-            
+
             document.getElementById('skill-form').reset();
             document.getElementById('skill-edit-id').value = "";
             document.getElementById('skill-field-id').value = "";
@@ -146,15 +146,15 @@ const Skills = {
         placeholder.classList.add('hidden');
         content.classList.remove('hidden');
         header.innerText = skill.name.toUpperCase();
-        
+
         actions.innerHTML = `
             <div class="flex items-center gap-3">
-                <button onclick="Skills.toggleActive('${skill.id}', ${!skill.is_active})" 
+                <button onclick="Skills.toggleActive('${escapeHtml(skill.id)}', ${!skill.is_active})"
                         class="p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
                         title="${skill.is_active ? 'Disable' : 'Enable'}">
                     <i class="fas ${skill.is_active ? 'fa-toggle-on' : 'fa-toggle-off'} text-xs"></i>
                 </button>
-                <button onclick="Skills.deleteSkill('${skill.id}')" 
+                <button onclick="Skills.deleteSkill('${escapeHtml(skill.id)}')"
                         class="p-2.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100">
                     <i class="fas fa-trash-alt text-xs"></i>
                 </button>

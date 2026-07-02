@@ -97,12 +97,38 @@ const UI = {
     },
 
     // --- Common helpers ---
+
+    // Escape a value for safe interpolation into innerHTML (text OR attribute
+    // context). Use this for ANY backend / agent / cross-channel-user derived
+    // string before putting it in a template literal. Also exposed as the
+    // global `escapeHtml` for the other UI modules.
+    escapeHtml(v) {
+        if (v === null || v === undefined) return '';
+        return String(v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
     parseMarkdown(text) {
         if (!text) return "";
+        let html = null;
         if (typeof marked !== 'undefined') {
-            try { return marked.parse(text); } catch(e) { return text; }
+            try { html = marked.parse(text); } catch(e) { html = null; }
         }
-        return text.replace(/\n/g, '<br>');
+        if (html === null) {
+            // marked unavailable/failed — escape first, never emit raw HTML.
+            return this.escapeHtml(text).replace(/\n/g, '<br>');
+        }
+        // marked emits raw HTML for `<img onerror=...>`, `<script>` etc. in the
+        // source, and chat/project/comment text is untrusted (LLM output or
+        // cross-channel end-user input). Sanitize before it hits innerHTML.
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(html);
+        }
+        return html;
     },
 
     formatUptime(seconds) {
@@ -181,3 +207,6 @@ const UI = {
 };
 
 window.UI = UI;
+// Global escaping helper for all UI modules. `escapeHtml` uses no `this`, so a
+// bare reference is safe to share.
+window.escapeHtml = UI.escapeHtml;

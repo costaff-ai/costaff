@@ -9,7 +9,7 @@ Object.assign(UI, {
                     <i class="fas fa-exclamation-triangle text-xl"></i>
                     <div>
                         <p class="text-xs font-black uppercase tracking-widest">License Invalid</p>
-                        <p class="text-xs text-slate-400 mt-1">${data.error || 'Unknown error'}</p>
+                        <p class="text-xs text-slate-400 mt-1">${escapeHtml(data.error || 'Unknown error')}</p>
                     </div>
                 </div>`;
             return;
@@ -38,7 +38,7 @@ Object.assign(UI, {
             <div class="flex flex-col gap-2">
                 <div class="flex justify-between items-center">
                     <span class="text-xs font-black uppercase tracking-widest text-slate-400">${label}</span>
-                    <span class="text-xs font-bold text-slate-500">${used} / ${fmtLimit(limit)}</span>
+                    <span class="text-xs font-bold text-slate-500">${escapeHtml(used)} / ${escapeHtml(fmtLimit(limit))}</span>
                 </div>
                 <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div class="h-full rounded-full transition-all ${barColor(p)}" style="width: ${p}%"></div>
@@ -61,11 +61,11 @@ Object.assign(UI, {
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-lg font-headline font-bold text-slate-900">${planLabel} PLAN</span>
+                                <span class="text-lg font-headline font-bold text-slate-900">${escapeHtml(planLabel)} PLAN</span>
                                 ${isExpired ? '<span class="text-[10px] font-black uppercase bg-red-50 text-red-500 px-2 py-0.5 rounded-full">EXPIRED</span>' : ''}
                             </div>
-                            ${data.issued_to ? `<p class="text-xs text-slate-400 mt-0.5">${data.issued_to}${data.contact_phone ? ` · ${data.contact_phone}` : ''}</p>` : ''}
-                            <p class="text-xs ${expiryColor} mt-0.5">${expiryText}</p>
+                            ${data.issued_to ? `<p class="text-xs text-slate-400 mt-0.5">${escapeHtml(data.issued_to)}${data.contact_phone ? ` · ${escapeHtml(data.contact_phone)}` : ''}</p>` : ''}
+                            <p class="text-xs ${expiryColor} mt-0.5">${escapeHtml(expiryText)}</p>
                         </div>
                     </div>
                     ${!isPaid ? `
@@ -96,8 +96,8 @@ Object.assign(UI, {
                     <i class="fas fa-${m.icon} text-primary opacity-30 transition-all group-hover:scale-110"></i>
                 </div>
                 <div class="mt-auto">
-                    <div class="text-4xl font-headline font-bold mb-3 text-slate-900">${m.isRaw ? m.value : m.value + '%'}</div>
-                    ${!m.isRaw ? `<div class="progress-bar bg-slate-100"><div class="progress-fill" style="width: ${m.value}%"></div></div>` : ''}
+                    <div class="text-4xl font-headline font-bold mb-3 text-slate-900">${m.isRaw ? escapeHtml(m.value) : escapeHtml(m.value) + '%'}</div>
+                    ${!m.isRaw ? `<div class="progress-bar bg-slate-100"><div class="progress-fill" style="width: ${escapeHtml(m.value)}%"></div></div>` : ''}
                 </div>
             </div>`).join('');
     },
@@ -111,16 +111,16 @@ Object.assign(UI, {
             const isActive = s.status.includes('Up');
             return `
             <tr class="group hover:bg-slate-50 transition-all">
-                <td class="font-headline font-bold tracking-tight text-base uppercase text-slate-900">${s.name}</td>
+                <td class="font-headline font-bold tracking-tight text-base uppercase text-slate-900">${escapeHtml(s.name)}</td>
                 <td>
                     <span class="status-badge ${isActive ? 'badge-active' : 'badge-idle'}">
                         <span class="badge-dot"></span>
                         ${isActive ? 'ACTIVE' : 'IDLE'}
                     </span>
                 </td>
-                <td class="text-[11px] font-mono text-slate-400 italic uppercase">${s.status}</td>
+                <td class="text-[11px] font-mono text-slate-400 italic uppercase">${escapeHtml(s.status)}</td>
                 <td class="text-right">
-                    <button onclick="UI.serviceAction('${s.name}', 'restart')" class="text-[9px] font-black text-blue-600 hover:text-white transition-all uppercase tracking-widest px-4 py-2 border border-blue-200 rounded-lg hover:bg-blue-600">RESTART</button>
+                    <button onclick="UI.serviceAction('${escapeHtml(s.name)}', 'restart')" class="text-[9px] font-black text-blue-600 hover:text-white transition-all uppercase tracking-widest px-4 py-2 border border-blue-200 rounded-lg hover:bg-blue-600">RESTART</button>
                 </td>
             </tr>`;
         }).join('');
@@ -162,19 +162,19 @@ Object.assign(UI, {
                 rwList.innerHTML = `<div class="flex items-center justify-center h-20 text-slate-300 text-[10px] font-bold uppercase tracking-widest">No active schedules</div>`;
             } else {
                 rwList.innerHTML = active.map(w => {
-                    const ch = w.channel ? `<span class="bg-green-50 text-green-600 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">${w.channel}</span>` : '';
+                    const ch = w.channel ? `<span class="bg-green-50 text-green-600 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">${escapeHtml(w.channel)}</span>` : '';
                     const lastRan = w.last_ran_at ? `<span class="text-[9px] text-slate-300">${new Date(w.last_ran_at).toLocaleString()}</span>` : '';
                     return `<div class="px-5 py-3 flex flex-col gap-1 hover:bg-slate-50 transition-all">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="font-bold text-slate-800 text-sm truncate">${w.title}</span>
+                            <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(w.title)}</span>
                             <div class="flex items-center gap-1 shrink-0">${ch}</div>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold">${w.cron}</span>
-                            <span class="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-bold">${w.agent_id || 'costaff_agent'}</span>
+                            <span class="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold">${escapeHtml(w.cron)}</span>
+                            <span class="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-bold">${escapeHtml(w.agent_id || 'costaff_agent')}</span>
                             ${lastRan}
                         </div>
-                        ${w.last_output ? `<p class="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mt-1">${w.last_output.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>` : ''}
+                        ${w.last_output ? `<p class="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mt-1">${escapeHtml(w.last_output)}</p>` : ''}
                     </div>`;
                 }).join('');
             }
@@ -201,17 +201,17 @@ Object.assign(UI, {
                         const tc = typeColor[e.type] || 'text-slate-500 bg-slate-50';
                         return `<div class="px-5 py-4 hover:bg-slate-50 transition-all">
                             <div class="flex items-center gap-2 mb-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${tc}">${e.type || 'note'}</span>
-                                <span class="text-[10px] font-bold text-slate-500">${e.agent_name || '—'}</span>
+                                <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${tc}">${escapeHtml(e.type || 'note')}</span>
+                                <span class="text-[10px] font-bold text-slate-500">${escapeHtml(e.agent_name || '—')}</span>
                             </div>
-                            ${e.done ? `<div class="mb-1"><span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Done</span><p class="text-xs text-slate-700 mt-0.5 leading-relaxed">${e.done}</p></div>` : ''}
-                            ${e.next ? `<div class="mb-1"><span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Next</span><p class="text-xs text-slate-500 mt-0.5 leading-relaxed">${e.next}</p></div>` : ''}
-                            ${e.blocker ? `<div><span class="text-[9px] font-black text-red-400 uppercase tracking-widest">Blocker</span><p class="text-xs text-red-600 mt-0.5 leading-relaxed">${e.blocker}</p></div>` : ''}
+                            ${e.done ? `<div class="mb-1"><span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Done</span><p class="text-xs text-slate-700 mt-0.5 leading-relaxed">${escapeHtml(e.done)}</p></div>` : ''}
+                            ${e.next ? `<div class="mb-1"><span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Next</span><p class="text-xs text-slate-500 mt-0.5 leading-relaxed">${escapeHtml(e.next)}</p></div>` : ''}
+                            ${e.blocker ? `<div><span class="text-[9px] font-black text-red-400 uppercase tracking-widest">Blocker</span><p class="text-xs text-red-600 mt-0.5 leading-relaxed">${escapeHtml(e.blocker)}</p></div>` : ''}
                         </div>`;
                     }).join('');
                     return `<div>
                         <div class="px-5 py-2 bg-slate-50 border-b border-slate-100 sticky top-0">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${date}</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${escapeHtml(date)}</span>
                         </div>
                         ${cards}
                     </div>`;

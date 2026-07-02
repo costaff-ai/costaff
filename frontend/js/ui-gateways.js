@@ -40,7 +40,7 @@ Object.assign(UI, {
                 document.getElementById('gateway-config-form').innerHTML = `<div class="p-4 rounded-xl bg-slate-50 border border-slate-100 text-sm text-slate-500">WebChat is a standalone web application.<br>Configure it via its own <code>.env</code> file.</div>`;
             } else {
                 let fields = platform === 'line' ? [ { label: 'ACCESS TOKEN', key: 'token', type: 'password' }, { label: 'SECRET KEY', key: 'secret', type: 'password' } ] : [{ label: 'TOKEN', key: 'token', type: 'password' }];
-                document.getElementById('gateway-config-form').innerHTML = fields.map(f => `<div class="space-y-3"><label class="label-mono text-[10px] text-blue-600 font-black uppercase tracking-[0.2em]">${f.label}</label><input type="${f.type}" id="gw-field-${f.key}" value="${gConf[f.key] || ''}" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 outline-none focus:ring-2 focus:ring-blue-500/20 font-mono text-sm text-slate-900"></div>`).join('');
+                document.getElementById('gateway-config-form').innerHTML = fields.map(f => `<div class="space-y-3"><label class="label-mono text-[10px] text-blue-600 font-black uppercase tracking-[0.2em]">${f.label}</label><input type="${f.type}" id="gw-field-${f.key}" value="${escapeHtml(gConf[f.key] || '')}" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 outline-none focus:ring-2 focus:ring-blue-500/20 font-mono text-sm text-slate-900"></div>`).join('');
             }
         }
     },

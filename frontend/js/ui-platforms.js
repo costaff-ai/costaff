@@ -19,7 +19,7 @@ const Platforms = {
             const list = await API.fetch('/api/platforms');
             this.render(list);
         } catch (e) {
-            el.innerHTML = `<div class="col-span-full text-center text-rose-500 py-12 text-sm font-mono">Failed to load: ${e.message}</div>`;
+            el.innerHTML = `<div class="col-span-full text-center text-rose-500 py-12 text-sm font-mono">Failed to load: ${escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -38,10 +38,10 @@ const Platforms = {
             const h = this.HEALTH[p.health] || this.HEALTH['n/a'];
             const up = p.health === 'healthy' || p.health === 'unhealthy';
             const actions = up
-                ? `${p.url ? `<a href="${p.url}" target="_blank" rel="noopener" class="px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all no-underline"><i class="fas fa-arrow-up-right-from-square mr-1"></i>Open</a>` : ''}
-                   ${this._btn('Restart', `Platforms.action('${p.name}','restart')`, 'bg-slate-100 text-slate-600 hover:bg-slate-200', 'fa-rotate')}
-                   ${this._btn('Stop', `Platforms.action('${p.name}','stop')`, 'bg-slate-100 text-rose-500 hover:bg-rose-50', 'fa-stop')}`
-                : this._btn('Start', `Platforms.action('${p.name}','start')`, 'bg-blue-600 text-white hover:bg-blue-700', 'fa-play');
+                ? `${p.url ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" class="px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all no-underline"><i class="fas fa-arrow-up-right-from-square mr-1"></i>Open</a>` : ''}
+                   ${this._btn('Restart', `Platforms.action('${escapeHtml(p.name)}','restart')`, 'bg-slate-100 text-slate-600 hover:bg-slate-200', 'fa-rotate')}
+                   ${this._btn('Stop', `Platforms.action('${escapeHtml(p.name)}','stop')`, 'bg-slate-100 text-rose-500 hover:bg-rose-50', 'fa-stop')}`
+                : this._btn('Start', `Platforms.action('${escapeHtml(p.name)}','start')`, 'bg-blue-600 text-white hover:bg-blue-700', 'fa-play');
             return `<div class="rounded-2xl border border-slate-100 bg-white p-5 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3 min-w-0">
@@ -49,8 +49,8 @@ const Platforms = {
                             <i class="fas ${p.is_shared_db ? 'fa-database' : 'fa-cube'} text-lg"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-black text-slate-900 uppercase tracking-wide truncate">${p.name}${p.is_shared_db ? ' <span class="text-[9px] text-slate-400 normal-case tracking-normal">(shared DB)</span>' : ''}</div>
-                            <div class="text-[10px] font-mono text-slate-400 mt-0.5 truncate">${p.port ? 'localhost:' + p.port : 'no public port'}${p.ref ? ' · ' + p.ref : ''}</div>
+                            <div class="text-sm font-black text-slate-900 uppercase tracking-wide truncate">${escapeHtml(p.name)}${p.is_shared_db ? ' <span class="text-[9px] text-slate-400 normal-case tracking-normal">(shared DB)</span>' : ''}</div>
+                            <div class="text-[10px] font-mono text-slate-400 mt-0.5 truncate">${p.port ? 'localhost:' + escapeHtml(p.port) : 'no public port'}${p.ref ? ' · ' + escapeHtml(p.ref) : ''}</div>
                         </div>
                     </div>
                     <span class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0"><span class="w-2 h-2 rounded-full ${h.dot}"></span>${h.label}</span>

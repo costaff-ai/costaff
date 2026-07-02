@@ -24,29 +24,32 @@ Object.assign(UI, {
             <tr class="group hover:bg-slate-50 transition-all border-b border-slate-100 last:border-none${toolClass}" style="${toolStyle}">
                 ${s.keys.map(k => {
                     let val = r[k] || '-';
+                    let valIsHtml = false; // set true when we intentionally build trusted markup for `val`
                     if (schemaType === 'reminders' && k === 'run_at' && r.cron) {
-                        val = `<span class="font-mono text-blue-600 font-bold">${r.cron}</span>`;
+                        val = `<span class="font-mono text-blue-600 font-bold">${escapeHtml(r.cron)}</span>`;
+                        valIsHtml = true;
                     }
                     if (schemaType === 'reminders' && k === 'channel' && r.channel === 'command') {
                         val = `<span class="bg-slate-900 text-white px-2 py-0.5 rounded text-[9px] font-black tracking-tighter uppercase">Shell_Exec</span>`;
+                        valIsHtml = true;
                     }
 
                     if (k === 'status' || k === 'state') {
-                        let displayVal = val.toString().toUpperCase();
+                        let displayVal = escapeHtml(val.toString().toUpperCase());
                         const isCron = schemaType === 'reminders' && r.cron;
 
                         if (k === 'state' && typeof val === 'object' && val !== null) {
                             const keys = Object.keys(val);
                             const preview = keys.slice(0, 3).join(', ') + (keys.length > 3 ? ` … +${keys.length - 3}` : '');
                             const escaped = JSON.stringify(val).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-                            displayVal = `<span class="text-[10px] font-mono text-slate-500 mr-1">{${preview}}</span><button onclick="UI.showStateModal('${escaped}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50 transition-colors">View</button>`;
+                            displayVal = `<span class="text-[10px] font-mono text-slate-500 mr-1">{${escapeHtml(preview)}}</span><button onclick="UI.showStateModal('${escaped}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50 transition-colors">View</button>`;
                         } else if (k === 'state' && typeof val === 'string' && val.startsWith('{')) {
                             try {
                                 const parsed = JSON.parse(val);
                                 const keys = Object.keys(parsed);
                                 const preview = keys.slice(0, 3).join(', ') + (keys.length > 3 ? ` … +${keys.length - 3}` : '');
                                 const escaped = val.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-                                displayVal = `<span class="text-[10px] font-mono text-slate-500 mr-1">{${preview}}</span><button onclick="UI.showStateModal('${escaped}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50 transition-colors">View</button>`;
+                                displayVal = `<span class="text-[10px] font-mono text-slate-500 mr-1">{${escapeHtml(preview)}}</span><button onclick="UI.showStateModal('${escaped}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50 transition-colors">View</button>`;
                             } catch {
                                 const escaped = val.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
                                 displayVal = `<button onclick="UI.showStateModal('${escaped}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 hover:bg-blue-50 transition-colors">View</button>`;
@@ -73,9 +76,11 @@ Object.assign(UI, {
                     if (schemaType === 'events' && k === 'content') {
                         try {
                             const parts = JSON.parse(val);
+                            // Escape everything, then re-allow ONLY bare whitelist tags
+                            // (no attributes) — so `<span onmouseover=...>` stays escaped.
                             const _safe = (s) => s
                                 .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                                .replace(/&lt;(\/?(b|i|u|s|code|br|span)(\s[^>]*)?)\&gt;/gi, '<$1>');
+                                .replace(/&lt;(\/?(?:b|i|u|s|code|br|span))&gt;/gi, '<$1>');
                             const _truncate = (text, limit=400) => {
                                 if (text.length <= limit) return `<span>${_safe(text)}</span>`;
                                 const uid = 'ev' + Math.random().toString(36).slice(2,8);
@@ -91,14 +96,14 @@ Object.assign(UI, {
                                 if (p.type === 'call') {
                                     const args = JSON.stringify(p.args, null, 2);
                                     return `<div class="text-xs mt-1 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                                        <span class="font-black text-amber-600 text-[10px] uppercase tracking-wide">🔧 ${p.name}</span>
+                                        <span class="font-black text-amber-600 text-[10px] uppercase tracking-wide">🔧 ${escapeHtml(p.name)}</span>
                                         <pre class="text-slate-500 text-[10px] mt-1 whitespace-pre-wrap leading-relaxed">${_truncate(args, 300)}</pre>
                                     </div>`;
                                 }
                                 if (p.type === 'result') {
                                     const data = typeof p.data === 'string' ? p.data : JSON.stringify(p.data, null, 2);
                                     return `<div class="text-xs mt-1 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                                        <span class="font-black text-emerald-600 text-[10px] uppercase tracking-wide">✅ ${p.name}</span>
+                                        <span class="font-black text-emerald-600 text-[10px] uppercase tracking-wide">✅ ${escapeHtml(p.name)}</span>
                                         <pre class="text-slate-500 text-[10px] mt-1 whitespace-pre-wrap leading-relaxed">${_truncate(data, 300)}</pre>
                                     </div>`;
                                 }
@@ -107,14 +112,14 @@ Object.assign(UI, {
                             return `<td class="px-6 py-5 max-w-sm">${html || '<span class="text-slate-300 text-xs italic">—</span>'}</td>`;
                         } catch(e) {}
                     }
-                    return `<td class="px-6 py-5 text-sm font-medium text-slate-900">${val}</td>`;
+                    return `<td class="px-6 py-5 text-sm font-medium text-slate-900">${valIsHtml ? val : escapeHtml(val)}</td>`;
                 }).join('')}
                 ${schemaType==='reminders' ? `<td class="px-6 py-5 text-right flex justify-end gap-2">
-                    <button onclick="UI.openEditCronModal('${r.id}', '${r.channel}', '${r.recipient}', \`${(r.cron || '') + ' ' + (r.prompt || '')}\`.trim())" class="p-2 text-slate-400 hover:text-blue-600 transition-all"><i class="fas fa-edit text-xs"></i></button>
-                    <button onclick="UI.deleteReminder('${r.id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button>
+                    <button data-cron-id="${escapeHtml(r.id)}" data-cron-channel="${escapeHtml(r.channel)}" data-cron-recipient="${escapeHtml(r.recipient)}" data-cron-full="${escapeHtml(((r.cron || '') + ' ' + (r.prompt || '')).trim())}" onclick="UI.openEditCronModal(this.dataset.cronId, this.dataset.cronChannel, this.dataset.cronRecipient, this.dataset.cronFull)" class="p-2 text-slate-400 hover:text-blue-600 transition-all"><i class="fas fa-edit text-xs"></i></button>
+                    <button onclick="UI.deleteReminder('${escapeHtml(r.id)}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button>
                 </td>` : ''}
-                ${schemaType==='identities' ? `<td class="px-6 py-5"><button onclick="UI.deleteIdentity('${r.session_id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button></td>` : ''}
-                ${schemaType==='user_states' ? `<td class="px-6 py-5"><button onclick="UI.deleteUserState('${r.app_name}','${r.user_id}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button></td>` : ''}
+                ${schemaType==='identities' ? `<td class="px-6 py-5"><button onclick="UI.deleteIdentity('${escapeHtml(r.session_id)}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button></td>` : ''}
+                ${schemaType==='user_states' ? `<td class="px-6 py-5"><button onclick="UI.deleteUserState('${escapeHtml(r.app_name)}','${escapeHtml(r.user_id)}')" class="p-2 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-trash-alt text-xs"></i></button></td>` : ''}
             </tr>`;
         }).join('');
     },

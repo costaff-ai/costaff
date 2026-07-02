@@ -127,13 +127,13 @@ const Apis = {
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-6 rounded-md ${methodColors[api.method] || 'bg-slate-100 text-slate-600'} flex items-center justify-center shrink-0 text-[10px] font-black tracking-tighter transition-colors group-hover:bg-blue-600 group-hover:text-white">
-                            ${api.method}
+                            ${escapeHtml(api.method)}
                         </div>
-                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${api.name}</span>
+                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${escapeHtml(api.name)}</span>
                     </div>
                     ${!api.is_active ? '<span class="text-[8px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded uppercase">Disabled</span>' : ''}
                 </div>
-                <p class="text-[11px] text-slate-400 font-mono truncate ml-[60px]">${api.url}</p>
+                <p class="text-[11px] text-slate-400 font-mono truncate ml-[60px]">${escapeHtml(api.url)}</p>
             </div>
         `).join('');
     },
@@ -152,7 +152,7 @@ const Apis = {
             content.classList.remove('hidden');
             header.innerText = "New API";
             actions.innerHTML = "";
-            
+
             document.getElementById('api-form').reset();
             document.getElementById('api-edit-id').value = "";
             document.getElementById('api-field-id').value = "";
@@ -167,15 +167,15 @@ const Apis = {
         content.classList.remove('hidden');
         header.innerText = api.name.toUpperCase();
         document.getElementById('api-curl-section').classList.add('hidden');
-        
+
         actions.innerHTML = `
             <div class="flex items-center gap-3">
-                <button onclick="Apis.toggleActive('${api.id}', ${!api.is_active})" 
+                <button onclick="Apis.toggleActive('${escapeHtml(api.id)}', ${!api.is_active})"
                         class="p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
                         title="${api.is_active ? 'Disable' : 'Enable'}">
                     <i class="fas ${api.is_active ? 'fa-toggle-on' : 'fa-toggle-off'} text-xs"></i>
                 </button>
-                <button onclick="Apis.deleteApi('${api.id}')" 
+                <button onclick="Apis.deleteApi('${escapeHtml(api.id)}')"
                         class="p-2.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100">
                     <i class="fas fa-trash-alt text-xs"></i>
                 </button>
