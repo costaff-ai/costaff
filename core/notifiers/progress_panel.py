@@ -462,7 +462,10 @@ async def panel_step(key, recipient, channel, session_id, agent,
         try:
             from core.notifiers.webchat import send_webchat_notification
             status = ("done" if ok else "failed") if phase == "end" else "doing"
-            send_webchat_notification(
+            # Blocking httpx push — offload so it can't freeze the event loop
+            # (the TG/DC/Slack panel branches already go through to_thread).
+            await asyncio.to_thread(
+                send_webchat_notification,
                 recipient, "",
                 session_id=session_id, agent=agent,
                 task_id=key, step=tool, status=status,
@@ -514,7 +517,9 @@ async def panel_section(key, recipient, channel, session_id, agent, text):
     if _is_webchat_channel(channel):
         try:
             from core.notifiers.webchat import send_webchat_notification
-            send_webchat_notification(
+            # Blocking httpx push — offload so it can't freeze the event loop.
+            await asyncio.to_thread(
+                send_webchat_notification,
                 recipient, text or "",
                 session_id=session_id, agent=agent,
                 task_id=key, step=None, status="section",

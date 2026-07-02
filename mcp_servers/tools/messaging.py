@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -58,19 +59,25 @@ async def send_message_now(
     finally:
         db.close()
 
+    # The telegram/discord/slack senders do BLOCKING httpx calls (file upload
+    # up to 60s). This is an async MCP tool running on the core event loop, so
+    # calling them directly would freeze every other task's panel/executor/
+    # queue poll. Offload each to a worker thread. (LINE is already async.)
     success = False
     if chan == "telegram":
-        success = send_telegram_notification(target_id, body, session_id=session_id)
+        success = await asyncio.to_thread(
+            send_telegram_notification, target_id, body, session_id=session_id)
         for fp in _extract_file_paths(body):
-            send_telegram_document(target_id, fp)
+            await asyncio.to_thread(send_telegram_document, target_id, fp)
     elif chan == "discord":
-        success = send_discord_notification(target_id, body, session_id=session_id)
+        success = await asyncio.to_thread(
+            send_discord_notification, target_id, body, session_id=session_id)
         for fp in _extract_file_paths(body):
-            send_discord_file(target_id, fp, session_id=session_id)
+            await asyncio.to_thread(send_discord_file, target_id, fp, session_id=session_id)
     elif chan == "slack":
-        success = send_slack_notification(target_id, body)
+        success = await asyncio.to_thread(send_slack_notification, target_id, body)
         for fp in _extract_file_paths(body):
-            send_slack_file(target_id, fp)
+            await asyncio.to_thread(send_slack_file, target_id, fp)
     elif chan == "line": success = await send_line_notification(target_id, body)
     elif chan == "webchat":
         # Webchat uses the regular notification flow (events)
