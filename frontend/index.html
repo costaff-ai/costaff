@@ -92,31 +92,26 @@
     </section>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 flex flex-col hidden overflow-y-auto shrink-0 transition-all">
-        <div class="p-8 pb-4">
-            <div class="flex items-center gap-3 text-blue-600 mb-8">
-                <i class="fas fa-robot text-3xl"></i>
-                <span class="text-2xl font-bold text-slate-900 tracking-tight">CoStaff</span>
+    <aside id="sidebar" class="w-64 flex flex-col hidden shrink-0 transition-all">
+        <div class="px-6 pt-6 pb-3 shrink-0">
+            <div class="flex items-center gap-3 text-blue-600 mb-4">
+                <i class="fas fa-robot text-2xl"></i>
+                <span class="text-xl font-bold text-slate-900 tracking-tight">CoStaff</span>
             </div>
+            <!-- Tier 0: System (core) switcher -->
+            <div id="system-switcher"></div>
         </div>
 
-        <nav id="main-nav" class="flex-1 pb-10">
-            <div class="sidebar-group-label">Dashboard</div>
-            <button data-tab="dashboard" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
-                <i class="fas fa-th-large w-5 text-center"></i> Dashboard
-            </button>
+        <nav id="main-nav" class="flex-1 pb-10 overflow-y-auto custom-scrollbar">
+            <!-- Tier 1: Manager Agent (pinned) -->
+            <div class="sidebar-group-label">Manager Agent</div>
+            <div id="nav-manager"></div>
 
-            <div class="sidebar-group-label">Chat</div>
-            <button data-tab="chat" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
-                <i class="fas fa-comments w-5 text-center"></i> Chat
-            </button>
+            <!-- Tier 1: External Agents (grouped, populated by Shell) -->
+            <div id="nav-external"></div>
 
-            <div class="sidebar-group-label">Agent</div>
-            <button data-tab="agents" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
-                <i class="fas fa-user-tie w-5 text-center"></i> Agents
-            </button>
-
-            <div class="sidebar-group-label">Agent Tools</div>
+            <!-- Tier 2 registry: System Library -->
+            <div class="sidebar-group-label">System Library</div>
             <button data-tab="mcps" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
                 <i class="fas fa-plug w-5 text-center"></i> MCPs
             </button>
@@ -125,6 +120,14 @@
             </button>
             <button data-tab="skills" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
                 <i class="fas fa-bolt w-5 text-center"></i> Skills
+            </button>
+
+            <div class="sidebar-group-label">Workspace</div>
+            <button data-tab="dashboard" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
+                <i class="fas fa-th-large w-5 text-center"></i> Dashboard
+            </button>
+            <button data-tab="chat" class="sidebar-item w-full flex items-center gap-3 px-6 py-3 transition-all font-bold text-sm">
+                <i class="fas fa-comments w-5 text-center"></i> Chat
             </button>
 
             <div class="sidebar-group-label">AI Team</div>
@@ -239,25 +242,26 @@
             }
         }
     </script>
-    <script src="js/config.js?v=5"></script>
-    <script src="js/httpClient.js?v=5"></script>
-    <script src="js/ui-core.js?v=5"></script>
-    <script src="js/ui-dashboard.js?v=5"></script>
-    <script src="js/ui-users.js?v=5"></script>
-    <script src="js/ui-sessions.js?v=5"></script>
-    <script src="js/ui-chat.js?v=5"></script>
-    <script src="js/ui-mcp.js?v=5"></script>
-    <script src="js/ui-gateways.js?v=5"></script>
-    <script src="js/ui-platforms.js?v=5"></script>
-    <script src="js/ui-agents.js?v=5"></script>
-    <script src="js/ui-logs.js?v=5"></script>
-    <script src="js/ui-cronjobs.js?v=5"></script>
-    <script src="js/projects.js?v=5"></script>
-    <script src="js/regular-work.js?v=5"></script>
-    <script src="js/apisView.js?v=5"></script>
-    <script src="js/skills.js?v=5"></script>
-    <script src="js/diary.js?v=5"></script>
-    <script src="js/cores.js?v=5"></script>
-    <script src="js/app.js?v=5"></script>
+    <script src="js/config.js?v=6"></script>
+    <script src="js/httpClient.js?v=6"></script>
+    <script src="js/ui-core.js?v=6"></script>
+    <script src="js/ui-dashboard.js?v=6"></script>
+    <script src="js/ui-users.js?v=6"></script>
+    <script src="js/ui-sessions.js?v=6"></script>
+    <script src="js/ui-chat.js?v=6"></script>
+    <script src="js/ui-mcp.js?v=6"></script>
+    <script src="js/ui-gateways.js?v=6"></script>
+    <script src="js/ui-platforms.js?v=6"></script>
+    <script src="js/ui-agents.js?v=6"></script>
+    <script src="js/ui-logs.js?v=6"></script>
+    <script src="js/ui-cronjobs.js?v=6"></script>
+    <script src="js/projects.js?v=6"></script>
+    <script src="js/regular-work.js?v=6"></script>
+    <script src="js/apisView.js?v=6"></script>
+    <script src="js/skills.js?v=6"></script>
+    <script src="js/diary.js?v=6"></script>
+    <script src="js/cores.js?v=6"></script>
+    <script src="js/shell.js?v=6"></script>
+    <script src="js/app.js?v=6"></script>
 </body>
 </html>

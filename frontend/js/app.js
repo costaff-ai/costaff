@@ -90,8 +90,8 @@ const App = {
         if (sidebar) sidebar.classList.remove('hidden');
         if (main) main.classList.remove('hidden');
 
-        // Core switcher (multi-CoStaff) + initial tab load
-        if (typeof Cores !== 'undefined') Cores.init();
+        // Shell: system switcher + Manager/External agent nav (sets activeCorePrefix)
+        if (typeof Shell !== 'undefined') await Shell.init();
         await this.switchMainTab('dashboard');
 
         // Polling sync — skip sessions tab (user-driven, not auto-refreshed)
@@ -116,7 +116,7 @@ const App = {
         // Load content if first time
         if (!this.state.loadedViews.has(tabId)) {
             try {
-                const html = await fetch(`views/${tabId}.html`).then(r => {
+                const html = await fetch(`views/${tabId}.html?v=6`).then(r => {
                     if (!r.ok) throw new Error(`View ${tabId} not found`);
                     return r.text();
                 });

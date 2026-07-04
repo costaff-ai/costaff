@@ -106,6 +106,7 @@ Object.assign(UI, {
             urlNotice.classList.remove('hidden');
         }
 
+        this.loadAgentComponents(agent.name.replace(/-/g, '_'), 'ext-agent-skills-list', 'ext-agent-apis-list');
         this.loadExternalAgents();
     },
 
@@ -203,6 +204,56 @@ Object.assign(UI, {
         this.loadAgentLogs();
         this.updateAgentStatus(name, svcs);
         this.loadAgentMCPConfig(name);
+        this.loadAgentComponents(this._agentConfigId(name), 'agent-skills-list', 'agent-apis-list');
+    },
+
+    // Filter a skill/api list down to what an agent sees: agent_ids is either
+    // '__all__' (global) or a comma-separated set of agent keys (costaff_agent,
+    // business_analysis, ...). Both are surfaced in the agent's component panel.
+    _filterByAgent(items, key) {
+        return (items || []).filter(it => {
+            const ids = (it.agent_ids || '__all__').split(',').map(s => s.trim());
+            return ids.includes('__all__') || ids.includes(key);
+        });
+    },
+
+    async loadAgentComponents(agentKey, skillsElId, apisElId) {
+        const [skills, apis] = await Promise.all([
+            API.fetch('/api/skills').catch(() => []),
+            API.fetch('/api/apis').catch(() => []),
+        ]);
+        this._renderComponentList(skillsElId, this._filterByAgent(skills, agentKey), 'skill');
+        this._renderComponentList(apisElId, this._filterByAgent(apis, agentKey), 'api');
+    },
+
+    _renderComponentList(elId, items, kind) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (!items.length) {
+            el.innerHTML = `<p class="text-[11px] text-slate-400">None scoped to this agent.</p>`;
+            return;
+        }
+        el.innerHTML = items.map(it => {
+            const ids = (it.agent_ids || '__all__').split(',').map(s => s.trim());
+            const isGlobal = ids.includes('__all__');
+            const scopeBadge = isGlobal
+                ? '<span class="text-[8px] font-black uppercase tracking-wider text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded shrink-0">Global</span>'
+                : '<span class="text-[8px] font-black uppercase tracking-wider text-green-600 bg-green-50 px-1.5 py-0.5 rounded shrink-0">Agent</span>';
+            const offBadge = it.is_active === false
+                ? '<span class="text-[8px] font-black uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">Off</span>' : '';
+            const meta = kind === 'api'
+                ? `${escapeHtml((it.method || 'GET').toUpperCase())} · ${escapeHtml(it.url || '')}`
+                : escapeHtml(it.description || 'No description');
+            const icon = kind === 'api' ? 'fa-code' : 'fa-bolt';
+            return `<div class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white">
+                <div class="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 text-slate-500 flex items-center justify-center shrink-0"><i class="fas ${icon} text-xs"></i></div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-bold text-slate-700 truncate">${escapeHtml(it.name)}</div>
+                    <div class="text-[10px] text-slate-400 font-mono truncate">${meta}</div>
+                </div>
+                ${offBadge}${scopeBadge}
+            </div>`;
+        }).join('');
     },
 
     // Map Docker container name (may include project prefix) to config agent_id

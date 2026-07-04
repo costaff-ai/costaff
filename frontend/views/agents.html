@@ -54,6 +54,22 @@
                         <div id="agent-mcp-checkboxes" class="grid grid-cols-2 gap-3"></div>
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Skills</span>
+                            <button onclick="App.switchMainTab('skills')" class="text-blue-600 text-[10px] font-bold hover:text-blue-700 uppercase">Library</button>
+                        </div>
+                        <div class="p-6"><div id="agent-skills-list" class="space-y-2"></div></div>
+                    </div>
+                    <div class="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">APIs</span>
+                            <button onclick="App.switchMainTab('apis')" class="text-blue-600 text-[10px] font-bold hover:text-blue-700 uppercase">Library</button>
+                        </div>
+                        <div class="p-6"><div id="agent-apis-list" class="space-y-2"></div></div>
+                    </div>
+                </div>
                 <div class="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                         <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Runtime Telemetry</span>
@@ -110,6 +126,24 @@
                     <div class="p-6">
                         <p class="text-[11px] text-slate-400 mb-4">Select which MCP extensions this agent can connect to.</p>
                         <div id="ext-agent-mcp-checkboxes" class="grid grid-cols-2 gap-3"></div>
+                    </div>
+                </div>
+
+                <!-- Skills + APIs scoped to this agent -->
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Skills</span>
+                            <button onclick="App.switchMainTab('skills')" class="text-blue-600 text-[10px] font-bold hover:text-blue-700 uppercase">Library</button>
+                        </div>
+                        <div class="p-6"><div id="ext-agent-skills-list" class="space-y-2"></div></div>
+                    </div>
+                    <div class="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">APIs</span>
+                            <button onclick="App.switchMainTab('apis')" class="text-blue-600 text-[10px] font-bold hover:text-blue-700 uppercase">Library</button>
+                        </div>
+                        <div class="p-6"><div id="ext-agent-apis-list" class="space-y-2"></div></div>
                     </div>
                 </div>
 
