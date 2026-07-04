@@ -12,7 +12,10 @@
 }
 
 /* ---------- sidebar ---------- */
-#sidebar.ck{ background:var(--ck-side); border-right:1px solid var(--ck-border); color:var(--ck-text); }
+/* main.css has `#sidebar{ background:var(--surface-low) !important }` which in
+   light-mode is #f8f9fa (light) — it would override our dark bg and leave light
+   text on a light surface. Same specificity + !important → cockpit wins. */
+#sidebar.ck{ background:var(--ck-side) !important; border-right:1px solid var(--ck-border) !important; color:var(--ck-text); }
 #sidebar.ck .ck-brand{ display:flex; align-items:center; gap:10px; color:var(--ck-accent); }
 #sidebar.ck .ck-brand span{ color:var(--ck-text); font-weight:700; font-size:18px; letter-spacing:-.01em; }
 
