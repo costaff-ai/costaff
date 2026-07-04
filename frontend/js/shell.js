@@ -106,8 +106,15 @@ const Shell = {
 
     _leaves(key, isSel, curTab, kind, ident) {
         const c = this._counts(key);
-        const row = (id, label, icon) => `<button class="ck-leaf ${isSel && curTab === id ? 'sel' : ''}" onclick="Shell.pick('${kind}','${ident}','${id}')"><span class="ck-li"><i class="fas ${icon}"></i></span>${label}<span class="ck-cnt">${c[id]}</span></button>`;
+        // manager leaves re-select the manager; external leaves re-select the
+        // external agent by key (so the component view gets the ext object).
+        const call = kind === 'manager' ? `Shell.pick('manager','${ident}',` : `Shell.pickExtByKey('${ident}',`;
+        const row = (id, label, icon) => `<button class="ck-leaf ${isSel && curTab === id ? 'sel' : ''}" onclick="${call}'${id}')"><span class="ck-li"><i class="fas ${icon}"></i></span>${label}<span class="ck-cnt">${c[id]}</span></button>`;
         return `<div class="ck-kids">${row('mcps', 'MCPs', 'fa-cube')}${row('apis', 'APIs', 'fa-code')}${row('skills', 'Skills', 'fa-bolt')}</div>`;
+    },
+    async pickExtByKey(key, tab) {
+        const agent = this.data.exts.find(a => this._extKey(a.name) === key);
+        if (agent) return this.pickExt(agent, tab);
     },
 
     renderTree() {
