@@ -8,7 +8,26 @@
   --ck-border:#232c39; --ck-border-strong:#303b4b;
   --ck-text:#e9edf5; --ck-muted:#9aa5b7; --ck-faint:#616d80;
   --ck-good:#42cc84; --ck-teal:#3fc3b7; --ck-warn:#e0aa4c; --ck-violet:#a48ff0;
+  --ck-on-accent:#0c1017;   /* text/icon glyph that sits ON the accent fill */
+  --ck-console:#05070b;     /* ck-logs terminal background */
   --ck-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+
+/* Light theme: the cockpit shell (sidebar #sidebar.ck + agent view
+   #view-agents.ck) used to be dark-only. It now follows the global
+   light/dark toggle by re-pointing every --ck-* token at a slate/blue
+   light palette. Everything downstream references var(--ck-*), so no
+   per-rule light overrides are needed. Dark mode is unchanged (tokens
+   above are its source of truth). */
+body.light-mode{
+  --ck-accent:#2563eb; --ck-accent-2:#3b82f6;
+  --ck-accent-soft:#e8f0fe; --ck-accent-border:#93b4f7;
+  --ck-side:#f8fafc; --ck-main:#f1f5f9; --ck-surface:#ffffff; --ck-surface-2:#eef2f7;
+  --ck-border:#e2e8f0; --ck-border-strong:#cbd5e1;
+  --ck-text:#0f172a; --ck-muted:#475569; --ck-faint:#94a3b8;
+  --ck-good:#16a34a; --ck-teal:#0f766e; --ck-warn:#b45309; --ck-violet:#7c3aed;
+  --ck-on-accent:#ffffff;
+  --ck-console:#f1f5f9;
 }
 
 /* ---------- sidebar ---------- */
@@ -23,7 +42,7 @@
 #sidebar.ck .ck-sw-btn{ width:100%; display:flex; align-items:center; gap:11px; background:var(--ck-surface); border:1px solid var(--ck-border); border-radius:12px; padding:9px 11px; cursor:pointer; text-align:left; transition:.14s; }
 #sidebar.ck .ck-sw-btn:hover{ border-color:var(--ck-accent-border); }
 #sidebar.ck .ck-sw-btn:disabled{ cursor:default; }
-#sidebar.ck .ck-sw-logo{ width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:#0c1017; display:grid; place-items:center; flex:none; }
+#sidebar.ck .ck-sw-logo{ width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:var(--ck-on-accent); display:grid; place-items:center; flex:none; }
 #sidebar.ck .ck-sw-txt{ flex:1; min-width:0; }
 #sidebar.ck .ck-sw-k{ display:block; font-family:var(--ck-mono); font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--ck-faint); font-weight:700; }
 #sidebar.ck .ck-sw-v{ display:block; font-size:14px; font-weight:700; color:var(--ck-text); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -51,7 +70,7 @@
 #sidebar.ck .ck-chev{ width:14px; height:14px; display:grid; place-items:center; flex:none; color:var(--ck-faint); transition:transform .18s; background:none; border:0; cursor:pointer; padding:0; }
 #sidebar.ck .ck-agent.open .ck-chev{ transform:rotate(90deg); }
 #sidebar.ck .ck-ai{ width:24px; height:24px; border-radius:7px; display:grid; place-items:center; flex:none; background:var(--ck-surface); border:1px solid var(--ck-border); color:var(--ck-muted); }
-#sidebar.ck .ck-agent.mgr .ck-ai{ background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:#0c1017; border:0; }
+#sidebar.ck .ck-agent.mgr .ck-ai{ background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:var(--ck-on-accent); border:0; }
 #sidebar.ck .ck-agent.sel .ck-ai{ border-color:var(--ck-accent-border); color:var(--ck-accent); }
 #sidebar.ck .ck-nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #sidebar.ck .ck-hub{ font-family:var(--ck-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:var(--ck-accent); font-weight:700; border:1px solid var(--ck-accent-border); padding:2px 6px; border-radius:5px; flex:none; }
@@ -95,7 +114,7 @@
 #view-agents.ck .ck-crumbs .sepi{ opacity:.45; }
 
 #view-agents.ck .ck-ahead{ display:flex; align-items:flex-start; gap:15px; padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--ck-border); }
-#view-agents.ck .ck-big{ width:48px; height:48px; border-radius:12px; display:grid; place-items:center; flex:none; background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:#0c1017; }
+#view-agents.ck .ck-big{ width:48px; height:48px; border-radius:12px; display:grid; place-items:center; flex:none; background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:var(--ck-on-accent); }
 #view-agents.ck .ck-ahead.lib .ck-big{ background:var(--ck-accent-soft); color:var(--ck-accent); }
 #view-agents.ck .ck-who{ flex:1; min-width:0; }
 #view-agents.ck .ck-who h2{ margin:0; font-size:19px; font-weight:700; letter-spacing:-.01em; color:var(--ck-text); }
@@ -115,7 +134,7 @@
 
 #view-agents.ck .ck-btn{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:6px 13px; border-radius:9px; cursor:pointer; border:1px solid var(--ck-border); background:var(--ck-surface); color:var(--ck-muted); transition:.14s; }
 #view-agents.ck .ck-btn:hover{ border-color:var(--ck-accent-border); color:var(--ck-text); }
-#view-agents.ck .ck-btn.primary{ background:var(--ck-accent); color:#0c1017; border-color:var(--ck-accent); }
+#view-agents.ck .ck-btn.primary{ background:var(--ck-accent); color:var(--ck-on-accent); border-color:var(--ck-accent); }
 #view-agents.ck .ck-btn.danger{ color:#f2685f; border-color:color-mix(in srgb,#f2685f 40%,transparent); }
 
 #view-agents.ck .ck-tabs{ display:flex; gap:2px; margin:0 0 18px; border-bottom:1px solid var(--ck-border); }
@@ -138,16 +157,16 @@
 #view-agents.ck .ck-cinfo .m{ font-size:11px; color:var(--ck-muted); margin-top:3px; font-family:var(--ck-mono); }
 #view-agents.ck .ck-cbadges{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:none; }
 #view-agents.ck .ck-check{ width:18px; height:18px; border-radius:5px; border:1.5px solid var(--ck-border-strong); flex:none; display:grid; place-items:center; color:transparent; }
-#view-agents.ck .ck-card.on .ck-check{ background:var(--ck-accent); border-color:var(--ck-accent); color:#0c1017; }
+#view-agents.ck .ck-card.on .ck-check{ background:var(--ck-accent); border-color:var(--ck-accent); color:var(--ck-on-accent); }
 
 #view-agents.ck .ck-empty{ border:1px dashed var(--ck-border-strong); border-radius:13px; padding:34px 20px; text-align:center; color:var(--ck-faint); background:var(--ck-surface-2); }
 #view-agents.ck .ck-empty p{ margin:8px 0 0; font-size:13px; } #view-agents.ck .ck-empty .s{ font-size:11px; margin-top:5px; font-family:var(--ck-mono); }
 #view-agents.ck .ck-banner{ display:flex; align-items:center; gap:10px; font-size:12px; color:var(--ck-muted); background:var(--ck-surface-2); border:1px solid var(--ck-border); border-radius:11px; padding:10px 14px; margin-bottom:16px; }
 #view-agents.ck .ck-banner b{ color:var(--ck-text); }
 #view-agents.ck .ck-applybar{ display:flex; justify-content:flex-end; margin-top:14px; }
-#view-agents.ck .ck-logs{ background:#05070b; border:1px solid var(--ck-border); border-radius:12px; padding:16px; font-family:var(--ck-mono); font-size:12px; color:var(--ck-teal); white-space:pre-wrap; line-height:1.6; max-height:460px; overflow:auto; }
+#view-agents.ck .ck-logs{ background:var(--ck-console); border:1px solid var(--ck-border); border-radius:12px; padding:16px; font-family:var(--ck-mono); font-size:12px; color:var(--ck-teal); white-space:pre-wrap; line-height:1.6; max-height:460px; overflow:auto; }
 
-/* the agents view content area gets the dark main bg */
+/* the agents view content area tracks the cockpit main bg (dark or light) */
 body.light-mode #content-area.ck-dark{ background:var(--ck-main); }
 
 /* dark rounded panel that hosts the agent component view (sits on light content area) */
