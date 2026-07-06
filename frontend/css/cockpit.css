@@ -35,6 +35,11 @@ body.light-mode{
    light-mode is #f8f9fa (light) — it would override our dark bg and leave light
    text on a light surface. Same specificity + !important → cockpit wins. */
 #sidebar.ck{ background:var(--ck-side) !important; border-right:1px solid var(--ck-border) !important; color:var(--ck-text); }
+/* the nav scroller is overflow-y:auto, which per spec forces overflow-x to
+   compute to `auto` too — so a stray sub-pixel / scrollbar-gutter width showed
+   a horizontal scrollbar. Pin it hidden (nothing overflows horizontally; row
+   text already truncates). */
+#sidebar.ck #main-nav{ overflow-x:hidden; }
 #sidebar.ck .ck-brand{ display:flex; align-items:center; gap:10px; color:var(--ck-accent); }
 #sidebar.ck .ck-brand span{ color:var(--ck-text); font-weight:700; font-size:15px; letter-spacing:-.01em; }
 
