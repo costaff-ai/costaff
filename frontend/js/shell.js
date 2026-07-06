@@ -102,10 +102,10 @@ const Shell = {
         });
     },
     // The tab set differs by agent kind. Manager: its own registry (MCPs it
-    // wires + global/agent-scoped APIs & Skills). External (Option-C) agents
-    // don't live in those registries — their real capability list is the A2A
-    // card's skills — so they get a Skills(card) tab, an MCPs tab only when
-    // mcp_configurable, and Logs.
+    // wires + global/agent-scoped APIs & Skills), MCPs editable. Every external
+    // (Option-C) agent gets the SAME two read-only pages — Skills (from its live
+    // A2A card) + MCPs (shared MCP wiring, view-only) — plus Logs. External
+    // agents are never editable here (no toggle / Apply & Restart).
     _tabsFor(isExt, ext) {
         if (!isExt) return [
             { id: 'mcps', label: 'MCPs', icon: 'fa-cube' },
@@ -113,10 +113,11 @@ const Shell = {
             { id: 'skills', label: 'Skills', icon: 'fa-bolt' },
             { id: 'logs', label: 'Logs', icon: 'fa-terminal' },
         ];
-        const t = [{ id: 'skills', label: 'Skills', icon: 'fa-bolt' }];
-        if (ext && ext.mcp_configurable) t.push({ id: 'mcps', label: 'MCPs', icon: 'fa-cube' });
-        t.push({ id: 'logs', label: 'Logs', icon: 'fa-terminal' });
-        return t;
+        return [
+            { id: 'skills', label: 'Skills', icon: 'fa-bolt' },
+            { id: 'mcps', label: 'MCPs', icon: 'fa-cube' },
+            { id: 'logs', label: 'Logs', icon: 'fa-terminal' },
+        ];
     },
     // count shown on a tab / tree leaf. External 'skills' = live A2A card count.
     _tabCount(id, key, isExt) {
@@ -281,19 +282,28 @@ const Shell = {
 
     _renderMcpTab(key, isExt, ext) {
         const body = document.getElementById('ck-body'); if (!body) return;
-        // url-type external agents self-manage MCP
-        if (isExt && ext.type === 'url') {
-            body.innerHTML = `<div class="ck-empty"><i class="fas fa-ban text-2xl"></i><p>Remote URL agent self-manages MCP</p><p class="s">CoStaff only handles routing & health</p></div>`;
-            return;
-        }
-        if (isExt && !ext.mcp_configurable) {
-            body.innerHTML = `<div class="ck-empty"><i class="fas fa-cube text-2xl"></i><p>This agent does not expose configurable MCP</p></div>`;
-            return;
-        }
-        const available = this.data.mcp.available_mcps || [];
         const assigned = (this.data.mcp.agent_mcps && this.data.mcp.agent_mcps[key]) || [];
+
+        // External agents: MCP wiring is READ-ONLY in the UI. Their tools live in
+        // their own container (see the Skills tab / A2A card); shared core-MCP
+        // wiring is managed via CLI (agent_mcp_filters + rebuild), not edited here.
+        if (isExt) {
+            if (!assigned.length) {
+                const why = ext && ext.type === 'url'
+                    ? 'Remote URL agent self-manages its MCP'
+                    : 'This agent runs its own tools; shared core-MCP wiring is set via CLI';
+                body.innerHTML = `<div class="ck-empty"><i class="fas fa-cube text-2xl"></i><p>No shared MCP servers wired to this agent</p><p class="s">${why}</p></div>`;
+                return;
+            }
+            const roCards = assigned.map(m => `<div class="ck-card"><div class="ck-ci"><i class="fas fa-cube text-xs"></i></div><div class="ck-cinfo"><div class="t"><code>${escapeHtml(m)}</code></div></div><div class="ck-cbadges"><span class="ck-chip g"><span class="d"></span>wired</span></div></div>`).join('');
+            body.innerHTML = `<div class="ck-banner"><i class="fas fa-lock"></i>Read-only · shared MCP servers wired to this agent (managed via CLI)</div><div class="ck-list">${roCards}</div>`;
+            return;
+        }
+
+        // Manager: editable core-MCP assignment.
+        const available = this.data.mcp.available_mcps || [];
         if (!available.length) { body.innerHTML = `<div class="ck-empty"><i class="fas fa-cube text-2xl"></i><p>No MCP available in this System</p></div>`; return; }
-        const coreName = isExt ? null : 'costaff';
+        const coreName = 'costaff';
         const cards = available.map(m => {
             const on = assigned.includes(m);
             const isCore = m === coreName;
