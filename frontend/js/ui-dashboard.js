@@ -102,12 +102,56 @@ Object.assign(UI, {
             </div>`).join('');
     },
 
+    // Known CoStaff System (core) prefixes — used to exclude unrelated host
+    // containers (ai-rap-*, gpt-vis, host postgres) from the metrics.
+    _corePrefixes() {
+        const cores = (typeof Shell !== 'undefined' && Shell.data && Shell.data.cores) || [];
+        const ps = cores.map(c => c.prefix).filter(Boolean);
+        return ps.length ? ps : ['costaff'];
+    },
+    // Populate the Runtime Monitor's System filter (All Systems + each core).
+    // Defaults to the ACTIVE system so the monitor is scoped to what you're on.
+    _ensureSysFilter() {
+        const sel = document.getElementById('dash-sys-filter');
+        if (!sel) return;
+        const cores = (typeof Shell !== 'undefined' && Shell.data && Shell.data.cores) || [];
+        if (this._dashSysFilter === undefined) {
+            const active = cores.find(c => c.active);
+            this._dashSysFilter = active ? active.prefix : ((typeof App !== 'undefined' && App.state.activeCorePrefix) || '__all__');
+        }
+        const opts = [{ v: '__all__', label: 'All Systems' }].concat(cores.map(c => ({ v: c.prefix, label: c.label || c.prefix })));
+        const want = opts.map(o => o.v).join(',');
+        if (sel.dataset.built !== want) {
+            sel.innerHTML = opts.map(o => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.label)}</option>`).join('');
+            sel.dataset.built = want;
+        }
+        sel.value = this._dashSysFilter;
+    },
+    setDashSystemFilter(val) {
+        this._dashSysFilter = val;
+        this.renderDashboard();  // re-render from cached svcs
+    },
+
     renderDashboard(svcs) {
+        if (svcs) this._dashSvcs = svcs;
+        svcs = this._dashSvcs || [];
         const lastUpdateEl = document.getElementById('dashboard-last-update');
         if (lastUpdateEl) lastUpdateEl.innerText = `SYNC: ${new Date().toLocaleTimeString()}`;
 
+        this._ensureSysFilter();
+        const filter = this._dashSysFilter;
+        const prefixes = this._corePrefixes();
+        // A container belongs to the selected System (specific prefix), or to
+        // ANY known CoStaff System when 'All Systems' is chosen.
+        const managed = (name) => {
+            const n = (name || '').toLowerCase();
+            if (filter && filter !== '__all__') return n.startsWith(filter.toLowerCase() + '-');
+            return prefixes.some(p => n.startsWith(p.toLowerCase() + '-'));
+        };
+        const rows = [...svcs].filter(s => managed(s.name)).sort((a, b) => a.name.localeCompare(b.name));
+
         const table = document.getElementById('status-table');
-        if (table) table.innerHTML = [...svcs].filter(s => s.name.toLowerCase().startsWith('costaff-')).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+        if (table) table.innerHTML = rows.map(s => {
             const isActive = s.status.includes('Up');
             return `
             <tr class="group hover:bg-slate-50 transition-all">
@@ -123,31 +167,28 @@ Object.assign(UI, {
                     <button onclick="UI.serviceAction('${escapeHtml(s.name)}', 'restart')" class="text-[9px] font-black text-blue-600 hover:text-white transition-all uppercase tracking-widest px-4 py-2 border border-blue-200 rounded-lg hover:bg-blue-600">RESTART</button>
                 </td>
             </tr>`;
-        }).join('');
+        }).join('') || `<tr><td colspan="4" class="text-center py-10 text-slate-300 text-sm font-bold">No services for this System</td></tr>`;
 
-        // Restrict every metric to CoStaff-managed containers. The
-        // backend `/api/status` is permissive (returns anything matching
-        // costaff/mcp/bot/postgres/gpt-vis), so unrelated containers from
-        // other projects (ai-rap-*, gpt-vis, the host postgres) would
-        // otherwise inflate the counts here.
-        const costaff = svcs.filter(s => s.name.toLowerCase().startsWith('costaff-'));
+        // Metrics scoped to the same filtered set. Channel/MCP detection is
+        // core-agnostic (matches <prefix>-channel- / <prefix>-mcp-).
+        const scoped = rows;
         const statsGrid = document.getElementById('stats-grid');
         if (statsGrid) statsGrid.innerHTML = `
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">TOTAL SERVICES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${scoped.length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">HEALTHY NODES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.status.includes('Up')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${scoped.filter(s=>s.status.includes('Up')).length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">GATEWAYS</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.name.startsWith('costaff-channel-')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${scoped.filter(s=>s.name.includes('-channel-')).length}</div>
             </div>
             <div class="card-linear bg-white border border-slate-100 shadow-xl rounded-3xl p-8 hover:bg-slate-50 transition-all duration-300 cursor-default group">
                 <div class="label-mono text-[9px] mb-4 text-slate-400 tracking-[0.2em] uppercase">MCP CORES</div>
-                <div class="text-5xl font-headline font-bold text-slate-900">${costaff.filter(s=>s.name.startsWith('costaff-mcp-')).length}</div>
+                <div class="text-5xl font-headline font-bold text-slate-900">${scoped.filter(s=>s.name.includes('-mcp-')).length}</div>
             </div>`;
     },
 

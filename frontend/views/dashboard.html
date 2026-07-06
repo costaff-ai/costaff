@@ -7,7 +7,7 @@
         </div>
         <div id="dashboard-last-update" class="text-[10px] font-mono text-slate-400 uppercase">SYNC_PENDING</div>
     </div>
-    
+
     <div id="os-stats-grid" class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Bento Cards by JS -->
     </div>
@@ -76,9 +76,13 @@
 <!-- Section: Process Matrix -->
 <div class="p-4 md:p-6">
     <div class="card-linear overflow-hidden bg-white border border-slate-100 rounded-[2rem] shadow-xl p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h3 class="text-lg font-headline font-bold text-slate-900 uppercase tracking-widest">Runtime Monitor</h3>
-            <span class="status-badge badge-live"><span class="badge-dot"></span>Live Data Stream</span>
+            <div class="flex items-center gap-3">
+                <select id="dash-sys-filter" onchange="UI.setDashSystemFilter(this.value)"
+                    class="text-[11px] font-bold uppercase tracking-wider border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400 cursor-pointer"></select>
+                <span class="status-badge badge-live"><span class="badge-dot"></span>Live Data Stream</span>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left">
