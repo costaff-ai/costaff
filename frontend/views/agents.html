@@ -37,3 +37,20 @@
         </div>
     </div>
 </div>
+
+<!-- Inline API / Skill registry editor (cockpit-themed; Shell-driven) -->
+<div id="ck-reg-modal" class="hidden fixed inset-0 flex items-center justify-center z-50" style="background:rgba(0,0,0,.55)">
+    <div class="ck-reg-card">
+        <div class="ck-reg-head">
+            <h3 id="ck-reg-title">New</h3>
+            <button class="ck-reg-x" onclick="Shell._closeReg()"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="ck-reg-body" class="ck-reg-body"></div>
+        <div class="ck-reg-foot">
+            <button id="ck-reg-delete" class="ck-btn danger" style="display:none" onclick="Shell._deleteReg()">Delete</button>
+            <span style="flex:1"></span>
+            <button class="ck-btn" onclick="Shell._closeReg()">Cancel</button>
+            <button class="ck-btn primary" onclick="Shell._saveReg()">Save</button>
+        </div>
+    </div>
+</div>

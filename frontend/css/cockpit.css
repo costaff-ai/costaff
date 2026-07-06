@@ -173,3 +173,29 @@ body.light-mode #content-area.ck-dark{ background:var(--ck-main); }
 #view-agents.ck .ck-panel{ background:var(--ck-main); border:1px solid var(--ck-border); border-radius:20px; padding:26px 30px; height:100%; overflow-y:auto; }
 #view-agents.ck .ck-ph{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--ck-faint); gap:14px; }
 #view-agents.ck .ck-ph i{ font-size:42px; opacity:.4; }
+
+/* pen affordance on editable registry cards (Manager APIs/Skills) */
+#view-agents.ck .ck-edit-hint{ color:var(--ck-faint); font-size:11px; opacity:0; transition:.14s; align-self:center; }
+#view-agents.ck .ck-card.click:hover .ck-edit-hint{ opacity:.8; }
+
+/* ---------- inline API/Skill registry editor modal (cockpit-themed) ---------- */
+.ck-reg-card{ background:var(--ck-main); border:1px solid var(--ck-border); border-radius:18px; width:100%; max-width:520px; margin:0 16px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 24px 70px rgba(0,0,0,.5); color:var(--ck-text); }
+.ck-reg-head{ display:flex; align-items:center; justify-content:space-between; padding:17px 22px; border-bottom:1px solid var(--ck-border); }
+.ck-reg-head h3{ font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--ck-text); }
+.ck-reg-x{ background:none; border:0; color:var(--ck-faint); cursor:pointer; font-size:15px; line-height:1; }
+.ck-reg-x:hover{ color:var(--ck-text); }
+.ck-reg-body{ padding:20px 22px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.ck-reg-row{ display:flex; gap:12px; }
+.ck-reg-fld{ display:flex; flex-direction:column; gap:5px; }
+.ck-reg-fld label{ font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ck-faint); }
+.ck-reg-fld input, .ck-reg-fld select, .ck-reg-fld textarea{ background:var(--ck-surface); border:1px solid var(--ck-border); border-radius:9px; padding:8px 11px; font-size:13px; color:var(--ck-text); outline:none; font-family:inherit; width:100%; }
+.ck-reg-fld textarea{ font-family:var(--ck-mono); font-size:12px; resize:vertical; }
+.ck-reg-fld select[multiple]{ padding:5px; }
+.ck-reg-fld input:focus, .ck-reg-fld select:focus, .ck-reg-fld textarea:focus{ border-color:var(--ck-accent-border); }
+.ck-reg-hint{ font-size:10px; color:var(--ck-faint); }
+.ck-reg-foot{ display:flex; align-items:center; gap:10px; padding:15px 22px; border-top:1px solid var(--ck-border); }
+/* modal lives outside #view-agents so the scoped .ck-btn rules don't reach it */
+.ck-reg-foot .ck-btn{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:7px 15px; border-radius:9px; cursor:pointer; border:1px solid var(--ck-border); background:var(--ck-surface); color:var(--ck-muted); transition:.14s; }
+.ck-reg-foot .ck-btn:hover{ border-color:var(--ck-accent-border); color:var(--ck-text); }
+.ck-reg-foot .ck-btn.primary{ background:var(--ck-accent); color:var(--ck-on-accent); border-color:var(--ck-accent); }
+.ck-reg-foot .ck-btn.danger{ color:#f2685f; border-color:color-mix(in srgb,#f2685f 40%,transparent); }

@@ -332,10 +332,13 @@ const Shell = {
 
     _renderItemTab(kind, key) {
         const body = document.getElementById('ck-body'); if (!body) return;
+        const label = kind === 'apis' ? 'API' : 'Skill';
+        const icon = kind === 'apis' ? 'fa-code' : 'fa-bolt';
         const list = kind === 'apis' ? this.data.apis : this.data.skills;
         const items = this._itemsFor(list, key);
+        const newBtn = `<button class="ck-btn primary" onclick="Shell._openReg('${kind}', null)"><i class="fas fa-plus" style="margin-right:6px"></i>New ${label}</button>`;
         if (!items.length) {
-            body.innerHTML = `<div class="ck-empty"><i class="fas ${kind === 'apis' ? 'fa-code' : 'fa-bolt'} text-2xl"></i><p>None scoped to this agent</p><div class="ck-applybar" style="justify-content:center;margin-top:12px"><button class="ck-btn" onclick="App.switchMainTab('${kind === 'apis' ? 'apis' : 'skills'}')">Manage registry</button></div></div>`;
+            body.innerHTML = `<div class="ck-empty"><i class="fas ${icon} text-2xl"></i><p>None scoped to this agent</p><div class="ck-applybar" style="justify-content:center;margin-top:12px">${newBtn}</div></div>`;
             return;
         }
         const cards = items.map(it => {
@@ -344,11 +347,96 @@ const Shell = {
             const badge = glob ? '<span class="ck-chip v"><span class="d"></span>Global</span>' : '<span class="ck-chip g"><span class="d"></span>Agent</span>';
             const off = it.is_active === false ? '<span class="ck-chip"><span class="d" style="background:var(--ck-faint)"></span>Off</span>' : '';
             const meta = kind === 'apis' ? `${escapeHtml((it.method || 'GET').toUpperCase())} · ${escapeHtml(it.url || '')}` : escapeHtml(it.description || '');
-            return `<div class="ck-card"><div class="ck-ci"><i class="fas ${kind === 'apis' ? 'fa-code' : 'fa-bolt'} text-xs"></i></div>
+            return `<div class="ck-card click" onclick="Shell._openReg('${kind}', Shell._itemAt('${kind}','${escapeHtml(String(it.id))}'))"><div class="ck-ci"><i class="fas ${icon} text-xs"></i></div>
                 <div class="ck-cinfo"><div class="t">${escapeHtml(it.name)}</div>${meta ? `<div class="m">${meta}</div>` : ''}</div>
-                <div class="ck-cbadges">${off}${badge}</div></div>`;
+                <div class="ck-cbadges">${off}${badge}<i class="fas fa-pen ck-edit-hint"></i></div></div>`;
         }).join('');
-        body.innerHTML = `<div class="ck-list">${cards}</div><div class="ck-applybar"><button class="ck-btn" onclick="App.switchMainTab('${kind === 'apis' ? 'apis' : 'skills'}')">Manage registry</button></div>`;
+        body.innerHTML = `<div class="ck-applybar" style="justify-content:flex-end;margin-bottom:14px">${newBtn}</div><div class="ck-list">${cards}</div>`;
+    },
+
+    // ---------- inline API/Skill registry editor (modal) ----------
+    _itemAt(kind, id) {
+        const list = kind === 'apis' ? this.data.apis : this.data.skills;
+        return (list || []).find(x => String(x.id) === String(id)) || null;
+    },
+    _agentScopeOptions(selected) {
+        const sel = selected || ['__all__'];
+        const opts = [{ v: '__all__', label: 'All agents' }, { v: this._mgrKey(), label: 'Manager (Costaff Agent)' }]
+            .concat((this.data.exts || []).map(a => ({ v: this._extKey(a.name), label: a.name })));
+        return opts.map(o => `<option value="${escapeHtml(o.v)}" ${sel.includes(o.v) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+    },
+    _regForm(kind, item) {
+        const agentSel = (item && item.agent_ids) ? item.agent_ids.split(',').map(s => s.trim()) : ['__all__'];
+        const scope = `<div class="ck-reg-fld"><label>Available to agents</label><select id="reg-agents" multiple size="4">${this._agentScopeOptions(agentSel)}</select><p class="ck-reg-hint">Hold ⌘/Ctrl to multi-select · "All agents" applies to every agent</p></div>`;
+        if (kind === 'apis') {
+            const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option ${item && item.method === m ? 'selected' : ''}>${m}</option>`).join('');
+            return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. Weather API"></div>
+                <div class="ck-reg-row"><div class="ck-reg-fld" style="flex:0 0 116px"><label>Method</label><select id="reg-method">${methods}</select></div>
+                <div class="ck-reg-fld" style="flex:1;min-width:0"><label>URL *</label><input id="reg-url" type="text" value="${item ? escapeHtml(item.url || '') : ''}" placeholder="https://api.example.com/..."></div></div>
+                <div class="ck-reg-fld"><label>Headers (JSON, optional)</label><textarea id="reg-headers" rows="3" placeholder='{"Authorization": "Bearer ..."}'>${item && item.headers ? escapeHtml(JSON.stringify(item.headers, null, 2)) : ''}</textarea></div>
+                <div class="ck-reg-fld"><label>Description (optional)</label><input id="reg-desc" type="text" value="${item ? escapeHtml(item.description || '') : ''}"></div>
+                ${scope}`;
+        }
+        return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. Summarize"></div>
+            <div class="ck-reg-fld"><label>Description</label><textarea id="reg-desc" rows="2">${item ? escapeHtml(item.description || '') : ''}</textarea></div>
+            <div class="ck-reg-fld"><label>Tags (comma-separated)</label><input id="reg-tags" type="text" value="${item ? escapeHtml(item.tags || '') : ''}" placeholder="research, finance"></div>
+            <div class="ck-reg-fld"><label>Usage / when to use (optional)</label><textarea id="reg-usage" rows="2">${item ? escapeHtml(item.usage || '') : ''}</textarea></div>
+            ${scope}`;
+    },
+    _openReg(kind, item) {
+        this._reg = { kind, id: item ? item.id : null, user_id: item ? (item.user_id || '__global__') : '__global__' };
+        const modal = document.getElementById('ck-reg-modal'); if (!modal) return;
+        document.getElementById('ck-reg-title').textContent = (item ? 'Edit ' : 'New ') + (kind === 'apis' ? 'API' : 'Skill');
+        document.getElementById('ck-reg-body').innerHTML = this._regForm(kind, item);
+        document.getElementById('ck-reg-delete').style.display = item ? '' : 'none';
+        modal.classList.remove('hidden');
+    },
+    _closeReg() { const m = document.getElementById('ck-reg-modal'); if (m) m.classList.add('hidden'); this._reg = null; },
+    async _saveReg() {
+        const r = this._reg; if (!r) return;
+        const agents = Array.from(document.getElementById('reg-agents').selectedOptions).map(o => o.value);
+        const agent_ids = agents.length ? agents.join(',') : '__all__';
+        let payload;
+        if (r.kind === 'apis') {
+            let headers = null;
+            const hraw = document.getElementById('reg-headers').value.trim();
+            if (hraw) { try { headers = JSON.parse(hraw); } catch { alert('Headers must be valid JSON, e.g. {"Authorization": "Bearer ..."}'); return; } }
+            payload = {
+                name: document.getElementById('reg-name').value.trim(),
+                method: document.getElementById('reg-method').value,
+                url: document.getElementById('reg-url').value.trim(),
+                headers,
+                description: document.getElementById('reg-desc').value.trim() || null,
+                user_id: r.user_id || '__global__',
+                agent_ids,
+            };
+            if (!payload.name || !payload.url) { alert('Name and URL are required.'); return; }
+        } else {
+            payload = {
+                name: document.getElementById('reg-name').value.trim(),
+                description: document.getElementById('reg-desc').value.trim() || null,
+                tags: document.getElementById('reg-tags').value.trim() || null,
+                usage: document.getElementById('reg-usage').value.trim() || null,
+                user_id: r.user_id || '__global__',
+                agent_ids,
+            };
+            if (!payload.name) { alert('Name is required.'); return; }
+        }
+        const ep = r.kind === 'apis' ? '/api/apis' : '/api/skills';
+        try {
+            const res = r.id
+                ? await API.fetch(`${ep}/${r.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+                : await API.fetch(ep, { method: 'POST', body: JSON.stringify(payload) });
+            if (res && res.status === 'success') { this._closeReg(); await this.reload(); }
+            else alert('Failed: ' + (res && res.detail ? res.detail : JSON.stringify(res)));
+        } catch (e) { alert('Error: ' + e.message); }
+    },
+    async _deleteReg() {
+        const r = this._reg; if (!r || !r.id) return;
+        if (!confirm('Delete this ' + (r.kind === 'apis' ? 'API' : 'skill') + '? This cannot be undone.')) return;
+        const ep = r.kind === 'apis' ? '/api/apis' : '/api/skills';
+        try { await API.fetch(`${ep}/${r.id}`, { method: 'DELETE' }); this._closeReg(); await this.reload(); }
+        catch (e) { alert('Error: ' + e.message); }
     },
 
     _renderLogsTab(isExt, ext) {
