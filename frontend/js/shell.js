@@ -9,16 +9,14 @@ const Shell = {
         sel: null,          // { type:'agent', key, managerName?, ext?, tab }
         expanded: {},       // agentKey -> bool
     },
-    data: { cores: [], svcs: [], exts: [], mcp: { available_mcps: [], agent_mcps: {} }, skills: [], apis: [], prefix: 'costaff', managerName: null },
+    data: { cores: [], svcs: [], exts: [], mcp: { available_mcps: [], agent_mcps: {} }, skills: [], apis: [], cards: {}, prefix: 'costaff', managerName: null },
 
     async init() {
         const va = document.getElementById('view-agents');
         if (va) va.classList.add('ck');
         await this.loadCores();
         await this.loadData();
-        this.renderCtx();
         this.renderTree();
-        this.renderLibrary();
     },
 
     async loadCores() {
@@ -46,9 +44,25 @@ const Shell = {
         App.state.cachedSvcs = this.data.svcs;
         const mgr = this.data.svcs.find(s => s.name.includes(this.data.prefix + '-agent-costaff'));
         this.data.managerName = mgr ? mgr.name : null;
+        this._loadCards();  // lazy, non-blocking: fetch each external agent's A2A card for its real skills
     },
 
-    async reload() { await this.loadData(); this.renderCtx(); this.renderTree(); this.renderLibrary(); if (this.state.sel) this.renderAgentView(); },
+    async reload() { await this.loadData(); this.renderTree(); if (this.state.sel) this.renderAgentView(); },
+
+    // Fetch external agents' live A2A agent cards (real declared skills). Cached
+    // per key; only fetches healthy agents not already cached. Re-renders when done.
+    async _fetchCard(ext) {
+        const key = this._extKey(ext.name);
+        try { this.data.cards[key] = await API.fetch(`/api/external-agents/${encodeURIComponent(ext.name)}/card`); }
+        catch (e) { this.data.cards[key] = { error: (e && e.message) || 'fetch failed', skills: [] }; }
+    },
+    async _loadCards() {
+        const pending = this.data.exts.filter(a => a.health && this.data.cards[this._extKey(a.name)] === undefined);
+        if (!pending.length) return;
+        await Promise.all(pending.map(a => this._fetchCard(a)));
+        this.renderTree();
+        if (this.state.sel && this.state.sel.type === 'ext') this.renderAgentView();
+    },
 
     // ---------- Tier 0 ----------
     renderSwitcher(active) {
@@ -76,15 +90,6 @@ const Shell = {
     toggleSys(e) { e.stopPropagation(); document.getElementById('ck-sw')?.classList.toggle('open'); },
     async switchCore(name) { try { await API.post('/api/cores/active', { name }); location.reload(); } catch (e) { alert('Switch failed: ' + e.message); } },
 
-    renderCtx() {
-        const el = document.getElementById('ck-ctx'); if (!el) return;
-        const active = this.data.cores.find(c => c.active) || this.data.cores[0] || {};
-        const port = active.manager_port || active.port || '';
-        const db = active.db || (active.prefix ? active.prefix + '_db' : '');
-        const n = 1 + this.data.exts.length;
-        el.innerHTML = `<span class="ck-dot"></span>${escapeHtml(this.data.prefix)}-*<span class="ck-sep">·</span>${port ? ':' + port : ''}${port ? '<span class="ck-sep">·</span>' : ''}${db ? escapeHtml(db) : ''}<span class="ck-sep">·</span>${n} agents`;
-    },
-
     // ---------- Tier 1: tree ----------
     _mgrKey() { return 'costaff_agent'; },
     _extKey(name) { return name.replace(/-/g, '_'); },
@@ -96,21 +101,38 @@ const Shell = {
             return ids.includes('__all__') || ids.includes(key);
         });
     },
-    _counts(key) {
-        return {
-            mcps: this._mcpCount(key),
-            apis: this._itemsFor(this.data.apis, key).length,
-            skills: this._itemsFor(this.data.skills, key).length,
-        };
+    // The tab set differs by agent kind. Manager: its own registry (MCPs it
+    // wires + global/agent-scoped APIs & Skills). External (Option-C) agents
+    // don't live in those registries — their real capability list is the A2A
+    // card's skills — so they get a Skills(card) tab, an MCPs tab only when
+    // mcp_configurable, and Logs.
+    _tabsFor(isExt, ext) {
+        if (!isExt) return [
+            { id: 'mcps', label: 'MCPs', icon: 'fa-cube' },
+            { id: 'apis', label: 'APIs', icon: 'fa-code' },
+            { id: 'skills', label: 'Skills', icon: 'fa-bolt' },
+            { id: 'logs', label: 'Logs', icon: 'fa-terminal' },
+        ];
+        const t = [{ id: 'skills', label: 'Skills', icon: 'fa-bolt' }];
+        if (ext && ext.mcp_configurable) t.push({ id: 'mcps', label: 'MCPs', icon: 'fa-cube' });
+        t.push({ id: 'logs', label: 'Logs', icon: 'fa-terminal' });
+        return t;
+    },
+    // count shown on a tab / tree leaf. External 'skills' = live A2A card count.
+    _tabCount(id, key, isExt) {
+        if (id === 'skills') return isExt ? ((this.data.cards[key] || {}).skills || []).length : this._itemsFor(this.data.skills, key).length;
+        if (id === 'apis') return this._itemsFor(this.data.apis, key).length;
+        if (id === 'mcps') return this._mcpCount(key);
+        return '';
     },
 
-    _leaves(key, isSel, curTab, kind, ident) {
-        const c = this._counts(key);
+    _leaves(key, isSel, curTab, kind, ident, isExt, ext) {
         // manager leaves re-select the manager; external leaves re-select the
         // external agent by key (so the component view gets the ext object).
         const call = kind === 'manager' ? `Shell.pick('manager','${ident}',` : `Shell.pickExtByKey('${ident}',`;
-        const row = (id, label, icon) => `<button class="ck-leaf ${isSel && curTab === id ? 'sel' : ''}" onclick="${call}'${id}')"><span class="ck-li"><i class="fas ${icon}"></i></span>${label}<span class="ck-cnt">${c[id]}</span></button>`;
-        return `<div class="ck-kids">${row('mcps', 'MCPs', 'fa-cube')}${row('apis', 'APIs', 'fa-code')}${row('skills', 'Skills', 'fa-bolt')}</div>`;
+        const leaves = this._tabsFor(isExt, ext).filter(t => t.id !== 'logs');  // logs is a tab, not a tree leaf
+        const row = (t) => `<button class="ck-leaf ${isSel && curTab === t.id ? 'sel' : ''}" onclick="${call}'${t.id}')"><span class="ck-li"><i class="fas ${t.icon}"></i></span>${t.label}<span class="ck-cnt">${this._tabCount(t.id, key, isExt)}</span></button>`;
+        return `<div class="ck-kids">${leaves.map(row).join('')}</div>`;
     },
     async pickExtByKey(key, tab) {
         const agent = this.data.exts.find(a => this._extKey(a.name) === key);
@@ -133,7 +155,7 @@ const Shell = {
                         <span class="ck-nm">Costaff Agent</span>
                         <span class="ck-hub">Hub</span>
                         <span class="ck-stat ${up ? 'up' : 'off'}"></span>
-                    </button>${this._leaves(key, sel, sel ? this.state.sel.tab : '', 'manager', key)}`;
+                    </button>${this._leaves(key, sel, sel ? this.state.sel.tab : '', 'manager', key, false, null)}`;
             } else {
                 mgrWrap.innerHTML = '<div class="px-3 py-2 text-[11px]" style="color:var(--ck-faint)">Manager offline</div>';
             }
@@ -148,25 +170,15 @@ const Shell = {
                 const open = this.state.expanded[key];
                 const dot = a.health ? 'up' : (a.enabled ? 'off' : 'off');
                 const payload = JSON.stringify(a).replace(/"/g, '&quot;');
-                return `<button class="ck-agent ${sel ? 'sel' : ''} ${open ? 'open' : ''}" onclick="Shell.pickExt(${payload}, '${sel ? this.state.sel.tab : 'mcps'}')">
+                return `<button class="ck-agent ${sel ? 'sel' : ''} ${open ? 'open' : ''}" onclick="Shell.pickExt(${payload}, '${sel ? this.state.sel.tab : 'skills'}')">
                         <span class="ck-chev" onclick="Shell.toggle(event,'${key}')"><i class="fas fa-chevron-right text-[10px]"></i></span>
                         <span class="ck-ai"><i class="fas fa-satellite-dish text-[10px]"></i></span>
                         <span class="ck-nm">${escapeHtml(a.name)}</span>
                         <span class="ck-stat ${a.health ? 'up' : (a.enabled ? 'off' : 'off')}"></span>
-                    </button>${this._leaves(key, sel, sel ? this.state.sel.tab : '', 'extkey', key)}`;
+                    </button>${this._leaves(key, sel, sel ? this.state.sel.tab : '', 'extkey', key, true, a)}`;
             }).join('');
             extWrap.innerHTML = `<div class="ck-grp">External Agents · ${exts.length}<button class="ck-add" onclick="UI.openAddExternalAgentModal()" title="Add external agent"><i class="fas fa-plus"></i></button></div>${exts.length ? rows : '<div class="ck-empt"><i class="fas fa-satellite-dish"></i><span>No external agent yet.<br><code>costaff agent add …</code></span></div>'}`;
         }
-    },
-
-    renderLibrary() {
-        const el = document.getElementById('nav-library'); if (!el) return;
-        const rows = [
-            { id: 'mcps', label: 'MCPs', icon: 'fa-cube', n: (this.data.mcp.available_mcps || []).length },
-            { id: 'apis', label: 'APIs', icon: 'fa-code', n: this.data.apis.length },
-            { id: 'skills', label: 'Skills', icon: 'fa-bolt', n: this.data.skills.length },
-        ];
-        el.innerHTML = rows.map(r => `<button class="ck-lib" onclick="App.switchMainTab('${r.id}')"><span class="ck-li"><i class="fas ${r.icon} text-xs"></i></span>${r.label}<span class="ck-cnt">${r.n}</span></button>`).join('');
     },
 
     toggle(e, key) { e.stopPropagation(); this.state.expanded[key] = !this.state.expanded[key]; this.renderTree(); },
@@ -181,7 +193,7 @@ const Shell = {
     },
     async pickExt(agent, tab) {
         const key = this._extKey(agent.name);
-        this.state.sel = { type: 'ext', key, tab: tab || 'mcps', ext: agent };
+        this.state.sel = { type: 'ext', key, tab: tab || 'skills', ext: agent };
         this.state.expanded[key] = true;
         await App.switchMainTab('agents');
         this.renderTree();
@@ -201,7 +213,8 @@ const Shell = {
         const name = isExt ? s.ext.name : 'Costaff Agent';
         const running = isExt ? !!s.ext.health : (this.data.svcs.find(v => v.name === this.data.managerName)?.status.includes('Up'));
         const typeLabel = isExt ? (s.ext.type === 'github' ? 'GitHub' : 'Remote URL') : '內建';
-        const c = this._counts(key);
+        const tabsList = this._tabsFor(isExt, isExt ? s.ext : null);
+        if (!tabsList.find(t => t.id === s.tab)) s.tab = tabsList[0].id;  // keep tab valid across agent kinds
 
         // header actions
         let acts = '';
@@ -220,7 +233,7 @@ const Shell = {
             ${!isExt ? '<span class="ck-chip">Orchestrator</span>' : (s.ext.version ? `<span class="ck-chip mono">v${escapeHtml(s.ext.version)}</span>` : '')}`;
 
         const keyLine = isExt ? `${this.data.prefix}-agent-${key.replace(/_/g, '-')}` : `${this.data.prefix}-agent-costaff`;
-        const tab = (id, label, n, icon) => `<button class="ck-tab ${s.tab === id ? 'sel' : ''}" onclick="Shell.setTab('${id}')"><i class="fas ${icon}"></i>${label}<span class="n">${n}</span></button>`;
+        const tab = (t) => `<button class="ck-tab ${s.tab === t.id ? 'sel' : ''}" onclick="Shell.setTab('${t.id}')"><i class="fas ${t.icon}"></i>${t.label}<span class="n">${this._tabCount(t.id, key, isExt)}</span></button>`;
 
         host.innerHTML = `
             <div class="ck-crumbs"><span class="sys">${escapeHtml(this._sysLabel())}</span><i class="fas fa-chevron-right text-[9px] sepi"></i><b>Agents</b><i class="fas fa-chevron-right text-[9px] sepi"></i><b>${escapeHtml(name)}</b><i class="fas fa-chevron-right text-[9px] sepi"></i><span class="cur">${s.tab.toUpperCase()}</span></div>
@@ -229,12 +242,41 @@ const Shell = {
                 <div class="ck-who"><h2>${escapeHtml(name)}</h2><div class="key">${escapeHtml(keyLine)}</div><div class="row">${badges}</div></div>
                 <div class="ck-acts">${acts}</div>
             </div>
-            <div class="ck-tabs">${tab('mcps', 'MCPs', c.mcps, 'fa-cube')}${tab('apis', 'APIs', c.apis, 'fa-code')}${tab('skills', 'Skills', c.skills, 'fa-bolt')}${tab('logs', 'Logs', '', 'fa-terminal')}</div>
+            <div class="ck-tabs">${tabsList.map(tab).join('')}</div>
             <div id="ck-body"></div>`;
 
         if (s.tab === 'mcps') this._renderMcpTab(key, isExt, s.ext);
         else if (s.tab === 'logs') this._renderLogsTab(isExt, s.ext);
+        else if (s.tab === 'skills' && isExt) this._renderCardSkillsTab(key, s.ext);
         else this._renderItemTab(s.tab, key);
+    },
+
+    // External agent Skills tab — rendered from the live A2A card (its REAL
+    // declared skills), fetched lazily via /api/external-agents/{name}/card.
+    _renderCardSkillsTab(key, ext) {
+        const body = document.getElementById('ck-body'); if (!body) return;
+        const card = this.data.cards[key];
+        if (card === undefined) {  // not fetched yet
+            body.innerHTML = `<div class="ck-empty"><i class="fas fa-bolt text-2xl"></i><p>Loading capabilities…</p></div>`;
+            this._fetchCard(ext).then(() => {
+                if (this.state.sel && this.state.sel.type === 'ext' && this.state.sel.key === key && this.state.sel.tab === 'skills') this._renderCardSkillsTab(key, ext);
+            });
+            return;
+        }
+        if (card.error) {
+            body.innerHTML = `<div class="ck-empty"><i class="fas fa-triangle-exclamation text-2xl"></i><p>Could not read this agent's A2A card</p><p class="s">${escapeHtml(String(card.error))}</p></div>`;
+            return;
+        }
+        const sk = card.skills || [];
+        if (!sk.length) { body.innerHTML = `<div class="ck-empty"><i class="fas fa-bolt text-2xl"></i><p>Agent card declares no skills</p></div>`; return; }
+        const banner = `<div class="ck-banner"><i class="fas fa-satellite-dish"></i>From the agent's live <b>A2A card</b> · ${sk.length} skill${sk.length > 1 ? 's' : ''}</div>`;
+        const cards = sk.map(sm => {
+            const desc = (sm.description || '').split('\n')[0].trim().slice(0, 160);
+            const tags = (sm.tags || []).slice(0, 6).map(t => `<span class="ck-chip mono">${escapeHtml(t)}</span>`).join('');
+            return `<div class="ck-card"><div class="ck-ci"><i class="fas fa-bolt text-xs"></i></div>
+                <div class="ck-cinfo"><div class="t">${escapeHtml(sm.name || sm.id || '(unnamed)')}</div>${desc ? `<div class="m" style="font-family:inherit">${escapeHtml(desc)}</div>` : ''}${tags ? `<div class="row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${tags}</div>` : ''}</div></div>`;
+        }).join('');
+        body.innerHTML = banner + `<div class="ck-list">${cards}</div>`;
     },
 
     _renderMcpTab(key, isExt, ext) {
@@ -283,7 +325,7 @@ const Shell = {
         const list = kind === 'apis' ? this.data.apis : this.data.skills;
         const items = this._itemsFor(list, key);
         if (!items.length) {
-            body.innerHTML = `<div class="ck-empty"><i class="fas ${kind === 'apis' ? 'fa-code' : 'fa-bolt'} text-2xl"></i><p>None scoped to this agent</p><p class="s">Add & assign in System Library</p></div>`;
+            body.innerHTML = `<div class="ck-empty"><i class="fas ${kind === 'apis' ? 'fa-code' : 'fa-bolt'} text-2xl"></i><p>None scoped to this agent</p><div class="ck-applybar" style="justify-content:center;margin-top:12px"><button class="ck-btn" onclick="App.switchMainTab('${kind === 'apis' ? 'apis' : 'skills'}')">Manage registry</button></div></div>`;
             return;
         }
         const cards = items.map(it => {
@@ -296,7 +338,7 @@ const Shell = {
                 <div class="ck-cinfo"><div class="t">${escapeHtml(it.name)}</div>${meta ? `<div class="m">${meta}</div>` : ''}</div>
                 <div class="ck-cbadges">${off}${badge}</div></div>`;
         }).join('');
-        body.innerHTML = `<div class="ck-list">${cards}</div><div class="ck-applybar"><button class="ck-btn" onclick="App.switchMainTab('${kind === 'apis' ? 'apis' : 'skills'}')">Manage in Library</button></div>`;
+        body.innerHTML = `<div class="ck-list">${cards}</div><div class="ck-applybar"><button class="ck-btn" onclick="App.switchMainTab('${kind === 'apis' ? 'apis' : 'skills'}')">Manage registry</button></div>`;
     },
 
     _renderLogsTab(isExt, ext) {

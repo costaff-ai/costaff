@@ -65,6 +65,44 @@ def list_external_agents(auth: bool = Depends(AuthManager.verify_token)):
     return result
 
 
+@router.get("/api/external-agents/{name}/card")
+def get_external_agent_card(name: str, auth: bool = Depends(AuthManager.verify_token)):
+    """Proxy an external agent's live A2A agent card so the dashboard can show
+    its REAL declared skills. External (Option-C) agents carry their tools in
+    their own container and expose them only over A2A — they are not in the
+    Manager's MCP/API/Skill registries, so the per-agent registry view is empty
+    for them. The card is the source of truth for what an external agent can do.
+    Host-side reachable URL: github agents via localhost:<public_port>, url
+    agents via their a2a_url (same resolution as the health check above)."""
+    conf = active_core().core_config()
+    agent = conf.get("external_agents", {}).get(name)
+    if not agent:
+        raise HTTPException(status_code=404, detail="unknown external agent")
+    base = None
+    if agent.get("type") == "github" and agent.get("public_port"):
+        base = f"http://localhost:{agent['public_port']}"
+    elif agent.get("type") == "url" and agent.get("a2a_url"):
+        base = agent["a2a_url"]
+    if not base:
+        raise HTTPException(status_code=400, detail="agent has no reachable A2A endpoint")
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            r = client.get(f"{base}/.well-known/agent-card.json")
+            r.raise_for_status()
+            card = r.json()
+    except Exception as e:  # noqa: BLE001 — surface any fetch/parse failure to the UI
+        raise HTTPException(status_code=502, detail=f"could not fetch agent card: {e}")
+    return {
+        "name": card.get("name", name),
+        "description": card.get("description", ""),
+        "version": card.get("version"),
+        "url": card.get("url", ""),
+        "protocol_version": card.get("protocolVersion"),
+        "capabilities": card.get("capabilities", {}),
+        "skills": card.get("skills", []),
+    }
+
+
 @router.post("/api/external-agents")
 def add_external_agent(req: ExternalAgentAddRequest, auth: bool = Depends(AuthManager.verify_token)):
     name = req.name.strip().lower().replace(" ", "-")

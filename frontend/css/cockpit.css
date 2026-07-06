@@ -36,7 +36,7 @@ body.light-mode{
    text on a light surface. Same specificity + !important → cockpit wins. */
 #sidebar.ck{ background:var(--ck-side) !important; border-right:1px solid var(--ck-border) !important; color:var(--ck-text); }
 #sidebar.ck .ck-brand{ display:flex; align-items:center; gap:10px; color:var(--ck-accent); }
-#sidebar.ck .ck-brand span{ color:var(--ck-text); font-weight:700; font-size:18px; letter-spacing:-.01em; }
+#sidebar.ck .ck-brand span{ color:var(--ck-text); font-weight:700; font-size:15px; letter-spacing:-.01em; }
 
 #sidebar.ck .ck-sw{ position:relative; }
 #sidebar.ck .ck-sw-btn{ width:100%; display:flex; align-items:center; gap:11px; background:var(--ck-surface); border:1px solid var(--ck-border); border-radius:12px; padding:9px 11px; cursor:pointer; text-align:left; transition:.14s; }
@@ -45,26 +45,22 @@ body.light-mode{
 #sidebar.ck .ck-sw-logo{ width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:var(--ck-on-accent); display:grid; place-items:center; flex:none; }
 #sidebar.ck .ck-sw-txt{ flex:1; min-width:0; }
 #sidebar.ck .ck-sw-k{ display:block; font-family:var(--ck-mono); font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--ck-faint); font-weight:700; }
-#sidebar.ck .ck-sw-v{ display:block; font-size:14px; font-weight:700; color:var(--ck-text); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#sidebar.ck .ck-sw-v{ display:block; font-size:13px; font-weight:700; color:var(--ck-text); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #sidebar.ck .ck-sw-caret{ color:var(--ck-faint); flex:none; transition:transform .18s; }
 #sidebar.ck .ck-sw.open .ck-sw-caret{ transform:rotate(180deg); }
 #sidebar.ck .ck-sw-menu{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--ck-surface); border:1px solid var(--ck-border); border-radius:12px; padding:5px; box-shadow:0 14px 40px rgba(0,0,0,.55); z-index:60; display:none; }
 #sidebar.ck .ck-sw.open .ck-sw-menu{ display:block; }
-#sidebar.ck .ck-sw-mi{ width:100%; display:flex; align-items:center; gap:9px; background:transparent; border:0; color:var(--ck-text); font-size:13.5px; font-weight:550; padding:9px 10px; border-radius:8px; cursor:pointer; text-align:left; }
+#sidebar.ck .ck-sw-mi{ width:100%; display:flex; align-items:center; gap:9px; background:transparent; border:0; color:var(--ck-text); font-size:12px; font-weight:550; padding:7px 10px; border-radius:8px; cursor:pointer; text-align:left; }
 #sidebar.ck .ck-sw-mi:hover{ background:color-mix(in srgb,var(--ck-accent) 16%,transparent); }
 #sidebar.ck .ck-sw-mi.on{ background:var(--ck-accent-soft); }
 #sidebar.ck .ck-sw-mi .ck-ck{ width:15px; color:var(--ck-accent); flex:none; }
 #sidebar.ck .ck-sw-mi .ck-meta{ margin-left:auto; font-family:var(--ck-mono); font-size:9px; color:var(--ck-faint); }
 
-#sidebar.ck .ck-ctx{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:10px 4px 12px; margin-bottom:2px; border-bottom:1px solid var(--ck-border); font-family:var(--ck-mono); font-size:10px; color:var(--ck-muted); }
-#sidebar.ck .ck-ctx .ck-dot{ width:6px; height:6px; border-radius:50%; background:var(--ck-good); flex:none; }
-#sidebar.ck .ck-ctx .ck-sep{ color:var(--ck-faint); opacity:.6; }
-
-#sidebar.ck .ck-grp{ font-family:var(--ck-mono); font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:var(--ck-faint); font-weight:600; padding:15px 10px 6px; display:flex; align-items:center; justify-content:space-between; }
+#sidebar.ck .ck-grp{ font-family:var(--ck-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ck-faint); font-weight:600; padding:11px 10px 5px; display:flex; align-items:center; justify-content:space-between; }
 #sidebar.ck .ck-grp .ck-add{ color:var(--ck-faint); cursor:pointer; font-size:12px; background:none; border:0; }
 #sidebar.ck .ck-grp .ck-add:hover{ color:var(--ck-accent); }
 
-#sidebar.ck .ck-agent{ width:100%; display:flex; align-items:center; gap:8px; padding:9px; font-size:13px; font-weight:600; color:var(--ck-text); background:transparent; border:0; border-radius:9px; cursor:pointer; transition:.13s; text-align:left; }
+#sidebar.ck .ck-agent{ width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; font-size:12px; font-weight:600; color:var(--ck-text); background:transparent; border:0; border-radius:9px; cursor:pointer; transition:.13s; text-align:left; }
 #sidebar.ck .ck-agent:hover{ background:color-mix(in srgb,var(--ck-accent) 10%,transparent); }
 #sidebar.ck .ck-agent.sel{ background:var(--ck-accent-soft); }
 #sidebar.ck .ck-chev{ width:14px; height:14px; display:grid; place-items:center; flex:none; color:var(--ck-faint); transition:transform .18s; background:none; border:0; cursor:pointer; padding:0; }
@@ -79,17 +75,17 @@ body.light-mode{
 
 #sidebar.ck .ck-kids{ display:none; margin:1px 0 5px 20px; padding-left:15px; border-left:1px solid var(--ck-border-strong); }
 #sidebar.ck .ck-agent.open + .ck-kids{ display:block; }
-#sidebar.ck .ck-leaf{ width:100%; display:flex; align-items:center; gap:8px; padding:7px 9px; font-size:12px; color:var(--ck-muted); font-weight:500; margin:1px 0; background:transparent; border:0; border-radius:8px; cursor:pointer; text-align:left; }
+#sidebar.ck .ck-leaf{ width:100%; display:flex; align-items:center; gap:8px; padding:5px 9px; font-size:11.5px; color:var(--ck-muted); font-weight:500; margin:1px 0; background:transparent; border:0; border-radius:8px; cursor:pointer; text-align:left; }
 #sidebar.ck .ck-leaf:hover{ background:color-mix(in srgb,var(--ck-accent) 6%,transparent); color:var(--ck-text); }
 #sidebar.ck .ck-leaf.sel{ color:var(--ck-accent); font-weight:640; background:color-mix(in srgb,var(--ck-accent) 8%,transparent); }
 #sidebar.ck .ck-leaf .ck-li{ width:15px; display:grid; place-items:center; flex:none; opacity:.85; }
 #sidebar.ck .ck-leaf .ck-cnt{ margin-left:auto; font-family:var(--ck-mono); font-size:10px; color:var(--ck-faint); }
 #sidebar.ck .ck-leaf.sel .ck-cnt{ color:var(--ck-accent); }
 
-#sidebar.ck .ck-lib{ width:100%; display:flex; align-items:center; gap:10px; padding:8px 9px; font-size:12.5px; font-weight:550; color:var(--ck-muted); background:transparent; border:0; border-radius:9px; cursor:pointer; text-align:left; }
+#sidebar.ck .ck-lib{ width:100%; display:flex; align-items:center; gap:10px; padding:6px 8px; font-size:12px; font-weight:550; color:var(--ck-muted); background:transparent; border:0; border-radius:9px; cursor:pointer; text-align:left; }
 #sidebar.ck .ck-lib:hover{ background:color-mix(in srgb,var(--ck-accent) 6%,transparent); color:var(--ck-text); }
 #sidebar.ck .ck-lib.sel{ background:var(--ck-accent-soft); color:var(--ck-accent); }
-#sidebar.ck .ck-lib .ck-li{ width:22px; height:22px; border-radius:6px; display:grid; place-items:center; flex:none; background:var(--ck-surface); border:1px solid var(--ck-border); }
+#sidebar.ck .ck-lib .ck-li{ width:20px; height:20px; border-radius:6px; display:grid; place-items:center; flex:none; background:var(--ck-surface); border:1px solid var(--ck-border); }
 #sidebar.ck .ck-lib.sel .ck-li{ color:var(--ck-accent); border-color:var(--ck-accent-border); }
 #sidebar.ck .ck-lib .ck-cnt{ margin-left:auto; font-family:var(--ck-mono); font-size:10px; color:var(--ck-faint); }
 #sidebar.ck .ck-lib.sel .ck-cnt{ color:var(--ck-accent); }
@@ -97,11 +93,14 @@ body.light-mode{
 #sidebar.ck .ck-empt{ display:flex; align-items:flex-start; gap:9px; margin:2px 4px; padding:11px 12px; font-size:11px; color:var(--ck-faint); border:1px dashed var(--ck-border-strong); border-radius:10px; line-height:1.5; }
 #sidebar.ck .ck-empt code{ font-family:var(--ck-mono); font-size:10px; color:var(--ck-muted); }
 
-/* legacy nav items (其餘導覽) restyled dark */
-#sidebar.ck .sidebar-item{ color:var(--ck-muted); border-radius:9px; }
+/* legacy nav items (其餘導覽) restyled dark + normalized to the ck- scale:
+   the Tailwind markup is text-sm/px-6/py-3 (14px, chunky) — override to match
+   the 12px/6px cockpit rows so the whole sidebar reads as one type scale. */
+#sidebar.ck .sidebar-item{ color:var(--ck-muted); border-radius:9px; font-size:12px !important; font-weight:600 !important; padding:6px 10px !important; gap:10px !important; }
+#sidebar.ck .sidebar-item i{ width:20px !important; font-size:12px; }
 #sidebar.ck .sidebar-item:hover{ background:color-mix(in srgb,var(--ck-accent) 8%,transparent) !important; color:var(--ck-text) !important; }
 #sidebar.ck .sidebar-item.active{ background:var(--ck-accent-soft) !important; color:var(--ck-accent) !important; }
-#sidebar.ck .sidebar-group-label{ color:var(--ck-faint) !important; }
+#sidebar.ck .sidebar-group-label{ color:var(--ck-faint) !important; font-size:9px !important; font-weight:700; letter-spacing:.14em; padding:11px 10px 5px !important; }
 #sidebar.ck .ck-logout{ color:var(--ck-faint); }
 #sidebar.ck .ck-logout:hover{ color:#f2685f; }
 
