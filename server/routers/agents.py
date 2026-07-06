@@ -1,3 +1,4 @@
+import concurrent.futures
 import logging
 import os
 import re
@@ -27,30 +28,44 @@ def get_available_agents(auth: bool = Depends(AuthManager.verify_token)):
         return []
 
 
+def _agent_health(agent: dict) -> bool:
+    """Liveness of one external agent. GitHub agents: localhost:<public_port>
+    (Docker internal URL not reachable from host); URL agents: a2a_url."""
+    if not agent.get("enabled"):
+        return False
+    health_url = None
+    if agent.get("type") == "github" and agent.get("public_port"):
+        health_url = f"http://localhost:{agent['public_port']}/.well-known/agent-card.json"
+    elif agent.get("type") == "url" and agent.get("a2a_url"):
+        health_url = f"{agent['a2a_url']}/.well-known/agent-card.json"
+    if not health_url:
+        return False
+    try:
+        with httpx.Client(timeout=2.0) as client:
+            return client.get(health_url).status_code == 200
+    except Exception:
+        return False
+
+
 @router.get("/api/external-agents")
 def list_external_agents(auth: bool = Depends(AuthManager.verify_token)):
     conf = active_core().core_config()  # the active core's own external_agents
+    # Skip legacy migrated entries that have no public_port (old compose-managed costaff-agent-coding)
+    agents = [
+        (name, agent)
+        for name, agent in conf.get("external_agents", {}).items()
+        if not (agent.get("type") == "github" and not agent.get("public_port"))
+    ]
+    # Health-check all agents CONCURRENTLY. Previously this was a sequential
+    # loop with a 3s timeout each, so one slow/booting agent stalled the whole
+    # sidebar (Manager + External both wait on this call) for N×3s.
+    if agents:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(agents))) as ex:
+            healths = list(ex.map(lambda na: _agent_health(na[1]), agents))
+    else:
+        healths = []
     result = []
-    for name, agent in conf.get("external_agents", {}).items():
-        # Skip legacy migrated entries that have no public_port (old compose-managed costaff-agent-coding)
-        if agent.get("type") == "github" and not agent.get("public_port"):
-            continue
-        health = False
-        if agent.get("enabled"):
-            # GitHub agents: use localhost:<public_port> (Docker internal URL not reachable from host)
-            # URL agents: use a2a_url directly
-            health_url = None
-            if agent.get("type") == "github" and agent.get("public_port"):
-                health_url = f"http://localhost:{agent['public_port']}/.well-known/agent-card.json"
-            elif agent.get("type") == "url" and agent.get("a2a_url"):
-                health_url = f"{agent['a2a_url']}/.well-known/agent-card.json"
-            if health_url:
-                try:
-                    with httpx.Client(timeout=3.0) as client:
-                        r = client.get(health_url)
-                        health = r.status_code == 200
-                except Exception:
-                    pass
+    for (name, agent), health in zip(agents, healths):
         result.append({
             "name": name,
             "type": agent.get("type", "url"),
@@ -92,14 +107,19 @@ def get_external_agent_card(name: str, auth: bool = Depends(AuthManager.verify_t
             card = r.json()
     except Exception as e:  # noqa: BLE001 — surface any fetch/parse failure to the UI
         raise HTTPException(status_code=502, detail=f"could not fetch agent card: {e}")
+    # Trim aggressively: A2A skill descriptions embed the agent's whole
+    # instruction (10-15KB each) and we only render name + first-line desc +
+    # tags. Dropping examples/capabilities/full descriptions shrinks the
+    # response ~10x, which matters because the sidebar fetches every card.
+    def _trim(sk: dict) -> dict:
+        desc = (sk.get("description") or "").split("\n")[0].strip()[:200]
+        return {"id": sk.get("id"), "name": sk.get("name"), "description": desc, "tags": sk.get("tags", [])}
+
     return {
         "name": card.get("name", name),
-        "description": card.get("description", ""),
         "version": card.get("version"),
         "url": card.get("url", ""),
-        "protocol_version": card.get("protocolVersion"),
-        "capabilities": card.get("capabilities", {}),
-        "skills": card.get("skills", []),
+        "skills": [_trim(sk) for sk in card.get("skills", [])],
     }
 
 
