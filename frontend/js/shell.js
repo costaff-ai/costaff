@@ -300,24 +300,37 @@ const Shell = {
             return;
         }
 
-        // Manager: editable core-MCP assignment.
+        // Manager: assign MCP servers (toggle + Apply) AND register new external
+        // MCP servers via the inline editor. Core (costaff) is fixed; external
+        // MCPs get an edit pencil.
         const available = this.data.mcp.available_mcps || [];
-        if (!available.length) { body.innerHTML = `<div class="ck-empty"><i class="fas fa-cube text-2xl"></i><p>No MCP available in this System</p></div>`; return; }
         const coreName = 'costaff';
+        const newBtn = `<button class="ck-btn" onclick="Shell._openReg('mcp', null)"><i class="fas fa-plus" style="margin-right:6px"></i>New MCP server</button>`;
         const cards = available.map(m => {
             const on = assigned.includes(m);
             const isCore = m === coreName;
             const badge = isCore ? '<span class="ck-chip b"><span class="d"></span>Core</span>' : '';
+            const edit = isCore ? '' : `<i class="fas fa-pen ck-mcp-edit" title="Edit MCP server" onclick="event.stopPropagation(); Shell._editMcp('${escapeHtml(m)}')"></i>`;
             return `<div class="ck-card click ${on ? 'on' : ''}" ${isCore ? '' : `onclick="Shell._toggleMcp(this)"`} data-mcp="${escapeHtml(m)}">
                 <div class="ck-ci"><i class="fas fa-cube text-xs"></i></div>
                 <div class="ck-cinfo"><div class="t"><code>${escapeHtml(m)}</code></div></div>
-                <div class="ck-cbadges">${badge}</div>
+                <div class="ck-cbadges">${badge}${edit}</div>
                 <span class="ck-check"><i class="fas fa-check text-[10px]"></i></span>
             </div>`;
         }).join('');
-        body.innerHTML = `<div class="ck-list">${cards}</div><div class="ck-applybar"><button class="ck-btn primary" onclick="Shell._applyMcp('${key}')">Apply & Restart</button></div>`;
+        const listOrEmpty = available.length
+            ? `<div class="ck-list">${cards}</div><div class="ck-applybar" style="margin-top:14px"><button class="ck-btn primary" onclick="Shell._applyMcp('${key}')">Apply & Restart</button></div>`
+            : `<div class="ck-empty"><i class="fas fa-cube text-2xl"></i><p>No MCP servers registered yet</p></div>`;
+        body.innerHTML = `<div class="ck-applybar" style="justify-content:flex-end;margin-bottom:14px">${newBtn}</div>${listOrEmpty}`;
     },
     _toggleMcp(card) { card.classList.toggle('on'); },
+    async _editMcp(name) {
+        try {
+            const cfg = await API.fetch(`/api/mcp/${encodeURIComponent(name)}/config`);
+            if (!cfg || !cfg.url) { alert(`"${name}" is a built-in MCP and has no editable endpoint.`); return; }
+            this._openReg('mcp', { name, url: cfg.url, transport: cfg.transport || 'streamable', headers: cfg.headers || {} });
+        } catch (e) { alert('Could not load MCP config: ' + e.message); }
+    },
     async _applyMcp(key) {
         const body = document.getElementById('ck-body'); if (!body) return;
         const mcps = Array.from(body.querySelectorAll('.ck-card.on')).map(c => c.dataset.mcp);
@@ -360,6 +373,14 @@ const Shell = {
         return (list || []).find(x => String(x.id) === String(id)) || null;
     },
     _regForm(kind, item) {
+        if (kind === 'mcp') {
+            const editing = !!(item && item.name);
+            const transports = ['streamable', 'sse'].map(t => `<option ${item && item.transport === t ? 'selected' : ''}>${t}</option>`).join('');
+            return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. notion" ${editing ? 'disabled' : ''}>${editing ? '<p class="ck-reg-hint">Name is fixed once registered</p>' : '<p class="ck-reg-hint">Lowercase identifier, no spaces</p>'}</div>
+                <div class="ck-reg-fld"><label>Endpoint URL *</label><input id="reg-url" type="text" value="${item ? escapeHtml(item.url || '') : ''}" placeholder="http://host:port/mcp"></div>
+                <div class="ck-reg-fld"><label>Transport</label><select id="reg-transport">${transports}</select></div>
+                <div class="ck-reg-fld"><label>Headers (JSON, optional)</label><textarea id="reg-headers" rows="3" placeholder='{"Authorization": "Bearer ..."}'>${item && item.headers && Object.keys(item.headers).length ? escapeHtml(JSON.stringify(item.headers, null, 2)) : ''}</textarea></div>`;
+        }
         if (kind === 'apis') {
             const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option ${item && item.method === m ? 'selected' : ''}>${m}</option>`).join('');
             return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. Weather API"></div>
@@ -374,17 +395,23 @@ const Shell = {
             <div class="ck-reg-fld"><label>Usage / when to use (optional)</label><textarea id="reg-usage" rows="2">${item ? escapeHtml(item.usage || '') : ''}</textarea></div>`;
     },
     _openReg(kind, item) {
-        // Registry items are configured at the Manager Agent only; there is no
-        // per-agent picker. New items default to '__all__' (the Manager always
-        // gets them); editing preserves the item's existing scope untouched.
-        this._reg = {
-            kind,
-            id: item ? item.id : null,
-            user_id: item ? (item.user_id || '__global__') : '__global__',
-            agent_ids: (item && item.agent_ids) || '__all__',
-        };
+        if (kind === 'mcp') {
+            // MCP id is its name; no user/agent scoping.
+            this._reg = { kind, id: item ? item.name : null };
+        } else {
+            // API/Skill registry is configured at the Manager Agent only; no
+            // per-agent picker. New → '__all__' (Manager always gets them);
+            // editing preserves the item's existing scope untouched.
+            this._reg = {
+                kind,
+                id: item ? item.id : null,
+                user_id: item ? (item.user_id || '__global__') : '__global__',
+                agent_ids: (item && item.agent_ids) || '__all__',
+            };
+        }
         const modal = document.getElementById('ck-reg-modal'); if (!modal) return;
-        document.getElementById('ck-reg-title').textContent = (item ? 'Edit ' : 'New ') + (kind === 'apis' ? 'API' : 'Skill');
+        const noun = kind === 'apis' ? 'API' : kind === 'mcp' ? 'MCP server' : 'Skill';
+        document.getElementById('ck-reg-title').textContent = (item ? 'Edit ' : 'New ') + noun;
         document.getElementById('ck-reg-body').innerHTML = this._regForm(kind, item);
         document.getElementById('ck-reg-delete').style.display = item ? '' : 'none';
         modal.classList.remove('hidden');
@@ -392,6 +419,27 @@ const Shell = {
     _closeReg() { const m = document.getElementById('ck-reg-modal'); if (m) m.classList.add('hidden'); this._reg = null; },
     async _saveReg() {
         const r = this._reg; if (!r) return;
+        if (r.kind === 'mcp') {
+            let headers = {};
+            const hraw = document.getElementById('reg-headers').value.trim();
+            if (hraw) { try { headers = JSON.parse(hraw); } catch { alert('Headers must be valid JSON, e.g. {"Authorization": "Bearer ..."}'); return; } }
+            const url = document.getElementById('reg-url').value.trim();
+            const transport = document.getElementById('reg-transport').value;
+            if (!url) { alert('Endpoint URL is required.'); return; }
+            const cfg = { url, transport, enabled: true, headers };
+            try {
+                const res = r.id
+                    ? await API.fetch(`/api/mcp/${encodeURIComponent(r.id)}/config`, { method: 'POST', body: JSON.stringify(cfg) })
+                    : await (async () => {
+                        const name = document.getElementById('reg-name').value.trim();
+                        if (!name) { throw new Error('__noname__'); }
+                        return API.fetch('/api/mcp', { method: 'POST', body: JSON.stringify({ name, url, config: cfg, is_external: true }) });
+                    })();
+                if (res && res.status === 'success') { this._closeReg(); await this.reload(); }
+                else alert('Failed: ' + (res && res.detail ? res.detail : JSON.stringify(res)));
+            } catch (e) { if (e.message === '__noname__') alert('Name is required.'); else alert('Error: ' + e.message); }
+            return;
+        }
         const agent_ids = r.agent_ids || '__all__';
         let payload;
         if (r.kind === 'apis') {
@@ -430,9 +478,10 @@ const Shell = {
     },
     async _deleteReg() {
         const r = this._reg; if (!r || !r.id) return;
-        if (!confirm('Delete this ' + (r.kind === 'apis' ? 'API' : 'skill') + '? This cannot be undone.')) return;
-        const ep = r.kind === 'apis' ? '/api/apis' : '/api/skills';
-        try { await API.fetch(`${ep}/${r.id}`, { method: 'DELETE' }); this._closeReg(); await this.reload(); }
+        const noun = r.kind === 'apis' ? 'API' : r.kind === 'mcp' ? 'MCP server' : 'skill';
+        if (!confirm(`Delete this ${noun}? This cannot be undone.`)) return;
+        const ep = r.kind === 'apis' ? '/api/apis' : r.kind === 'mcp' ? '/api/mcp' : '/api/skills';
+        try { await API.fetch(`${ep}/${encodeURIComponent(r.id)}`, { method: 'DELETE' }); this._closeReg(); await this.reload(); }
         catch (e) { alert('Error: ' + e.message); }
     },
 

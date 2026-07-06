@@ -68,6 +68,9 @@ body.light-mode{
 #sidebar.ck .ck-ai{ width:24px; height:24px; border-radius:7px; display:grid; place-items:center; flex:none; background:var(--ck-surface); border:1px solid var(--ck-border); color:var(--ck-muted); }
 #sidebar.ck .ck-agent.mgr .ck-ai{ background:linear-gradient(135deg,var(--ck-accent),var(--ck-accent-2)); color:var(--ck-on-accent); border:0; }
 #sidebar.ck .ck-agent.sel .ck-ai{ border-color:var(--ck-accent-border); color:var(--ck-accent); }
+/* manager icon sits on an accent gradient — keep its glyph on-accent when selected
+   (the .sel rule above would tint it accent-blue → blue-on-blue reads as dark) */
+#sidebar.ck .ck-agent.mgr.sel .ck-ai{ color:var(--ck-on-accent); }
 #sidebar.ck .ck-nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #sidebar.ck .ck-hub{ font-family:var(--ck-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:var(--ck-accent); font-weight:700; border:1px solid var(--ck-accent-border); padding:2px 6px; border-radius:5px; flex:none; }
 #sidebar.ck .ck-stat{ width:7px; height:7px; border-radius:50%; flex:none; }
@@ -177,6 +180,10 @@ body.light-mode #content-area.ck-dark{ background:var(--ck-main); }
 /* pen affordance on editable registry cards (Manager APIs/Skills) */
 #view-agents.ck .ck-edit-hint{ color:var(--ck-faint); font-size:11px; opacity:0; transition:.14s; align-self:center; }
 #view-agents.ck .ck-card.click:hover .ck-edit-hint{ opacity:.8; }
+/* edit pencil on external MCP cards (click stops toggle propagation) */
+#view-agents.ck .ck-mcp-edit{ color:var(--ck-faint); font-size:11px; cursor:pointer; opacity:0; transition:.14s; align-self:center; margin-left:2px; }
+#view-agents.ck .ck-card:hover .ck-mcp-edit{ opacity:.7; }
+#view-agents.ck .ck-mcp-edit:hover{ color:var(--ck-accent); opacity:1; }
 
 /* ---------- inline API/Skill registry editor modal (cockpit-themed) ---------- */
 .ck-reg-card{ background:var(--ck-main); border:1px solid var(--ck-border); border-radius:18px; width:100%; max-width:520px; margin:0 16px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 24px 70px rgba(0,0,0,.5); color:var(--ck-text); }
