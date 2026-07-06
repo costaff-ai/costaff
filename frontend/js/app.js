@@ -116,7 +116,7 @@ const App = {
         // Load content if first time
         if (!this.state.loadedViews.has(tabId)) {
             try {
-                const html = await fetch(`views/${tabId}.html?v=15`).then(r => {
+                const html = await fetch(`views/${tabId}.html?v=16`).then(r => {
                     if (!r.ok) throw new Error(`View ${tabId} not found`);
                     return r.text();
                 });

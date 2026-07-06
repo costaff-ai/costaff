@@ -1,15 +1,29 @@
 <div class="p-8">
     <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-            <h3 class="text-lg font-black uppercase tracking-widest text-slate-900">Business Platforms</h3>
-            <p class="text-xs text-slate-400 mt-1 font-mono">Self-hosted ERP / CRM / HRM / … · shared PostgreSQL · dependency order (db → account-manager → rest)</p>
+        <h3 class="text-lg font-black uppercase tracking-widest text-slate-900">Business Platforms</h3>
+        <div class="flex items-center gap-2 flex-wrap">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-300"></i>
+                <input id="plat-search" oninput="Platforms.setSearch(this.value)" placeholder="Search…"
+                    class="pl-8 pr-3 py-2 rounded-xl text-xs border border-slate-200 bg-white text-slate-600 focus:outline-none focus:border-blue-400 w-40">
+            </div>
+            <select id="plat-status" onchange="Platforms.setStatus(this.value)"
+                class="text-[11px] font-bold uppercase tracking-wider border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-600 focus:outline-none focus:border-blue-400 cursor-pointer">
+                <option value="__all__">All statuses</option>
+                <option value="healthy">Healthy</option>
+                <option value="unhealthy">Starting</option>
+                <option value="down">Down</option>
+                <option value="n/a">Disabled</option>
+            </select>
+            <div class="flex rounded-xl border border-slate-200 overflow-hidden">
+                <button id="plat-view-cards" onclick="Platforms.setView('cards')" title="Card view" class="px-3 py-2 text-xs text-slate-500"><i class="fas fa-table-cells-large"></i></button>
+                <button id="plat-view-list" onclick="Platforms.setView('list')" title="List view" class="px-3 py-2 text-xs text-slate-500 border-l border-slate-200"><i class="fas fa-list"></i></button>
+            </div>
+            <button onclick="Platforms.load()" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+                <i class="fas fa-rotate-right mr-1"></i>Refresh
+            </button>
         </div>
-        <button onclick="Platforms.load()" class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
-            <i class="fas fa-rotate-right mr-2"></i>Refresh
-        </button>
     </div>
-    <div class="mb-5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-700 font-mono leading-relaxed">
-        Read-only ops view. Deploy / rebuild / remove / version-pin remain CLI-only — use <code class="font-bold">costaff platform add | rebuild | remove</code>.
-    </div>
-    <div id="platforms-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <div id="platforms-count" class="text-[11px] font-mono text-slate-400 mb-3"></div>
+    <div id="platforms-list"></div>
 </div>
