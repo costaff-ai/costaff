@@ -14,6 +14,8 @@ const Platforms = {
     _search: '',
     _status: '__all__',
     _view: 'cards',
+    _page: 1,
+    _pageSize: 8,   // rows per page in the table (list) view
 
     async init() { await this.load(); },
 
@@ -30,9 +32,11 @@ const Platforms = {
         }
     },
 
-    setSearch(v) { this._search = (v || '').toLowerCase().trim(); this.render(); },
-    setStatus(v) { this._status = v; this.render(); },
-    setView(v) { this._view = v; this.render(); },
+    // filter / view changes reset to the first page (the visible set changed)
+    setSearch(v) { this._search = (v || '').toLowerCase().trim(); this._page = 1; this.render(); },
+    setStatus(v) { this._status = v; this._page = 1; this.render(); },
+    setView(v) { this._view = v; this._page = 1; this.render(); },
+    setPage(n) { this._page = n; this.render(); },
 
     _syncToggle() {
         const on = 'px-3 py-2 text-xs bg-blue-600 text-white';
@@ -116,8 +120,15 @@ const Platforms = {
     },
 
     _renderList(el, list) {
-        el.className = 'rounded-2xl border border-slate-100 bg-white overflow-hidden';
-        const rows = list.map(p => {
+        el.className = '';
+        // paginate so a long platform list stays manageable
+        const total = list.length;
+        const pageSize = this._pageSize;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        this._page = Math.min(Math.max(1, this._page), pages);
+        const start = (this._page - 1) * pageSize;
+        const pageItems = list.slice(start, start + pageSize);
+        const rows = pageItems.map(p => {
             const h = this.HEALTH[p.health] || this.HEALTH['n/a'];
             return `<tr class="border-t border-slate-50 hover:bg-slate-50/60 transition-all">
                 <td class="py-3 px-4">
@@ -131,11 +142,25 @@ const Platforms = {
                 <td class="py-3 px-4"><div class="flex items-center gap-2 flex-wrap justify-end">${this._actions(p)}</div></td>
             </tr>`;
         }).join('');
-        el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-left">
+        const table = `<div class="rounded-2xl border border-slate-100 bg-white overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left">
             <thead><tr class="text-[10px] uppercase tracking-widest text-slate-400 bg-slate-50/50">
                 <th class="py-2.5 px-4 font-black">Platform</th><th class="py-2.5 px-4 font-black">Endpoint</th><th class="py-2.5 px-4 font-black">Status</th><th class="py-2.5 px-4 font-black text-right">Actions</th>
             </tr></thead>
-            <tbody>${rows}</tbody></table></div>`;
+            <tbody>${rows}</tbody></table></div></div>`;
+        el.innerHTML = table + this._pager(this._page, pages, start, pageItems.length, total);
+    },
+
+    _pager(page, pages, start, shown, total) {
+        if (pages <= 1) return '';
+        const btn = (label, target, disabled) => `<button ${disabled ? 'disabled' : `onclick="Platforms.setPage(${target})"`} class="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${disabled ? 'bg-slate-50 text-slate-300 cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${label}</button>`;
+        return `<div class="flex items-center justify-between mt-4 flex-wrap gap-3">
+            <span class="text-[11px] font-mono text-slate-400">Showing ${start + 1}–${start + shown} of ${total}</span>
+            <div class="flex items-center gap-2">
+                ${btn('<i class="fas fa-chevron-left mr-1"></i>Prev', page - 1, page <= 1)}
+                <span class="text-[11px] font-black uppercase tracking-widest text-slate-500 px-1">Page ${page} / ${pages}</span>
+                ${btn('Next<i class="fas fa-chevron-right ml-1"></i>', page + 1, page >= pages)}
+            </div>
+        </div>`;
     },
 
     async action(name, act) {
