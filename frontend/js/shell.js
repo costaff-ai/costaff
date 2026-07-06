@@ -359,32 +359,30 @@ const Shell = {
         const list = kind === 'apis' ? this.data.apis : this.data.skills;
         return (list || []).find(x => String(x.id) === String(id)) || null;
     },
-    _agentScopeOptions(selected) {
-        const sel = selected || ['__all__'];
-        const opts = [{ v: '__all__', label: 'All agents' }, { v: this._mgrKey(), label: 'Manager (Costaff Agent)' }]
-            .concat((this.data.exts || []).map(a => ({ v: this._extKey(a.name), label: a.name })));
-        return opts.map(o => `<option value="${escapeHtml(o.v)}" ${sel.includes(o.v) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
-    },
     _regForm(kind, item) {
-        const agentSel = (item && item.agent_ids) ? item.agent_ids.split(',').map(s => s.trim()) : ['__all__'];
-        const scope = `<div class="ck-reg-fld"><label>Available to agents</label><select id="reg-agents" multiple size="4">${this._agentScopeOptions(agentSel)}</select><p class="ck-reg-hint">Hold ⌘/Ctrl to multi-select · "All agents" applies to every agent</p></div>`;
         if (kind === 'apis') {
             const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option ${item && item.method === m ? 'selected' : ''}>${m}</option>`).join('');
             return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. Weather API"></div>
                 <div class="ck-reg-row"><div class="ck-reg-fld" style="flex:0 0 116px"><label>Method</label><select id="reg-method">${methods}</select></div>
                 <div class="ck-reg-fld" style="flex:1;min-width:0"><label>URL *</label><input id="reg-url" type="text" value="${item ? escapeHtml(item.url || '') : ''}" placeholder="https://api.example.com/..."></div></div>
                 <div class="ck-reg-fld"><label>Headers (JSON, optional)</label><textarea id="reg-headers" rows="3" placeholder='{"Authorization": "Bearer ..."}'>${item && item.headers ? escapeHtml(JSON.stringify(item.headers, null, 2)) : ''}</textarea></div>
-                <div class="ck-reg-fld"><label>Description (optional)</label><input id="reg-desc" type="text" value="${item ? escapeHtml(item.description || '') : ''}"></div>
-                ${scope}`;
+                <div class="ck-reg-fld"><label>Description (optional)</label><input id="reg-desc" type="text" value="${item ? escapeHtml(item.description || '') : ''}"></div>`;
         }
         return `<div class="ck-reg-fld"><label>Name *</label><input id="reg-name" type="text" value="${item ? escapeHtml(item.name) : ''}" placeholder="e.g. Summarize"></div>
             <div class="ck-reg-fld"><label>Description</label><textarea id="reg-desc" rows="2">${item ? escapeHtml(item.description || '') : ''}</textarea></div>
             <div class="ck-reg-fld"><label>Tags (comma-separated)</label><input id="reg-tags" type="text" value="${item ? escapeHtml(item.tags || '') : ''}" placeholder="research, finance"></div>
-            <div class="ck-reg-fld"><label>Usage / when to use (optional)</label><textarea id="reg-usage" rows="2">${item ? escapeHtml(item.usage || '') : ''}</textarea></div>
-            ${scope}`;
+            <div class="ck-reg-fld"><label>Usage / when to use (optional)</label><textarea id="reg-usage" rows="2">${item ? escapeHtml(item.usage || '') : ''}</textarea></div>`;
     },
     _openReg(kind, item) {
-        this._reg = { kind, id: item ? item.id : null, user_id: item ? (item.user_id || '__global__') : '__global__' };
+        // Registry items are configured at the Manager Agent only; there is no
+        // per-agent picker. New items default to '__all__' (the Manager always
+        // gets them); editing preserves the item's existing scope untouched.
+        this._reg = {
+            kind,
+            id: item ? item.id : null,
+            user_id: item ? (item.user_id || '__global__') : '__global__',
+            agent_ids: (item && item.agent_ids) || '__all__',
+        };
         const modal = document.getElementById('ck-reg-modal'); if (!modal) return;
         document.getElementById('ck-reg-title').textContent = (item ? 'Edit ' : 'New ') + (kind === 'apis' ? 'API' : 'Skill');
         document.getElementById('ck-reg-body').innerHTML = this._regForm(kind, item);
@@ -394,8 +392,7 @@ const Shell = {
     _closeReg() { const m = document.getElementById('ck-reg-modal'); if (m) m.classList.add('hidden'); this._reg = null; },
     async _saveReg() {
         const r = this._reg; if (!r) return;
-        const agents = Array.from(document.getElementById('reg-agents').selectedOptions).map(o => o.value);
-        const agent_ids = agents.length ? agents.join(',') : '__all__';
+        const agent_ids = r.agent_ids || '__all__';
         let payload;
         if (r.kind === 'apis') {
             let headers = null;
