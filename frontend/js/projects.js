@@ -396,12 +396,7 @@ const Projects = {
         const specEl = document.getElementById('td-spec');
         if (specEl) {
             const raw = t.spec || '*(No spec provided)*';
-            if (typeof marked !== 'undefined') {
-                marked.setOptions({ gfm: true, breaks: true });
-                specEl.innerHTML = UI.parseMarkdown(raw);
-            } else {
-                specEl.textContent = raw;
-            }
+            specEl.innerHTML = UI.parseMarkdown(raw);
         }
         const stColor = { backlog: 'text-slate-500', queued: 'text-amber-600', doing: 'text-blue-600', done: 'text-green-600', failed: 'text-red-500' };
         const statusEl = document.getElementById('td-status');

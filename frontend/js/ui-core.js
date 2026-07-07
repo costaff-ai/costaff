@@ -116,7 +116,9 @@ const UI = {
         if (!text) return "";
         let html = null;
         if (typeof marked !== 'undefined') {
-            try { html = marked.parse(text); } catch(e) { html = null; }
+            // breaks:true — agent/LLM text uses single \n as a hard line break
+            // (bullets, numbered notes); default CommonMark would collapse them.
+            try { html = marked.parse(text, { gfm: true, breaks: true }); } catch(e) { html = null; }
         }
         if (html === null) {
             // marked unavailable/failed — escape first, never emit raw HTML.
