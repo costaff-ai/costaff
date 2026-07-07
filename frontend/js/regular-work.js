@@ -4,6 +4,7 @@
 const RegularWork = {
     items: [],
     editingId: null,
+    CHANNEL_OPTIONS: ['telegram', 'discord', 'line', 'slack', 'webchat'],
 
     async init() {
         this.bindForm();
@@ -19,13 +20,14 @@ const RegularWork = {
         if (!form) return;
         form.onsubmit = async (e) => {
             e.preventDefault();
+            const channels = this.collectChannels();
+            if (channels === null) return; // validation failed inside collectChannels
             const data = {
                 title: document.getElementById('rw-f-title').value.trim(),
                 spec: document.getElementById('rw-f-spec').value.trim(),
                 cron: document.getElementById('rw-f-cron').value.trim(),
                 agent_id: document.getElementById('rw-f-agent').value.trim() || 'costaff_agent',
-                channel: document.getElementById('rw-f-channel').value || null,
-                recipient: document.getElementById('rw-f-recipient').value.trim() || null,
+                channels: channels,
             };
             if (!data.title || !data.spec || !data.cron) return alert('Title, Spec, and Cron are required.');
             try {
@@ -38,6 +40,53 @@ const RegularWork = {
                 await this.load();
             } catch (err) { alert('Save failed: ' + err.message); }
         };
+    },
+
+    // --- Multi-channel row editor -------------------------------------
+    // Normalize a work's delivery targets to [{channel, recipient}]
+    // regardless of API generation (new `channels` list vs legacy pair).
+    targetsOf(w) {
+        if (Array.isArray(w.channels) && w.channels.length) return w.channels;
+        return w.channel ? [{ channel: w.channel, recipient: w.recipient }] : [];
+    },
+
+    channelRowHtml(target) {
+        const opts = this.CHANNEL_OPTIONS.map(c =>
+            `<option value="${c}" ${target.channel === c ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
+        ).join('');
+        return `<div class="rw-channel-row flex items-center gap-2">
+            <select class="rw-cr-channel w-36 bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">${opts}</select>
+            <input type="text" class="rw-cr-recipient flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Chat ID or User ID" value="${escapeHtml(target.recipient || '')}">
+            <button type="button" onclick="this.closest('.rw-channel-row').remove()" class="w-9 h-9 shrink-0 rounded-full bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-all" title="Remove">
+                <i class="fas fa-trash-alt text-[10px]"></i>
+            </button>
+        </div>`;
+    },
+
+    addChannelRow(target) {
+        document.getElementById('rw-f-channels').insertAdjacentHTML('beforeend', this.channelRowHtml(target || { channel: 'telegram' }));
+    },
+
+    renderChannelRows(targets) {
+        const box = document.getElementById('rw-f-channels');
+        if (!box) return;
+        box.innerHTML = '';
+        (targets || []).forEach(t => this.addChannelRow(t));
+    },
+
+    // Returns [{channel, recipient}] or null when a row is invalid.
+    collectChannels() {
+        const out = [];
+        for (const row of document.querySelectorAll('#rw-f-channels .rw-channel-row')) {
+            const channel = row.querySelector('.rw-cr-channel').value;
+            const recipient = row.querySelector('.rw-cr-recipient').value.trim();
+            if (!recipient) {
+                alert('Each channel row needs a Recipient ID (or remove the row).');
+                return null;
+            }
+            out.push({ channel, recipient });
+        }
+        return out;
     },
 
     async load() {
@@ -73,7 +122,9 @@ const RegularWork = {
         list.innerHTML = this.items.map(w => {
             const isPaused = w.status === 'paused';
             const agentBadge = w.agent_id ? `<span class="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml(w.agent_id)}</span>` : '';
-            const channelBadge = w.channel ? `<span class="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml(w.channel.toUpperCase())}</span>` : '';
+            const channelBadge = this.targetsOf(w).map(t =>
+                `<span class="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${escapeHtml((t.channel || '').toUpperCase())}</span>`
+            ).join('');
             return `<div class="px-6 py-5 flex items-center gap-4 hover:bg-slate-50/50 transition-all group cursor-pointer" onclick="RegularWork.openDetail('${escapeHtml(w.id)}')">
                 <div class="w-10 h-10 rounded-xl ${isPaused ? 'bg-slate-100' : 'bg-blue-50'} flex items-center justify-center shrink-0">
                     <i class="fas fa-sync-alt text-sm ${isPaused ? 'text-slate-400' : 'text-blue-500'}"></i>
@@ -112,7 +163,10 @@ const RegularWork = {
         document.getElementById('rw-detail-spec').textContent = w.spec;
         document.getElementById('rw-detail-cron').textContent = w.cron;
         document.getElementById('rw-detail-agent').textContent = w.agent_id || '—';
-        document.getElementById('rw-detail-channel').textContent = w.channel ? `${w.channel.toUpperCase()} → ${w.recipient || '?'}` : 'No callback';
+        const targets = this.targetsOf(w);
+        document.getElementById('rw-detail-channel').innerHTML = targets.length
+            ? targets.map(t => `<div>${escapeHtml((t.channel || '').toUpperCase())} → <span class="font-mono">${escapeHtml(t.recipient || '?')}</span></div>`).join('')
+            : 'No callback';
         document.getElementById('rw-detail-modal').classList.remove('hidden');
         document.getElementById('rw-detail-logs').innerHTML = '<div class="text-center py-8 text-slate-300 text-xs font-bold">Loading...</div>';
         try {
@@ -146,6 +200,7 @@ const RegularWork = {
         document.getElementById('rw-modal-title').textContent = 'Add Regular Work';
         document.getElementById('rw-edit-id').value = '';
         document.getElementById('rw-form').reset();
+        this.renderChannelRows([]);
         document.getElementById('rw-modal').classList.remove('hidden');
     },
 
@@ -159,14 +214,14 @@ const RegularWork = {
         document.getElementById('rw-f-spec').value = w.spec;
         document.getElementById('rw-f-cron').value = w.cron;
         document.getElementById('rw-f-agent').value = w.agent_id || '';
-        document.getElementById('rw-f-channel').value = w.channel || '';
-        document.getElementById('rw-f-recipient').value = w.recipient || '';
+        this.renderChannelRows(this.targetsOf(w));
         document.getElementById('rw-modal').classList.remove('hidden');
     },
 
     closeModal() {
         document.getElementById('rw-modal').classList.add('hidden');
         document.getElementById('rw-form').reset();
+        this.renderChannelRows([]);
         this.editingId = null;
     },
 

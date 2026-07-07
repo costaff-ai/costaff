@@ -23,13 +23,19 @@ class AddMCPRequest(BaseModel):
     url: Optional[str] = None
 
 
+class ChannelTarget(BaseModel):
+    channel: str
+    recipient: Optional[str] = None
+
+
 class RegularWorkCreateRequest(BaseModel):
     title: str
     spec: str
     cron: str
     agent_id: Optional[str] = "costaff_agent"
-    channel: Optional[str] = None
-    recipient: Optional[str] = None
+    channel: Optional[str] = None       # legacy single-channel form
+    recipient: Optional[str] = None     # legacy single-recipient form
+    channels: Optional[List[ChannelTarget]] = None  # multi-channel delivery targets
     user_id: Optional[str] = None
 
 
@@ -38,8 +44,9 @@ class RegularWorkUpdateRequest(BaseModel):
     spec: Optional[str] = None
     cron: Optional[str] = None
     agent_id: Optional[str] = None
-    channel: Optional[str] = None
-    recipient: Optional[str] = None
+    channel: Optional[str] = None       # legacy single-channel form
+    recipient: Optional[str] = None     # legacy single-recipient form
+    channels: Optional[List[ChannelTarget]] = None  # multi-channel delivery targets
     status: Optional[str] = None  # active / paused
 
 

@@ -19,11 +19,12 @@ def _cfg(url, monkeypatch):
     return cfg
 
 
-def test_single_head_is_baseline(monkeypatch):
+def test_single_head(monkeypatch):
+    """The migration graph must stay linear — exactly one head."""
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory.from_config(_cfg("sqlite://", monkeypatch))
-    assert list(script.get_heads()) == ["0001_baseline"]
+    assert list(script.get_heads()) == ["0002_regular_work_channels"]
 
 
 def test_upgrade_head_creates_core_schema(tmp_path, monkeypatch):

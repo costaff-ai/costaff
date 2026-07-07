@@ -88,8 +88,8 @@
                     <p id="rw-detail-agent" class="text-sm font-bold text-purple-600"></p>
                 </div>
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Channel</span>
-                    <p id="rw-detail-channel" class="text-sm font-bold text-green-600"></p>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Channels</span>
+                    <div id="rw-detail-channel" class="text-sm font-bold text-green-600 space-y-1"></div>
                 </div>
             </div>
             <div>
@@ -140,20 +140,15 @@
                     <input type="text" id="rw-f-agent" placeholder="costaff_agent" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Channel (Optional)</label>
-                    <select id="rw-f-channel" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
-                        <option value="">No Callback</option>
-                        <option value="telegram">Telegram</option>
-                        <option value="discord">Discord</option>
-                        <option value="line">Line</option>
-                    </select>
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Delivery Channels (Optional)</label>
+                    <button type="button" onclick="RegularWork.addChannelRow()" class="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-bold hover:bg-blue-100 transition-all">
+                        <i class="fas fa-plus mr-1"></i>Add Channel
+                    </button>
                 </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Recipient ID</label>
-                    <input type="text" id="rw-f-recipient" placeholder="Chat ID or User ID" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
-                </div>
+                <div id="rw-f-channels" class="space-y-2"></div>
+                <p class="text-[10px] text-slate-400 mt-2">Empty = no callback. Each row delivers the result to one channel + recipient ID.</p>
             </div>
             <div class="pt-4 flex gap-4">
                 <button type="button" onclick="RegularWork.closeModal()" class="flex-1 px-6 py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition-all">CANCEL</button>

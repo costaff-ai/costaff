@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 import uuid
 from datetime import datetime
 
@@ -49,11 +50,25 @@ async def _run_for_user(regular_work_id: str, work, user_id: str):
         if not work:
             return
 
-        # Resolve channel/recipient for this user
-        channel = work.channel
-        recipient = work.recipient
-        if not channel:
+        # Resolve delivery targets: multi-channel JSON first, then the legacy
+        # single pair, then the user's default channel as a last resort.
+        targets = []
+        raw_channels = getattr(work, "channels", None)
+        if raw_channels:
+            try:
+                targets = [
+                    (t.get("channel"), t.get("recipient"))
+                    for t in json.loads(raw_channels)
+                    if isinstance(t, dict) and t.get("channel")
+                ]
+            except (ValueError, TypeError):
+                logger.warning(f"RegularWork {regular_work_id}: unparseable channels JSON, falling back")
+        if not targets and work.channel:
+            targets = [(work.channel, work.recipient)]
+        if not targets:
             channel, recipient = get_user_channel_info(user_id, db)
+            if channel:
+                targets = [(channel, recipient)]
 
         app_name = os.getenv("ADK_APP_NAME", "costaff_agent")
         session_id = f"rwork_{regular_work_id}_{user_id[:8]}"
@@ -71,8 +86,10 @@ async def _run_for_user(regular_work_id: str, work, user_id: str):
             "DO now, not as a request to schedule.)\n\n"
             + work.spec
         )
-        if channel and recipient:
-            spec += f"\n\n(System Note: This is a scheduled regular work. Deliver your output to the user via {channel}. Do NOT call send_message_now for this recipient.)"
+        deliverable = [(c, r) for c, r in targets if c and r]
+        if deliverable:
+            names = ", ".join(sorted({c for c, _ in deliverable}))
+            spec += f"\n\n(System Note: This is a scheduled regular work. Deliver your output to the user via {names}. Do NOT call send_message_now for this recipient.)"
 
         try:
             result_text = await run_adk_prompt(app_name, user_id, session_id, spec)
@@ -91,8 +108,14 @@ async def _run_for_user(regular_work_id: str, work, user_id: str):
             db.add(new_log)
             db.commit()
 
-            if channel and recipient and not work.silent:
-                await dispatch_notification(channel, recipient, result_text, session_id)
+            if not work.silent:
+                for ch, rec in deliverable:
+                    try:
+                        await dispatch_notification(ch, rec, result_text, session_id)
+                    except Exception:
+                        logger.exception(
+                            f"RegularWork {regular_work_id}: delivery to {ch}/{rec} failed"
+                        )
 
         except Exception as e:
             logger.error(f"RegularWork execution failed {regular_work_id} for user {user_id}: {e}")

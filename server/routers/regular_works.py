@@ -5,6 +5,7 @@ to an agent on schedule. Decoupled from the project Epic/Story/Task
 hierarchy because regular works run autonomously and do not produce
 per-run artifacts (their effect is the side-effects each agent run has).
 """
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -23,18 +24,69 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _normalize_targets(req) -> list:
+    """Collapse the request's channel fields into [{"channel", "recipient"}].
+
+    Prefers the multi-channel `channels` list; falls back to the legacy
+    single channel/recipient pair so old API clients keep working.
+    """
+    if req.channels is not None:
+        return [
+            {"channel": t.channel.strip(), "recipient": (t.recipient or "").strip() or None}
+            for t in req.channels if t.channel and t.channel.strip()
+        ]
+    if req.channel:
+        return [{"channel": req.channel, "recipient": req.recipient}]
+    return []
+
+
+def _target_columns(targets: list) -> dict:
+    """DB values for a target list: JSON blob + legacy mirror of the first pair."""
+    first = targets[0] if targets else {}
+    return {
+        "channels": json.dumps(targets, ensure_ascii=False) if targets else None,
+        "channel": first.get("channel"),
+        "recipient": first.get("recipient"),
+    }
+
+
+def _parse_targets_row(row: dict) -> dict:
+    """Decode the channels JSON column into a list for API responses."""
+    raw = row.pop("channels", None)
+    targets = None
+    if raw:
+        try:
+            targets = [t for t in json.loads(raw) if isinstance(t, dict) and t.get("channel")]
+        except (ValueError, TypeError):
+            targets = None
+    if targets is None:
+        targets = [{"channel": row["channel"], "recipient": row.get("recipient")}] if row.get("channel") else []
+    row["channels"] = targets
+    return row
+
+
 @router.get("/api/regular-works")
 def list_regular_works(auth: bool = Depends(AuthManager.verify_token)):
     engine = DatabaseManager.get_engine()
     if not engine:
         return []
+    base_cols = ("id, user_id, title, spec, cron, agent_id, channel, recipient, "
+                 "status, last_run, next_run, created_at, updated_at")
     try:
         with engine.connect() as conn:
-            res = conn.execute(text(
-                "SELECT id, user_id, title, spec, cron, agent_id, channel, recipient, status, last_run, next_run, created_at, updated_at "
-                "FROM regular_works ORDER BY created_at ASC"
-            ))
-            return [_serialize_row(dict(r._mapping)) for r in res]
+            try:
+                res = conn.execute(text(
+                    f"SELECT {base_cols}, channels FROM regular_works ORDER BY created_at ASC"
+                ))
+                rows = [dict(r._mapping) for r in res]
+            except Exception:
+                # Stack DB not migrated to 0002 yet — fall back to legacy columns.
+                conn.rollback()
+                res = conn.execute(text(
+                    f"SELECT {base_cols} FROM regular_works ORDER BY created_at ASC"
+                ))
+                rows = [dict(r._mapping) for r in res]
+            return [_parse_targets_row(_serialize_row(r)) for r in rows]
     except Exception:
         logger.exception("regular_works list-handler failed")
         return []
@@ -52,15 +104,16 @@ def create_regular_work_api(req: RegularWorkCreateRequest, auth: bool = Depends(
     try:
         wid = str(uuid.uuid4())
         now = datetime.utcnow()
+        cols = _target_columns(_normalize_targets(req))
         with engine.connect() as conn:
             conn.execute(text("""
-                INSERT INTO regular_works (id, user_id, session_id, title, spec, cron, agent_id, channel, recipient, status, created_at, updated_at)
-                VALUES (:id, :user_id, :session_id, :title, :spec, :cron, :agent_id, :channel, :recipient, :status, :now, :now)
+                INSERT INTO regular_works (id, user_id, session_id, title, spec, cron, agent_id, channel, recipient, channels, status, created_at, updated_at)
+                VALUES (:id, :user_id, :session_id, :title, :spec, :cron, :agent_id, :channel, :recipient, :channels, :status, :now, :now)
             """), {
                 "id": wid, "user_id": req.user_id or "dashboard-user",
                 "session_id": "dashboard-manual", "title": req.title,
                 "spec": req.spec, "cron": req.cron, "agent_id": req.agent_id or "costaff_agent",
-                "channel": req.channel, "recipient": req.recipient,
+                "channel": cols["channel"], "recipient": cols["recipient"], "channels": cols["channels"],
                 "status": "active", "now": now
             })
             conn.commit()
@@ -85,9 +138,13 @@ def update_regular_work_api(work_id: str, req: RegularWorkUpdateRequest, auth: b
         updates = req.dict(exclude_unset=True)
         if not updates:
             return {"status": "no changes"}
+        if "channels" in updates or "channel" in updates or "recipient" in updates:
+            # Any channel-shaped edit rewrites the full target set (JSON +
+            # legacy mirror) so the two representations never diverge.
+            updates.update(_target_columns(_normalize_targets(req)))
         updates["id"] = work_id
         updates["now"] = datetime.utcnow()
-        allowed = {"title", "spec", "cron", "agent_id", "channel", "recipient", "status"}
+        allowed = {"title", "spec", "cron", "agent_id", "channel", "recipient", "channels", "status"}
         set_clauses = [f"{k} = :{k}" for k in updates if k in allowed]
         set_clauses.append("updated_at = :now")
         with engine.connect() as conn:

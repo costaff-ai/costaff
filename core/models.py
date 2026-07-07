@@ -115,8 +115,9 @@ class RegularWork(Base):
     spec = Column(String, nullable=False)       # Full instructions for the Agent
     cron = Column(String, nullable=False)
     agent_id = Column(String, nullable=True)    # Which agent to call (None = costaff_agent)
-    channel = Column(String, nullable=True)
-    recipient = Column(String, nullable=True)
+    channel = Column(String, nullable=True)     # Legacy single-channel (kept for compat; mirrors channels[0])
+    recipient = Column(String, nullable=True)   # Legacy single-recipient (mirrors channels[0])
+    channels = Column(String, nullable=True)    # JSON array of {"channel": str, "recipient": str} delivery targets
     status = Column(String, default="active")   # active / paused
     silent = Column(Boolean, default=False)     # True = internal only, skip user notification
     last_run = Column(DateTime, nullable=True)
