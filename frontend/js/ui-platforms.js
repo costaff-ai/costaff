@@ -1,7 +1,8 @@
-// Platforms — read-only ops view for business platforms (ERP/CRM/HRM/…).
-// Lists registered platforms with frontend health, allows start / restart /
-// stop, and supports search + status filtering and a card / list view toggle.
-// Deploy/rebuild/remove stay CLI-only.
+// Platforms — business platforms (ERP/CRM/HRM/…) in two flavours:
+// - local: installed on this host via `costaff platform add`; health probes
+//   localhost, lifecycle = start/restart/stop. Deploy/rebuild stay CLI-only.
+// - remote: registered here App-Store-style (pick an app → set its URL);
+//   health probes the stored URL, full CRUD from the dashboard.
 const Platforms = {
     HEALTH: {
         healthy:   { dot: 'bg-emerald-500', label: 'Healthy' },
@@ -17,7 +18,7 @@ const Platforms = {
     _page: 1,
     _pageSize: 8,   // rows per page in the table (list) view
 
-    async init() { await this.load(); },
+    async init() { this.bindStoreForm(); await this.load(); },
 
     async load() {
         const el = document.getElementById('platforms-list');
@@ -62,16 +63,35 @@ const Platforms = {
     },
 
     _actions(p) {
+        const open = p.url ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" class="px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all no-underline"><i class="fas fa-arrow-up-right-from-square mr-1"></i>Open</a>` : '';
+        if (p.type === 'remote') {
+            // remote instances live on their own host — no compose lifecycle here
+            return `${open}
+               ${this._btn('Edit', `Platforms.openEdit('${escapeHtml(p.name)}')`, 'bg-slate-100 text-slate-600 hover:bg-slate-200', 'fa-pen')}
+               ${this._btn('Remove', `Platforms.remove('${escapeHtml(p.name)}')`, 'bg-slate-100 text-rose-500 hover:bg-rose-50', 'fa-trash-alt')}`;
+        }
         const up = p.health === 'healthy' || p.health === 'unhealthy';
         return up
-            ? `${p.url ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" class="px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all no-underline"><i class="fas fa-arrow-up-right-from-square mr-1"></i>Open</a>` : ''}
+            ? `${open}
                ${this._btn('Restart', `Platforms.action('${escapeHtml(p.name)}','restart')`, 'bg-slate-100 text-slate-600 hover:bg-slate-200', 'fa-rotate')}
                ${this._btn('Stop', `Platforms.action('${escapeHtml(p.name)}','stop')`, 'bg-slate-100 text-rose-500 hover:bg-rose-50', 'fa-stop')}`
             : this._btn('Start', `Platforms.action('${escapeHtml(p.name)}','start')`, 'bg-blue-600 text-white hover:bg-blue-700', 'fa-play');
     },
 
     _endpoint(p) {
+        if (p.type === 'remote') return p.url ? escapeHtml(p.url.replace(/^https?:\/\//, '')) : 'no URL';
         return `${p.port ? 'localhost:' + escapeHtml(p.port) : 'no public port'}${p.ref ? ' · ' + escapeHtml(p.ref) : ''}`;
+    },
+
+    _icon(p) {
+        if (p.is_shared_db) return 'fa-database';
+        return p.icon || (p.type === 'remote' ? 'fa-cloud' : 'fa-cube');
+    },
+
+    _typeTag(p) {
+        return p.type === 'remote'
+            ? ' <span class="text-[9px] text-sky-500 normal-case tracking-normal font-bold">(remote)</span>'
+            : (p.is_shared_db ? ' <span class="text-[9px] text-slate-400 normal-case tracking-normal">(shared DB)</span>' : '');
     },
 
     render() {
@@ -105,10 +125,10 @@ const Platforms = {
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-blue-600 shrink-0">
-                            <i class="fas ${p.is_shared_db ? 'fa-database' : 'fa-cube'} text-lg"></i>
+                            <i class="fas ${this._icon(p)} text-lg"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-black text-slate-900 uppercase tracking-wide truncate">${escapeHtml(p.name)}${p.is_shared_db ? ' <span class="text-[9px] text-slate-400 normal-case tracking-normal">(shared DB)</span>' : ''}</div>
+                            <div class="text-sm font-black text-slate-900 uppercase tracking-wide truncate">${escapeHtml(p.name)}${this._typeTag(p)}</div>
                             <div class="text-[10px] font-mono text-slate-400 mt-0.5 truncate">${this._endpoint(p)}</div>
                         </div>
                     </div>
@@ -133,8 +153,8 @@ const Platforms = {
             return `<tr class="border-t border-slate-50 hover:bg-slate-50/60 transition-all">
                 <td class="py-3 px-4">
                     <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-blue-600 shrink-0"><i class="fas ${p.is_shared_db ? 'fa-database' : 'fa-cube'} text-xs"></i></div>
-                        <span class="text-xs font-black text-slate-900 uppercase tracking-wide truncate">${escapeHtml(p.name)}${p.is_shared_db ? ' <span class="text-[9px] text-slate-400 normal-case tracking-normal">(shared DB)</span>' : ''}</span>
+                        <div class="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-blue-600 shrink-0"><i class="fas ${this._icon(p)} text-xs"></i></div>
+                        <span class="text-xs font-black text-slate-900 uppercase tracking-wide truncate">${escapeHtml(p.name)}${this._typeTag(p)}</span>
                     </div>
                 </td>
                 <td class="py-3 px-4 text-[11px] font-mono text-slate-400 whitespace-nowrap">${this._endpoint(p)}</td>
@@ -170,5 +190,131 @@ const Platforms = {
         } catch (e) {
             alert(`Platform ${act} failed:\n${e.message}`);
         }
+    },
+
+    // --- App-Store flow: pick an app → set its URL --------------------
+    _editing: null,   // platform name when editing, null when adding
+    _catalog: [],
+
+    async openStore() {
+        this._editing = null;
+        document.getElementById('plat-store-title').textContent = 'Add Platform';
+        document.getElementById('plat-store-subtitle').textContent = 'Pick an app, then point it at your instance';
+        this._showStep('shelf');
+        document.getElementById('plat-store-modal').classList.remove('hidden');
+        const grid = document.getElementById('plat-catalog-grid');
+        grid.innerHTML = `<div class="col-span-full text-center text-slate-400 py-8 text-sm font-mono">Loading catalog…</div>`;
+        try {
+            this._catalog = (await API.fetch('/api/platforms/catalog')) || [];
+        } catch (e) {
+            grid.innerHTML = `<div class="col-span-full text-center text-rose-500 py-8 text-sm font-mono">Failed to load catalog: ${escapeHtml(e.message)}</div>`;
+            return;
+        }
+        const card = (app) => `
+            <button type="button" ${app.registered ? 'disabled' : `onclick="Platforms.pickApp('${escapeHtml(app.name)}')"`}
+                class="text-left p-4 rounded-2xl border transition-all ${app.registered
+                    ? 'border-slate-100 bg-slate-50 opacity-50 cursor-default'
+                    : 'border-slate-100 bg-white hover:border-blue-300 hover:shadow-md'}">
+                <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3"><i class="fas ${escapeHtml(app.icon || 'fa-cube')}"></i></div>
+                <div class="text-xs font-black text-slate-900 uppercase tracking-wide">${escapeHtml(app.name)}${app.registered ? ' <span class="text-[9px] text-emerald-500 normal-case tracking-normal">✓ registered</span>' : ''}</div>
+                <div class="text-[10px] text-slate-400 mt-1 leading-snug">${escapeHtml(app.description || '')}</div>
+            </button>`;
+        grid.innerHTML = this._catalog.map(card).join('') + `
+            <button type="button" onclick="Platforms.pickApp(null)"
+                class="text-left p-4 rounded-2xl border border-dashed border-slate-200 bg-white/50 hover:border-blue-300 hover:shadow-md transition-all">
+                <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mb-3"><i class="fas fa-plus"></i></div>
+                <div class="text-xs font-black text-slate-900 uppercase tracking-wide">Custom</div>
+                <div class="text-[10px] text-slate-400 mt-1 leading-snug">Any other platform — set your own name and URL.</div>
+            </button>`;
+    },
+
+    pickApp(name) {
+        const app = name ? this._catalog.find(a => a.name === name) : null;
+        this._fillForm({
+            name: app ? app.name : '',
+            nameEditable: !app,
+            icon: app ? app.icon : 'fa-cube',
+            description: app ? app.description : '',
+            url: '', mcp_url: '',
+        });
+        this._showStep('form');
+    },
+
+    openEdit(name) {
+        const p = this._all.find(x => x.name === name);
+        if (!p) return;
+        this._editing = name;
+        document.getElementById('plat-store-title').textContent = 'Edit Platform';
+        document.getElementById('plat-store-subtitle').textContent = 'Update where this platform lives';
+        this._fillForm({
+            name: p.name, nameEditable: false, icon: this._icon(p),
+            description: p.description || '', url: p.url || '', mcp_url: p.mcp_url || '',
+        });
+        this._showStep('form');
+        document.getElementById('plat-store-back').textContent = 'CANCEL';
+        document.getElementById('plat-store-modal').classList.remove('hidden');
+    },
+
+    _fillForm(f) {
+        document.getElementById('plat-f-icon').className = `fas ${f.icon || 'fa-cube'} text-xl`;
+        document.getElementById('plat-f-name-label').textContent = f.name || 'Custom platform';
+        document.getElementById('plat-f-desc-label').textContent = f.description || '';
+        document.getElementById('plat-f-name-row').classList.toggle('hidden', !f.nameEditable);
+        document.getElementById('plat-f-name').value = f.name;
+        document.getElementById('plat-f-url').value = f.url;
+        document.getElementById('plat-f-mcp').value = f.mcp_url;
+        document.getElementById('plat-f-desc').value = f.description;
+    },
+
+    _showStep(step) {
+        document.getElementById('plat-store-shelf').classList.toggle('hidden', step !== 'shelf');
+        document.getElementById('plat-store-form').classList.toggle('hidden', step !== 'form');
+        document.getElementById('plat-store-back').textContent = 'BACK';
+    },
+
+    storeBack() {
+        if (this._editing) return this.closeStore();
+        this._showStep('shelf');
+    },
+
+    closeStore() {
+        document.getElementById('plat-store-modal').classList.add('hidden');
+        this._editing = null;
+    },
+
+    bindStoreForm() {
+        const form = document.getElementById('plat-store-form');
+        if (!form) return;
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const nameRowHidden = document.getElementById('plat-f-name-row').classList.contains('hidden');
+            const name = this._editing
+                || (nameRowHidden ? document.getElementById('plat-f-name-label').textContent
+                                  : document.getElementById('plat-f-name').value).trim().toLowerCase();
+            const body = {
+                url: document.getElementById('plat-f-url').value.trim(),
+                mcp_url: document.getElementById('plat-f-mcp').value.trim() || null,
+                description: document.getElementById('plat-f-desc').value.trim() || null,
+            };
+            if (!body.url) return alert('Frontend URL is required.');
+            try {
+                if (this._editing) {
+                    await API.fetch(`/api/platforms/${this._editing}`, { method: 'PUT', body: JSON.stringify(body) });
+                } else {
+                    if (!name) return alert('Name is required.');
+                    await API.fetch('/api/platforms', { method: 'POST', body: JSON.stringify({ name, ...body }) });
+                }
+                this.closeStore();
+                await this.load();
+            } catch (err) { alert('Save failed: ' + err.message); }
+        };
+    },
+
+    async remove(name) {
+        if (!confirm(`Unregister platform '${name}'?\n(The remote instance itself is not touched.)`)) return;
+        try {
+            await API.fetch(`/api/platforms/${name}`, { method: 'DELETE' });
+            await this.load();
+        } catch (e) { alert('Remove failed: ' + e.message); }
     },
 };

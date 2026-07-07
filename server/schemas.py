@@ -23,6 +23,21 @@ class AddMCPRequest(BaseModel):
     url: Optional[str] = None
 
 
+class PlatformRegisterRequest(BaseModel):
+    """Register a remote (URL-only) business platform from the store."""
+    name: str
+    url: str
+    mcp_url: Optional[str] = None
+    description: Optional[str] = None
+
+
+class PlatformUpdateRequest(BaseModel):
+    url: Optional[str] = None
+    mcp_url: Optional[str] = None
+    description: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
 class ChannelTarget(BaseModel):
     channel: str
     recipient: Optional[str] = None

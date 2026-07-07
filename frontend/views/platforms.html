@@ -22,8 +22,64 @@
             <button onclick="Platforms.load()" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
                 <i class="fas fa-rotate-right mr-1"></i>Refresh
             </button>
+            <button onclick="Platforms.openStore()" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+                <i class="fas fa-plus mr-1"></i>Add Platform
+            </button>
         </div>
     </div>
     <div id="platforms-count" class="text-[11px] font-mono text-slate-400 mb-3"></div>
     <div id="platforms-list"></div>
+</div>
+
+<!-- Platform Store Modal (pick an app → set its URL) -->
+<div id="plat-store-modal" class="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm hidden">
+    <div class="bg-white border border-slate-100 rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+        <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <div>
+                <h3 id="plat-store-title" class="text-xl font-bold text-slate-900">Add Platform</h3>
+                <p id="plat-store-subtitle" class="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">Pick an app, then point it at your instance</p>
+            </div>
+            <button onclick="Platforms.closeStore()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+        </div>
+
+        <!-- Step 1: catalog shelf -->
+        <div id="plat-store-shelf" class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div id="plat-catalog-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="col-span-full text-center text-slate-400 py-8 text-sm font-mono">Loading catalog…</div>
+            </div>
+        </div>
+
+        <!-- Step 2: URL setup form -->
+        <form id="plat-store-form" class="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-5 hidden">
+            <div class="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <div class="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <i id="plat-f-icon" class="fas fa-cube text-xl"></i>
+                </div>
+                <div class="min-w-0">
+                    <div id="plat-f-name-label" class="text-sm font-black text-slate-900 uppercase tracking-wide">—</div>
+                    <div id="plat-f-desc-label" class="text-[11px] text-slate-400 truncate"></div>
+                </div>
+            </div>
+            <div id="plat-f-name-row" class="hidden">
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Name</label>
+                <input type="text" id="plat-f-name" placeholder="my-platform" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Frontend URL</label>
+                <input type="text" id="plat-f-url" required placeholder="http://192.168.1.10:18210 or https://erp.example.com" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-mono text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">MCP URL (Optional)</label>
+                <input type="text" id="plat-f-mcp" placeholder="http://host:port/mcp — lets agents operate this platform" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-mono text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Description (Optional)</label>
+                <input type="text" id="plat-f-desc" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+            <div class="pt-2 flex gap-4">
+                <button type="button" id="plat-store-back" onclick="Platforms.storeBack()" class="flex-1 px-6 py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition-all">BACK</button>
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all active:scale-95">SAVE</button>
+            </div>
+        </form>
+    </div>
 </div>

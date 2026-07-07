@@ -37,33 +37,12 @@ from services.platform_ops import (
     compose as _compose,
     ensure_networks as _ensure_networks,
 )
+from services.platform_registry import OFFICIAL_PLATFORMS
 from utils.paths import _base_dir
 
 console = Console()
 
 platform_app = typer.Typer(help="Manage business platforms (shared-DB compose projects).")
-
-_GH = "https://github.com/costaff-ai"
-
-# Official CoStaff Platform Registry.
-#   prefix : env-var prefix used by the platform's compose (<P>_DB_PASSWORD …)
-#   oidc   : the Account Manager seeds an `AM_<oidc>_CLIENT_SECRET` client
-#            for this platform (None → platform doesn't use OIDC)
-#   port   : default frontend (public) port
-OFFICIAL_PLATFORMS = {
-    "db":              {"github": f"{_GH}/costaff-platform-db.git", "prefix": None, "oidc": None, "port": None},
-    "account-manager": {"github": f"{_GH}/costaff-platform-account-manager.git", "prefix": "AM", "oidc": None, "port": 18320},
-    "erp":             {"github": f"{_GH}/costaff-platform-erp.git", "prefix": "ERP", "oidc": "ERP", "port": 18210},
-    "crm":             {"github": f"{_GH}/costaff-platform-crm.git", "prefix": "CRM", "oidc": "CRM", "port": 18250},
-    "scm":             {"github": f"{_GH}/costaff-platform-scm.git", "prefix": "SCM", "oidc": "SCM", "port": 18310},
-    "hrm":             {"github": f"{_GH}/costaff-platform-hrm.git", "prefix": "HRM", "oidc": "HRM", "port": 18410},
-    "plm":             {"github": f"{_GH}/costaff-platform-plm.git", "prefix": "PLM", "oidc": "PLM", "port": 18510},
-    "accounting":      {"github": f"{_GH}/costaff-platform-accounting.git", "prefix": "ACC", "oidc": None, "port": 18610},
-    "knowledge":       {"github": f"{_GH}/costaff-platform-knowledge.git", "prefix": "KMS", "oidc": "KMS", "port": 18710},
-    "project":         {"github": f"{_GH}/costaff-platform-project.git", "prefix": "PROJECT", "oidc": "PROJECT", "port": 18730},
-    "expense":         {"github": f"{_GH}/costaff-platform-expense.git", "prefix": "EXPENSE", "oidc": "EXPENSE", "port": 18750},
-    "helpdesk":        {"github": f"{_GH}/costaff-platform-helpdesk.git", "prefix": "HELPDESK", "oidc": "HELPDESK", "port": 18770},
-}
 
 # Keys whose empty values get a random secret on env bootstrap.
 _SECRET_KEY_RE = re.compile(r"_(PASSWORD|SECRET|KEY|SALT)$")
