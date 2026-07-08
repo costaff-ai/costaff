@@ -83,7 +83,7 @@ Object.assign(UI, {
         const toggleClass = agent.enabled ? 'bg-slate-100 text-rose-500' : 'bg-blue-600 text-white hover:bg-blue-700';
         actions.innerHTML = `
             <button onclick="UI.toggleExtAgent('${escapeHtml(agent.name)}', ${!agent.enabled})" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${toggleClass}">${toggleLabel}</button>
-            ${agent.type === 'url' ? `<button onclick="UI.removeExtAgent('${escapeHtml(agent.name)}')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-rose-200 text-rose-500 hover:bg-rose-50 transition-all">REMOVE</button>` : ''}
+            ${agent.type === 'url' && agent.added_by !== 'cli' ? `<button onclick="UI.removeExtAgent('${escapeHtml(agent.name)}')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-rose-200 text-rose-500 hover:bg-rose-50 transition-all">REMOVE</button>` : ''}
         `;
 
         const mcpSection = document.getElementById('ext-agent-mcp-section');

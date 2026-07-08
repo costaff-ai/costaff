@@ -159,7 +159,9 @@ def agent_add(
             console.print(f"[red]Deploy failed: {e}[/red]")
             raise typer.Exit(1)
     else:
-        entry = {"type": "url", "a2a_url": url, "description": description, "enabled": True}
+        # added_by stamps CRUD ownership: CLI-added agents are only removable
+        # via `costaff agent remove` (the dashboard rejects them).
+        entry = {"type": "url", "added_by": "cli", "a2a_url": url, "description": description, "enabled": True}
 
     if tag:
         entry["ref"] = tag

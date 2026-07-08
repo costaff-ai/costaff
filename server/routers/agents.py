@@ -69,6 +69,7 @@ def list_external_agents(auth: bool = Depends(AuthManager.verify_token)):
         result.append({
             "name": name,
             "type": agent.get("type", "url"),
+            "added_by": agent.get("added_by"),  # "ui" | "cli" | None (legacy)
             "a2a_url": agent.get("a2a_url", ""),
             "description": agent.get("description", ""),
             "enabled": agent.get("enabled", True),
@@ -138,6 +139,7 @@ def add_external_agent(req: ExternalAgentAddRequest, auth: bool = Depends(AuthMa
         raise HTTPException(400, f"Agent '{name}' already exists.")
     conf.setdefault("external_agents", {})[name] = {
         "type": "url",
+        "added_by": "ui",   # CRUD ownership: UI-added → UI-deletable
         "a2a_url": req.a2a_url,
         "description": req.description or "",
         "enabled": True,
@@ -181,8 +183,12 @@ def remove_external_agent(name: str, auth: bool = Depends(AuthManager.verify_tok
     conf = core.core_config()
     if name not in conf.get("external_agents", {}):
         raise HTTPException(404, f"Agent '{name}' not found.")
-    if conf["external_agents"][name].get("type") == "github":
+    entry = conf["external_agents"][name]
+    if entry.get("type") == "github":
         raise HTTPException(400, "GitHub-deployed agents must be removed via CLI: costaff agent remove")
+    if entry.get("added_by") == "cli":
+        # CRUD ownership: whoever added a resource owns its deletion.
+        raise HTTPException(400, f"Agent '{name}' was added via CLI — remove it with: costaff agent remove {name}")
     del conf["external_agents"][name]
     core.write_config(conf)
     core.regen_external_agents_env()
