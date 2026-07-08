@@ -58,6 +58,29 @@ class CoreContext:
         self.compose_project = data.get("compose_project") or ""
         self.manager_service = data.get("manager_service") or self.cn("agent-costaff")
 
+    # --- derived filesystem layout (mirrors the ~/.costaff convention:
+    #     <base>/costaff/config.json, <base>/costaff-agent/, <base>/workspace/) ---
+    @property
+    def runtime_root(self) -> str:
+        return os.path.dirname(self.config_path)
+
+    @property
+    def base_dir(self) -> str:
+        return os.path.dirname(self.runtime_root)
+
+    @property
+    def workspace_root(self) -> str:
+        return os.path.join(self.base_dir, "workspace")
+
+    @property
+    def main_compose(self) -> str:
+        return self.compose_file or os.path.join(self.runtime_root, "docker-compose.yaml")
+
+    @property
+    def is_default(self) -> bool:
+        """True for the synthetic single-install core (no registry entry)."""
+        return self.name == "default"
+
     # --- containers ---
     def cn(self, suffix: str) -> str:
         """Container name for a logical role, e.g. cn('agent-costaff')."""
@@ -166,6 +189,32 @@ def list_cores() -> list:
 def active_core() -> CoreContext:
     cores, active = _registry()
     return CoreContext(active, cores[active])
+
+
+def get_core(name: str = None) -> CoreContext:
+    """Resolve a core by name; None → the active core (CLI --core semantics)."""
+    cores, active = _registry()
+    target = name or active
+    if target not in cores:
+        raise ValueError(f"unknown core '{target}' (known: {', '.join(sorted(cores))})")
+    return CoreContext(target, cores[target])
+
+
+def all_used_public_ports() -> set:
+    """Public ports claimed by agents/channels across EVERY registered core.
+
+    Host ports are machine-global, so allocation on one core must not
+    collide with entries registered on another core's config.json.
+    """
+    cores, _ = _registry()
+    used = set()
+    for name, data in cores.items():
+        conf = CoreContext(name, data).core_config()
+        for section in ("external_agents", "dynamic_channels"):
+            for entry in conf.get(section, {}).values():
+                if entry.get("public_port"):
+                    used.add(entry["public_port"])
+    return used
 
 
 def set_active(name: str) -> str:

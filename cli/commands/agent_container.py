@@ -17,25 +17,26 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
-from services.config import ConfigManager
-from services.runtime import get_runtime
+from services.agent_components import agent_card_url
+from services.runtime import runtime_for
 from services.runtime.git import Git, GitError
-from utils.paths import PATHS
 
 from .agent import agent_app
+from .agent_lifecycle import CORE_OPT, _resolve_core
 
 console = Console()
 
 
 @agent_app.command("list")
-def agent_list():
+def agent_list(core_name: Optional[str] = CORE_OPT):
     """List all external agents with health status."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     agents = conf.get("external_agents", {})
     if not agents:
-        console.print("[yellow]No external agents configured.[/yellow]")
+        console.print(f"[yellow]No external agents configured on core '{core.name}'.[/yellow]")
         return
-    table = Table(title="External Agents")
+    table = Table(title=f"External Agents (core: {core.name})")
     table.add_column("Name", style="cyan")
     table.add_column("Type", style="blue")
     table.add_column("Ref", style="magenta")
@@ -45,9 +46,12 @@ def agent_list():
     table.add_column("Description")
     for name, agent in agents.items():
         health = "—"
-        if agent.get("a2a_url") and agent.get("enabled"):
+        # Host-side reachable URL (github → localhost:public_port), same
+        # resolution as the dashboard health check.
+        probe = agent_card_url(agent)
+        if probe and agent.get("enabled"):
             try:
-                r = httpx.get(f"{agent['a2a_url']}/.well-known/agent-card.json", timeout=3.0)
+                r = httpx.get(f"{probe}/.well-known/agent-card.json", timeout=3.0)
                 health = "[green]●[/green]" if r.status_code == 200 else "[red]●[/red]"
             except Exception:
                 health = "[red]●[/red]"
@@ -58,7 +62,10 @@ def agent_list():
 
 
 @agent_app.command("tags")
-def agent_tags(name: str = typer.Argument(..., help="Agent name to inspect tags for")):
+def agent_tags(
+    name: str = typer.Argument(..., help="Agent name to inspect tags for"),
+    core_name: Optional[str] = CORE_OPT,
+):
     """List available release tags on the agent's origin remote.
 
     Use this to discover what versions exist before pinning via
@@ -67,9 +74,10 @@ def agent_tags(name: str = typer.Argument(..., help="Agent name to inspect tags 
     no fetch is required and the network round-trip is light. The
     currently pinned ref (if any) is annotated with a ✓ mark.
     """
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     agent_conf = conf["external_agents"][name]
     source_path = agent_conf.get("source_path")
@@ -94,11 +102,15 @@ def agent_tags(name: str = typer.Argument(..., help="Agent name to inspect tags 
 
 
 @agent_app.command("restart")
-def agent_restart(name: str = typer.Argument(..., help="Agent name to restart")):
+def agent_restart(
+    name: str = typer.Argument(..., help="Agent name to restart"),
+    core_name: Optional[str] = CORE_OPT,
+):
     """Restart a local agent's containers without rebuilding."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     agent_conf = conf["external_agents"][name]
     if agent_conf.get("type") != "github" or not agent_conf.get("fragment_path"):
@@ -106,9 +118,9 @@ def agent_restart(name: str = typer.Argument(..., help="Agent name to restart"))
         raise typer.Exit(1)
 
     fragment_path = agent_conf["fragment_path"]
-    container_names = agent_conf.get("container_names", [f"costaff-{name}"])
-    load_dotenv(PATHS["env"], override=True)
-    runtime = get_runtime()
+    container_names = agent_conf.get("container_names", [f"{core.prefix}-{name}"])
+    load_dotenv(core.env_path, override=True)
+    runtime = runtime_for(core)
 
     console.print(f"Stopping agent [bold]{name}[/bold]...")
     runtime.stop(container_names, fragment=fragment_path)
@@ -128,11 +140,13 @@ def agent_rebuild(
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without Docker layer cache"),
     pull: bool = typer.Option(True, "--pull/--no-pull", help="Sync source from origin before rebuilding (pull for branch pin, fetch+checkout for tag/commit pin)"),
     tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin to a different release tag / branch / commit. Persisted to config so the next rebuild stays on this ref."),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Rebuild Docker images and restart a local agent from source."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     agent_conf = conf["external_agents"][name]
     if agent_conf.get("type") != "github" or not agent_conf.get("fragment_path"):
@@ -140,10 +154,10 @@ def agent_rebuild(
         raise typer.Exit(1)
 
     fragment_path = agent_conf["fragment_path"]
-    container_names = agent_conf.get("container_names", [f"costaff-{name}"])
+    container_names = agent_conf.get("container_names", [f"{core.prefix}-{name}"])
     source_path = agent_conf.get("source_path", "(unknown)")
-    load_dotenv(PATHS["env"], override=True)
-    runtime = get_runtime()
+    load_dotenv(core.env_path, override=True)
+    runtime = runtime_for(core)
 
     # Effective ref: --tag overrides any persisted pin; otherwise stay on
     # whatever the entry has. None means "track default branch" — same as
@@ -174,7 +188,7 @@ def agent_rebuild(
     # source tree would still be on whatever ref it was before.
     if tag and tag != agent_conf.get("ref") and ref_sync_ok:
         agent_conf["ref"] = tag
-        ConfigManager.save_config(conf)
+        core.write_config(conf)
 
     console.print(f"Building [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
     try:

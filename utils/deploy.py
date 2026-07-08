@@ -83,6 +83,7 @@ def _deploy_local_agent(
     conf: dict,
     predefined_envs: dict = None,
     strict: bool = False,
+    core=None,
 ) -> dict:
     """Build and start a local-path agent following CoStaff Agent Convention.
 
@@ -90,11 +91,20 @@ def _deploy_local_agent(
     Agent Protocol schema; otherwise only protocol-version compatibility
     is enforced (legacy manifests without protocol_version warn instead
     of fail). See services.agent_protocol for details.
+
+    `core` (services.cores.CoreContext) targets the deploy at a specific
+    core's paths / container prefix / compose project. None → the active
+    core, which on single-install hosts is the synthetic default with the
+    exact historical layout.
     """
     import yaml as _yaml
     from dotenv import load_dotenv
     from services.docker import DockerManager
     from services.agent_protocol import ProtocolError, validate_manifest
+    from services.cores import active_core, all_used_public_ports
+
+    if core is None:
+        core = active_core()
 
     source_path = os.path.abspath(source_path)
     manifest_path = os.path.join(source_path, "costaff.agent.json")
@@ -121,17 +131,20 @@ def _deploy_local_agent(
     description = manifest.get("description", "")
     version = manifest.get("version", "")
 
-    public_port = _next_available_port(conf)
-    fragment_dir = os.path.join(_base_dir, "costaff-agent", name)
+    public_port = _next_available_port(conf, reserved=all_used_public_ports())
+    fragment_dir = os.path.join(core.base_dir, "costaff-agent", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
-    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs, name=name)
-    load_dotenv(PATHS["env"], override=True)
+    plugin_env_path = _prompt_and_write_plugin_env(
+        manifest, fragment_dir, predefined_envs, name=name,
+        core_env_path=core.env_path, container_prefix=core.prefix,
+    )
+    load_dotenv(core.env_path, override=True)
 
     # Plan B workspace directories: private per-agent + shared
-    agent_container_name = f"costaff-agent-{name}"
-    private_host_dir = os.path.join(_workspace_root, agent_container_name)
-    shared_host_dir = os.path.join(_workspace_root, "shared")
+    agent_container_name = f"{core.prefix}-agent-{name}"
+    private_host_dir = os.path.join(core.workspace_root, agent_container_name)
+    shared_host_dir = os.path.join(core.workspace_root, "shared")
     agent_shared_host_dir = os.path.join(shared_host_dir, agent_container_name)
     os.makedirs(private_host_dir, exist_ok=True)
     os.makedirs(agent_shared_host_dir, exist_ok=True)
@@ -153,7 +166,7 @@ def _deploy_local_agent(
         explicit = svc_def.get("container_name")
         if explicit:
             return explicit
-        return f"costaff-{svc}" if svc.startswith("costaff-") else f"costaff-{svc}"
+        return f"{core.prefix}-{svc}"
 
     a2a_container_name_val = _svc_to_container(a2a_service, src_compose["services"].get(a2a_service, {}))
 
@@ -227,7 +240,7 @@ def _deploy_local_agent(
 
     # Inject env_file into all services
     for svc_def in services_fragment.values():
-        svc_def["env_file"] = [PATHS["env"], plugin_env_path]
+        svc_def["env_file"] = [core.env_path, plugin_env_path]
 
     fragment = {
         "services": services_fragment,
@@ -242,20 +255,24 @@ def _deploy_local_agent(
 
     # Sync MCP_SERVER_URLS before container creation — see _deploy_local_channel
     # for the rationale (manual-onboard installs otherwise hit MCP with no auth).
-    from services.config import ConfigManager
-    ConfigManager.update_mcp_urls()
-    load_dotenv(PATHS["env"], override=True)
+    core.regen_mcp_urls()
+    load_dotenv(core.env_path, override=True)
 
-    # Build & start
+    # Build & start (scoped to this core's compose project so containers land
+    # on the right stack and don't name-conflict across cores)
     import httpx
     from rich.console import Console
     console = Console()
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     ext_services = list(services_fragment.keys())
-    cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--build", "--force-recreate"]
-    console.print(f"Building and starting {name}...")
+    cmd = DockerManager.get_cmd()
+    if core.compose_project:
+        cmd += ["-p", core.compose_project]
+    cmd += ["-f", core.main_compose, "-f", fragment_path, "up", "-d", "--build", "--force-recreate"]
+    cmd += ext_services
+    console.print(f"Building and starting {name} (core: {core.name})...")
     import subprocess
-    result = subprocess.run(cmd, cwd=_project_root)
+    compose_cwd = core.runtime_root if os.path.isdir(core.runtime_root) else _project_root
+    result = subprocess.run(cmd, cwd=compose_cwd)
     if result.returncode != 0:
         raise RuntimeError("docker compose up failed")
 

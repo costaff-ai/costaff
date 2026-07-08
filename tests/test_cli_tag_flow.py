@@ -33,6 +33,29 @@ def fake_git():
     return MagicMock()
 
 
+class FakeCore:
+    """Stands in for services.cores.CoreContext in agent-command tests."""
+    name = "default"
+    label = "Default"
+    prefix = "costaff"
+    env_path = "/tmp/.env"
+    is_default = True
+
+    def __init__(self, conf):
+        self._conf = conf
+        self.saved = 0
+
+    def core_config(self):
+        return self._conf
+
+    def write_config(self, conf):
+        self._conf = conf
+        self.saved += 1
+
+    def cn(self, suffix):
+        return f"{self.prefix}-{suffix}"
+
+
 # ----- agent rebuild --------------------------------------------------
 
 def test_agent_rebuild_with_pinned_ref_uses_checkout(fake_git, fake_runtime):
@@ -54,10 +77,10 @@ def test_agent_rebuild_with_pinned_ref_uses_checkout(fake_git, fake_runtime):
 
     fake_git.is_repo.return_value = True
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config") as save_mock, \
+    core = FakeCore(conf)
+    with patch.object(agent_container, "_resolve_core", return_value=core), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=True, tag=None)
 
@@ -65,7 +88,7 @@ def test_agent_rebuild_with_pinned_ref_uses_checkout(fake_git, fake_runtime):
     fake_git.checkout.assert_called_once_with("/tmp/ba-src", "v0.1.0-alpha-1")
     fake_git.pull_ff_only.assert_not_called()
     # Config doesn't change — no explicit --tag was passed.
-    save_mock.assert_not_called()
+    assert core.saved == 0
 
 
 def test_agent_rebuild_without_pin_falls_back_to_pull(fake_git, fake_runtime):
@@ -86,10 +109,9 @@ def test_agent_rebuild_without_pin_falls_back_to_pull(fake_git, fake_runtime):
 
     fake_git.is_repo.return_value = True
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config"), \
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=True, tag=None)
 
@@ -120,17 +142,17 @@ def test_agent_rebuild_skips_pin_persist_when_checkout_fails(fake_git, fake_runt
     # `git checkout v9.9.9` "did not match any file(s) known to git" case.
     fake_git.checkout.side_effect = GitError("pathspec 'v9.9.9' did not match any file(s)")
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config") as save_mock, \
+    core = FakeCore(conf)
+    with patch.object(agent_container, "_resolve_core", return_value=core), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=True, tag="v9.9.9")
 
     fake_git.fetch_tags.assert_called_once_with("/tmp/ba-src")
     fake_git.checkout.assert_called_once_with("/tmp/ba-src", "v9.9.9")
     # Critical: config.json must NOT be told we're now on v9.9.9.
-    save_mock.assert_not_called()
+    assert core.saved == 0
     assert "ref" not in conf["external_agents"]["ba"]
 
 
@@ -152,16 +174,16 @@ def test_agent_rebuild_tag_override_writes_new_pin(fake_git, fake_runtime):
     }
     fake_git.is_repo.return_value = True
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config") as save_mock, \
+    core = FakeCore(conf)
+    with patch.object(agent_container, "_resolve_core", return_value=core), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=True, tag="v0.2.0")
 
     fake_git.checkout.assert_called_once_with("/tmp/ba-src", "v0.2.0")
     assert conf["external_agents"]["ba"]["ref"] == "v0.2.0"
-    save_mock.assert_called_once()
+    assert core.saved == 1
 
 
 def test_agent_rebuild_no_pull_skips_all_git_work(fake_git, fake_runtime):
@@ -182,10 +204,9 @@ def test_agent_rebuild_no_pull_skips_all_git_work(fake_git, fake_runtime):
     }
     fake_git.is_repo.return_value = True
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config"), \
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=False, tag=None)
 
@@ -331,10 +352,9 @@ def test_agent_rebuild_force_removes_containers_before_up(fake_git, fake_runtime
     fake_runtime.force_remove_container.side_effect = lambda n: call_log.append(f"rm:{n}")
     fake_runtime.up.side_effect = lambda *a, **kw: call_log.append("up")
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
-         patch.object(agent_container.ConfigManager, "save_config"), \
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(agent_container, "Git", return_value=fake_git), \
-         patch.object(agent_container, "get_runtime", return_value=fake_runtime), \
+         patch.object(agent_container, "runtime_for", return_value=fake_runtime), \
          patch.object(agent_container, "load_dotenv"):
         agent_container.agent_rebuild(name="ba", no_cache=False, pull=False, tag=None)
 
@@ -396,7 +416,7 @@ def test_agent_tags_lists_origin_tags_with_pin_marker(capsys, fake_git):
     fake_git.is_repo.return_value = True
     fake_git.list_remote_tags.return_value = ["v0.2.0", "v0.1.0-alpha-1"]
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(agent_container, "Git", return_value=fake_git):
         agent_container.agent_tags(name="ba")
 
@@ -419,7 +439,7 @@ def test_agent_tags_empty_remote_prints_friendly_message(capsys, fake_git):
     fake_git.is_repo.return_value = True
     fake_git.list_remote_tags.return_value = []
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value=conf), \
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(agent_container, "Git", return_value=fake_git):
         agent_container.agent_tags(name="notion")
 
@@ -432,7 +452,7 @@ def test_agent_tags_missing_agent_exits_with_error():
     import typer
     from cli.commands import agent_container
 
-    with patch.object(agent_container.ConfigManager, "get_config", return_value={"external_agents": {}}):
+    with patch.object(agent_container, "_resolve_core", return_value=FakeCore({"external_agents": {}})):
         with pytest.raises(typer.Exit):
             agent_container.agent_tags(name="ghost")
 

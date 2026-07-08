@@ -6,8 +6,12 @@ internal docker network.
 """
 
 
-def _next_available_port(conf: dict) -> int:
+def _next_available_port(conf: dict, reserved: set = None) -> int:
+    """First free agent port. `reserved` adds ports claimed elsewhere —
+    host ports are machine-global, so multi-core hosts must pass the union
+    of every core's used ports (services.cores.all_used_public_ports)."""
     used = {a.get("public_port") for a in conf.get("external_agents", {}).values() if a.get("public_port")}
+    used |= reserved or set()
     for p in range(18100, 18200):
         if p not in used:
             return p

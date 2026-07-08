@@ -11,22 +11,31 @@ import os
 import re
 import shutil
 import sys
-import threading
 from typing import Optional
 
 import questionary
 import typer
 from rich.console import Console
 
-from services.config import ConfigManager
-from services.docker import DockerManager
+from services.cores import get_core
 from services.runtime.git import Git, GitError
-from utils.paths import _project_root, _base_dir
+from utils.paths import _project_root
 from utils.deploy import _deploy_local_agent
 
 from .agent import agent_app
 
 console = Console()
+
+CORE_OPT = typer.Option(None, "--core", help="Target core (see `costaff core list`). Default: the active core.")
+
+
+def _resolve_core(name):
+    """--core resolution shared by every agent command."""
+    try:
+        return get_core(name)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
 
 
 def _confirm_enable_transfer(conf: dict, name: str, yes: bool) -> None:
@@ -86,6 +95,7 @@ def agent_add(
     strict: bool = typer.Option(False, "--strict", help="Reject the manifest if it does not pass the full Agent Protocol JSON Schema"),
     enable_transfer: bool = typer.Option(False, "--enable-transfer", help="Wire this agent via sub_agents/transfer instead of AgentTool (needed e.g. for multimodal/image input to the sub-agent). Flips the WHOLE Manager into transfer mode — requires confirmation."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive --enable-transfer confirmation (the warning is still printed for audit)."),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Add an external agent (URL, Local, or GitHub mode)."""
     if not url and not local and not github:
@@ -97,7 +107,10 @@ def agent_add(
         console.print("[red]Error: name must be lowercase alphanumeric with hyphens/underscores[/red]")
         raise typer.Exit(1)
 
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    if not core.is_default:
+        console.print(f"[dim]Target core: {core.name} ({core.label})[/dim]")
+    conf = core.core_config()
     if name in conf.get("external_agents", {}):
         console.print(f"[red]Error: Agent '{name}' already exists. Use 'costaff agent remove {name}' first.[/red]")
         raise typer.Exit(1)
@@ -129,7 +142,7 @@ def agent_add(
                 predefined_envs[k.strip()] = v.strip()
 
     if github:
-        target_src = os.path.join(_base_dir, "costaff-agent", name, "src")
+        target_src = os.path.join(core.base_dir, "costaff-agent", name, "src")
         if os.path.exists(target_src):
             if sys.stdin.isatty() and not questionary.confirm(f"Source directory {target_src} already exists. Overwrite?").ask():
                 raise typer.Exit(0)
@@ -153,7 +166,7 @@ def agent_add(
     if local:
         try:
             entry = _deploy_local_agent(
-                name, local, conf, predefined_envs=predefined_envs, strict=strict
+                name, local, conf, predefined_envs=predefined_envs, strict=strict, core=core
             )
         except Exception as e:
             console.print(f"[red]Deploy failed: {e}[/red]")
@@ -201,48 +214,54 @@ def agent_add(
                 f"(edit config.json → agent_mcp_filters.{agent_key} to change).[/dim]"
             )
 
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    ConfigManager.update_mcp_urls()
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    core.regen_mcp_urls()
 
-    console.print(f"[green]Agent '{name}' deployed and registered.[/green]")
-    console.print("Restarting core agent to apply changes...")
-    threading.Thread(target=DockerManager.run_action, args=("costaff-agent-costaff", "restart"), daemon=False).start()
+    console.print(f"[green]Agent '{name}' deployed and registered on core '{core.name}'.[/green]")
+    console.print("Recreating the manager so it picks up the new agent...")
+    core.recreate_manager()
     console.print("[green]Done.[/green]")
 
 
 @agent_app.command("remove")
-def agent_remove(name: str = typer.Argument(..., help="Agent name to remove")):
+def agent_remove(
+    name: str = typer.Argument(..., help="Agent name to remove"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt (non-interactive use)"),
+    core_name: Optional[str] = CORE_OPT,
+):
     """Remove an external agent."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
-    if not questionary.confirm(f"Remove agent '{name}'?").ask():
+    if not yes and not questionary.confirm(f"Remove agent '{name}' from core '{core.name}'?").ask():
         return
     del conf["external_agents"][name]
     if name == "costaff-agent-coding":
         conf["coding_agent_enabled"] = False
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    console.print(f"[green]Agent '{name}' removed.[/green]")
-    console.print("[yellow]Restart costaff-agent-costaff to apply: costaff start[/yellow]")
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    console.print(f"[green]Agent '{name}' removed from core '{core.name}'.[/green]")
+    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply.[/yellow]")
 
 
 @agent_app.command("enable")
-def agent_enable(name: str = typer.Argument(...)):
+def agent_enable(name: str = typer.Argument(...), core_name: Optional[str] = CORE_OPT):
     """Enable an external agent."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     conf["external_agents"][name]["enabled"] = True
     if name == "costaff-agent-coding":
         conf["coding_agent_enabled"] = True
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    console.print(f"[green]Agent '{name}' enabled.[/green]")
-    console.print("[yellow]Restart costaff-agent-costaff to apply changes.[/yellow]")
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    console.print(f"[green]Agent '{name}' enabled on core '{core.name}'.[/green]")
+    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply changes.[/yellow]")
 
 
 @agent_app.command("transfer")
@@ -251,6 +270,7 @@ def agent_transfer(
     enable: bool = typer.Option(False, "--enable", help="Wire via sub_agents/transfer (global Manager change — confirmed)"),
     disable: bool = typer.Option(False, "--disable", help="Revert to AgentTool (default, stable contract)"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the --enable confirmation (warning still printed)"),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Toggle an existing agent between AgentTool (default) and transfer.
 
@@ -261,9 +281,10 @@ def agent_transfer(
     if enable == disable:
         console.print("[red]Specify exactly one of --enable or --disable.[/red]")
         raise typer.Exit(1)
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     entry = conf["external_agents"][name]
     if enable:
@@ -277,24 +298,25 @@ def agent_transfer(
             console.print(f"[yellow]'{name}' is already AgentTool (transfer off). Nothing changed.[/yellow]")
             raise typer.Exit(0)
         entry["transfer"] = False
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
+    core.write_config(conf)
+    core.regen_external_agents_env()
     state = "transfer (sub_agents)" if enable else "AgentTool (default)"
     console.print(f"[green]'{name}' is now wired via {state}.[/green]")
-    console.print("[yellow]Restart costaff-agent-costaff to apply; re-run tests/test_remote_agent_tools.py.[/yellow]")
+    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply; re-run tests/test_remote_agent_tools.py.[/yellow]")
 
 
 @agent_app.command("disable")
-def agent_disable(name: str = typer.Argument(...)):
+def agent_disable(name: str = typer.Argument(...), core_name: Optional[str] = CORE_OPT):
     """Disable an external agent."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("external_agents", {}):
-        console.print(f"[red]Error: Agent '{name}' not found.[/red]")
+        console.print(f"[red]Error: Agent '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     conf["external_agents"][name]["enabled"] = False
     if name == "costaff-agent-coding":
         conf["coding_agent_enabled"] = False
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    console.print(f"[green]Agent '{name}' disabled.[/green]")
-    console.print("[yellow]Restart costaff-agent-costaff to apply changes.[/yellow]")
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    console.print(f"[green]Agent '{name}' disabled on core '{core.name}'.[/green]")
+    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply changes.[/yellow]")

@@ -19,10 +19,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from services.config import ConfigManager
-from utils.paths import PATHS
-
 from .agent import agent_app
+from .agent_lifecycle import CORE_OPT, _resolve_core
 
 console = Console()
 
@@ -78,10 +76,12 @@ def agent_model(
     api_base: Optional[str] = typer.Option(None, "--api-base", help="LiteLLM API base URL"),
     api_key: Optional[str] = typer.Option(None, "--api-key", help="LiteLLM API key"),
     show: bool = typer.Option(False, "--show", help="Show current model settings"),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Set or view model configuration for an agent."""
-    env_path = PATHS["env"]
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    env_path = core.env_path
+    conf = core.core_config()
     agents = conf.get("external_agents", {})
 
     # --show: print current settings for all agents

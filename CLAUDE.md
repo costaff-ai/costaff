@@ -10,9 +10,9 @@ costaff/
 ├── cli/commands/            # CLI 子命令
 │   ├── services.py          # costaff start/stop/restart/ps
 │   ├── agent.py             # `costaff agent ...` 群組 registry（純 typer.Typer 殼）
-│   ├── agent_lifecycle.py   #   add / remove / enable / disable
-│   ├── agent_container.py   #   list / restart / rebuild
-│   ├── agent_model.py       #   model + .env 讀寫 helpers
+│   ├── agent_lifecycle.py   #   add / remove / enable / disable / transfer（全部支援 --core，預設 active core）
+│   ├── agent_container.py   #   list / tags / restart / rebuild（支援 --core；容器操作經 runtime_for(core) 綁定該 stack 的 compose -p/-f）
+│   ├── agent_model.py       #   model + .env 讀寫 helpers（支援 --core，讀寫該 core 的 .env）
 │   ├── agent_components.py  #   mcp list/set + skills（Component 層，跟隨 active core，與 dashboard 卡片同語意）
 │   ├── core.py              # costaff core list/use/discover（Workspace 層，multi-core 切換，與 dashboard switcher 同 registry）
 │   ├── channel.py           # costaff channel add/list/remove/rebuild

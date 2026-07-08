@@ -31,9 +31,14 @@ class DockerRuntime(Runtime):
         self,
         compose_cwd: Optional[str] = None,
         base_compose: str = "docker-compose.yaml",
+        project: Optional[str] = None,
     ):
         self.base_compose = base_compose
         self.compose_cwd = compose_cwd or _detect_compose_cwd(base_compose)
+        # Compose project name (-p). Cores launched with an explicit project
+        # (e.g. twk-core) need it, or `up` on their services hits container
+        # name conflicts against the originally-labelled containers.
+        self.project = project
 
     # ─────────── Helpers ───────────
 
@@ -51,8 +56,9 @@ class DockerRuntime(Runtime):
             return ["docker-compose"]
 
     def _compose_args(self, fragment: Optional[str] = None) -> list:
-        """Build the `-f base [-f fragment]` args for a compose call."""
-        args = ["-f", self.base_compose]
+        """Build the `[-p project] -f base [-f fragment]` args for a compose call."""
+        args = ["-p", self.project] if self.project else []
+        args += ["-f", self.base_compose]
         if fragment:
             args += ["-f", fragment]
         return args
