@@ -8,8 +8,41 @@ This repository is **private** — for internal / paid-tier consumption only.
 
 ## [Unreleased]
 
+## [0.1.0-beta-1] - 2026-07-08
+
 ### Added
 
+- **Dashboard cockpit — 3-tier information architecture.** New dark,
+  theme-aware sidebar built on a `--ck-*` token system (`cockpit.css`):
+  a System switcher (tier 0), a pinned Manager Agent + expandable External
+  Agents tree (tier 1), and per-agent tabbed **MCP / API / Skill** component
+  pages (tier 2). External agents render their real skills straight from the
+  live A2A card; API/Skill/MCP registries are edited inline.
+- **Multi-CoStaff ("Full") support.** A host running several independent
+  cores (`stack` / `asst` / `twk` …) is now first-class end to end. The
+  dashboard's System switcher and the new `costaff core list/use/discover`
+  command share one registry + active-core pointer (`services/cores.py`).
+  Every read endpoint and the Runtime Monitor follow the active System.
+- **`--core` on every agent command.** `costaff agent
+  add/remove/enable/disable/transfer/list/tags/restart/rebuild/model` resolve
+  a target core (active core by default, `--core <name>` to override) and
+  write to that core's `config.json` / `.env`, driving its compose project.
+  Host ports are reserved across all cores so allocation never collides.
+  Single-install hosts are unaffected (synthetic default core = historical
+  paths). (`tests/test_multicore_cli.py`)
+- **`costaff agent mcp list/set` and `costaff agent skills`.** The Component
+  layer in the terminal, sharing exact semantics with the dashboard's MCP /
+  Skill cards via `services/agent_components.py`.
+- **Business Platforms App-Store registration.** Platforms no longer have to
+  be installed on the dashboard host: pick an app from the official catalog
+  (or Custom) and point it at a URL. Remote entries get full dashboard CRUD
+  and URL-based health checks; local (CLI-installed) platforms stay
+  CLI-managed. (`tests/test_platform_store.py`)
+- **Regular Work multi-channel delivery.** A scheduled job can now deliver
+  its result to several channel + recipient targets; the executor fans out
+  and one failed channel no longer fails the run. Backed by a new
+  `regular_works.channels` column (migration `0002`).
+  (`tests/test_regular_work_channels.py`)
 - **`costaff update --all`** — after pinning the core, re-pins and rebuilds
   every source-based agent and channel to the same `--tag` (or pulls latest
   when no tag). Reuses the per-plugin `agent rebuild` / `channel rebuild`
@@ -29,6 +62,32 @@ This repository is **private** — for internal / paid-tier consumption only.
   dumped inside the running postgres container (consistent snapshot, no host
   Postgres client needed, no need to stop services). Logic in
   `services/backup.py`. (`tests/test_backup.py`)
+
+### Changed
+
+- **CRUD ownership principle enforced.** A resource is deletable only from
+  where it was created: CLI-added agents/platforms are CLI-delete only, and
+  UI-registered (remote / URL) resources are UI-deletable. Both surfaces
+  stamp origin (`added_by` / platform `type`) and reject cross-surface
+  deletes with a pointer to the right tool.
+  (`tests/test_agent_crud_ownership.py`)
+- **Chat / dashboard markdown** renders single-newline line breaks
+  (`marked` `breaks: true`) so agent bullet lists no longer collapse into
+  one paragraph.
+
+### Fixed
+
+- Dashboard now scopes the Agents view, Runtime Monitor, and per-core writes
+  to the active core instead of hard-coding the `costaff` prefix.
+- Renamed channel containers (`asst-channel-*`, `twk-channel-*`) are detected
+  as LIVE in the gateways tab.
+
+### Security
+
+- Integration headers are encrypted at rest; the dashboard no longer leaks
+  DB engine connections on each poll; defense-in-depth against XSS in the
+  admin dashboard; notifiers no longer block the event loop on synchronous
+  channel sends.
 
 ## [0.1.0-alpha-2] - 2026-06-14
 

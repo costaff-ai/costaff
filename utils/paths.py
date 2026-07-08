@@ -17,7 +17,7 @@ _base_dir: str = os.environ.get("COSTAFF_HOME") or str(Path.home() / ".costaff")
 _runtime_root: str = os.path.join(_base_dir, "costaff")
 _workspace_root: str = os.path.join(_base_dir, "workspace")
 
-VERSION = "0.1.0-alpha-2"
+VERSION = "0.1.0-beta-1"
 
 PATHS = {
     "env":      os.path.join(_runtime_root, ".env"),
