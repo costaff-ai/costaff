@@ -76,7 +76,8 @@ def list_platforms(auth: bool = Depends(AuthManager.verify_token)):
         info = platforms[name]
         remote = _is_remote(info)
         port = info.get("public_port")
-        catalog = OFFICIAL_PLATFORMS.get(name, {})
+        # catalog identity: extra instances register as e.g. "erp-2" with app="erp"
+        catalog = OFFICIAL_PLATFORMS.get(info.get("app") or name, {})
         out.append({
             "name": name,
             "type": "remote" if remote else "local",
@@ -126,6 +127,8 @@ def register_platform(req: PlatformRegisterRequest, auth: bool = Depends(AuthMan
         "url": _validate_url(req.url),
         "enabled": True,
     }
+    if req.app and req.app in OFFICIAL_PLATFORMS:
+        entry["app"] = req.app
     if req.mcp_url:
         entry["mcp_url"] = _validate_url(req.mcp_url)
     if req.description:

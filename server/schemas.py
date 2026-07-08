@@ -27,6 +27,7 @@ class PlatformRegisterRequest(BaseModel):
     """Register a remote (URL-only) business platform from the store."""
     name: str
     url: str
+    app: Optional[str] = None       # catalog app this instance is of (icon/description source)
     mcp_url: Optional[str] = None
     description: Optional[str] = None
 

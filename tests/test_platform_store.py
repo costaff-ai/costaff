@@ -63,6 +63,24 @@ def test_register_remote_platform(client, tmp_path):
     assert listed["erp"]["type"] == "local"
 
 
+def test_register_extra_instance_inherits_catalog_identity(client, tmp_path):
+    """'erp' is locally installed; a second remote instance registers under a
+    new name with app='erp' and inherits the catalog icon/description."""
+    r = client.post("/api/platforms", json={
+        "name": "erp-2", "url": "http://10.0.0.5:18210", "app": "erp",
+    })
+    assert r.status_code == 200
+    assert _platforms(tmp_path / "config.json")["erp-2"]["app"] == "erp"
+
+    listed = {p["name"]: p for p in client.get("/api/platforms").json()}
+    assert listed["erp-2"]["icon"] == OFFICIAL_PLATFORMS["erp"]["icon"]
+    assert listed["erp-2"]["description"] == OFFICIAL_PLATFORMS["erp"]["description"]
+
+    # unknown app identity is dropped, not stored
+    client.post("/api/platforms", json={"name": "x1", "url": "http://a:1", "app": "not-an-app"})
+    assert "app" not in _platforms(tmp_path / "config.json")["x1"]
+
+
 def test_register_rejects_dup_and_bad_input(client):
     assert client.post("/api/platforms", json={"name": "erp", "url": "http://x:1"}).status_code == 409
     assert client.post("/api/platforms", json={"name": "Bad Name!", "url": "http://x:1"}).status_code == 400

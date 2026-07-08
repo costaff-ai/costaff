@@ -193,11 +193,13 @@ const Platforms = {
     },
 
     // --- App-Store flow: pick an app → set its URL --------------------
-    _editing: null,   // platform name when editing, null when adding
+    _editing: null,     // platform name when editing, null when adding
+    _pickedApp: null,   // catalog app the new instance belongs to (icon identity)
     _catalog: [],
 
     async openStore() {
         this._editing = null;
+        this._pickedApp = null;
         document.getElementById('plat-store-title').textContent = 'Add Platform';
         document.getElementById('plat-store-subtitle').textContent = 'Pick an app, then point it at your instance';
         this._showStep('shelf');
@@ -210,13 +212,13 @@ const Platforms = {
             grid.innerHTML = `<div class="col-span-full text-center text-rose-500 py-8 text-sm font-mono">Failed to load catalog: ${escapeHtml(e.message)}</div>`;
             return;
         }
+        // Registered apps stay clickable — picking one registers ANOTHER
+        // instance under a new name (e.g. a remote erp next to the local one).
         const card = (app) => `
-            <button type="button" ${app.registered ? 'disabled' : `onclick="Platforms.pickApp('${escapeHtml(app.name)}')"`}
-                class="text-left p-4 rounded-2xl border transition-all ${app.registered
-                    ? 'border-slate-100 bg-slate-50 opacity-50 cursor-default'
-                    : 'border-slate-100 bg-white hover:border-blue-300 hover:shadow-md'}">
+            <button type="button" onclick="Platforms.pickApp('${escapeHtml(app.name)}')"
+                class="text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-blue-300 hover:shadow-md transition-all">
                 <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3"><i class="fas ${escapeHtml(app.icon || 'fa-cube')}"></i></div>
-                <div class="text-xs font-black text-slate-900 uppercase tracking-wide">${escapeHtml(app.name)}${app.registered ? ' <span class="text-[9px] text-emerald-500 normal-case tracking-normal">✓ registered</span>' : ''}</div>
+                <div class="text-xs font-black text-slate-900 uppercase tracking-wide">${escapeHtml(app.name)}${app.registered ? ' <span class="text-[9px] text-emerald-500 normal-case tracking-normal">✓ installed</span>' : ''}</div>
                 <div class="text-[10px] text-slate-400 mt-1 leading-snug">${escapeHtml(app.description || '')}</div>
             </button>`;
         grid.innerHTML = this._catalog.map(card).join('') + `
@@ -228,15 +230,30 @@ const Platforms = {
             </button>`;
     },
 
+    // next free instance name for an app: "erp" → "erp-2" → "erp-3" …
+    _suggestName(app) {
+        const taken = new Set(this._all.map(p => p.name));
+        if (!taken.has(app)) return app;
+        let i = 2;
+        while (taken.has(`${app}-${i}`)) i++;
+        return `${app}-${i}`;
+    },
+
     pickApp(name) {
         const app = name ? this._catalog.find(a => a.name === name) : null;
+        this._pickedApp = app ? app.name : null;
+        const extraInstance = !!(app && app.registered);
         this._fillForm({
-            name: app ? app.name : '',
-            nameEditable: !app,
+            name: app ? this._suggestName(app.name) : '',
+            nameEditable: !app || extraInstance,
             icon: app ? app.icon : 'fa-cube',
             description: app ? app.description : '',
             url: '', mcp_url: '',
         });
+        if (extraInstance) {
+            document.getElementById('plat-f-desc-label').textContent =
+                `'${app.name}' already exists here — this registers another instance under a new name.`;
+        }
         this._showStep('form');
     },
 
@@ -280,6 +297,7 @@ const Platforms = {
     closeStore() {
         document.getElementById('plat-store-modal').classList.add('hidden');
         this._editing = null;
+        this._pickedApp = null;
     },
 
     bindStoreForm() {
@@ -302,7 +320,7 @@ const Platforms = {
                     await API.fetch(`/api/platforms/${this._editing}`, { method: 'PUT', body: JSON.stringify(body) });
                 } else {
                     if (!name) return alert('Name is required.');
-                    await API.fetch('/api/platforms', { method: 'POST', body: JSON.stringify({ name, ...body }) });
+                    await API.fetch('/api/platforms', { method: 'POST', body: JSON.stringify({ name, app: this._pickedApp, ...body }) });
                 }
                 this.closeStore();
                 await this.load();
