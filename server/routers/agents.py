@@ -90,24 +90,18 @@ def get_external_agent_card(name: str, auth: bool = Depends(AuthManager.verify_t
     for them. The card is the source of truth for what an external agent can do.
     Host-side reachable URL: github agents via localhost:<public_port>, url
     agents via their a2a_url (same resolution as the health check above)."""
+    from services.agent_components import agent_card_url, fetch_agent_card
+
     conf = active_core().core_config()
     agent = conf.get("external_agents", {}).get(name)
     if not agent:
         raise HTTPException(status_code=404, detail="unknown external agent")
-    base = None
-    if agent.get("type") == "github" and agent.get("public_port"):
-        base = f"http://localhost:{agent['public_port']}"
-    elif agent.get("type") == "url" and agent.get("a2a_url"):
-        base = agent["a2a_url"]
-    if not base:
+    if not agent_card_url(agent):
         raise HTTPException(status_code=400, detail="agent has no reachable A2A endpoint")
     try:
-        with httpx.Client(timeout=5.0) as client:
-            r = client.get(f"{base}/.well-known/agent-card.json")
-            r.raise_for_status()
-            card = r.json()
-    except Exception as e:  # noqa: BLE001 — surface any fetch/parse failure to the UI
-        raise HTTPException(status_code=502, detail=f"could not fetch agent card: {e}")
+        card = fetch_agent_card(agent)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     # Trim aggressively: A2A skill descriptions embed the agent's whole
     # instruction (10-15KB each) and we only render name + first-line desc +
     # tags. Dropping examples/capabilities/full descriptions shrinks the

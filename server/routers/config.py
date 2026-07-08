@@ -182,59 +182,20 @@ def delete_mcp(name: str, auth: bool = Depends(AuthManager.verify_token)):
 
 @router.get("/api/agent-mcp-config")
 def get_agent_mcp_config(auth: bool = Depends(AuthManager.verify_token)):
-    conf = active_core().core_config()
-    all_mcp_names = list(conf.get("mcp", []))
-    for name, val in conf.get("external_mcp", {}).items():
-        enabled = val.get("enabled", True) if isinstance(val, dict) else True
-        if enabled:
-            all_mcp_names.append(name)
+    from services.agent_components import agent_mcp_map
 
-    agent_mcps = conf.get("agent_mcps", {})
-
-    result_mcps = {
-        "costaff_agent": agent_mcps.get("costaff_agent", all_mcp_names),
-    }
-    # Include github-type external agents (URL agents are not managed by CoStaff)
-    for name, agent in conf.get("external_agents", {}).items():
-        if agent.get("type") == "github":
-            agent_key = name.replace("-", "_")
-            result_mcps[agent_key] = agent_mcps.get(agent_key, all_mcp_names)
-
-    return {"available_mcps": all_mcp_names, "agent_mcps": result_mcps}
+    return agent_mcp_map(active_core().core_config())
 
 
 @router.post("/api/agent-mcp-config")
 def update_agent_mcp_config(req: AgentMCPConfigRequest, auth: bool = Depends(AuthManager.verify_token)):
+    from services.agent_components import set_agent_mcps
+
     core = active_core()
-    conf = core.core_config()
-    agent_mcps = conf.get("agent_mcps", {})
-    agent_mcps[req.agent_id] = req.mcps
-    conf["agent_mcps"] = agent_mcps
-    core.write_config(conf)
-    core.regen_mcp_urls()
-
-    # Find if this is a github-type external agent (has its own compose fragment)
-    agent_id_to_name = {n.replace("-", "_"): n for n in conf.get("external_agents", {})}
-    ext_name = agent_id_to_name.get(req.agent_id)
-    ext_agent_conf = conf.get("external_agents", {}).get(ext_name) if ext_name else None
-
-    if ext_agent_conf and ext_agent_conf.get("type") == "github" and ext_agent_conf.get("fragment_path"):
-        # Recreate the sub-agent (active core's compose project + its fragment)
-        fragment_path = ext_agent_conf["fragment_path"]
-        primary_service = ext_agent_conf.get("container_names", [ext_name])[0]
-        def _restart_ext_agent():
-            load_dotenv(core.env_path, override=True)
-            base = DockerManager.get_cmd()
-            if core.compose_project:
-                base += ["-p", core.compose_project]
-            if core.compose_file:
-                base += ["-f", core.compose_file]
-            base += ["-f", fragment_path]
-            cwd = os.path.dirname(core.compose_file) if core.compose_file else _project_root
-            subprocess.run(base + ["up", "-d", "--force-recreate", "--no-deps", primary_service], check=False, cwd=cwd)
-            print(f"[MCP] Recreated external agent {ext_name} ({primary_service}) on core {core.name}")
-        threading.Thread(target=_restart_ext_agent, daemon=True).start()
-    elif req.agent_id == "costaff_agent":
-        threading.Thread(target=core.recreate_manager, daemon=True).start()
-
+    try:
+        restart = set_agent_mcps(core, req.agent_id, req.mcps)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if restart:
+        threading.Thread(target=restart, daemon=True).start()
     return {"status": "success", "agent_id": req.agent_id, "mcps": req.mcps}

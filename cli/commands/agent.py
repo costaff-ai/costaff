@@ -21,3 +21,4 @@ agent_app = typer.Typer(help="Manage external agents.")
 from . import agent_lifecycle  # noqa: E402,F401  add / remove / enable / disable
 from . import agent_container  # noqa: E402,F401  list / restart / rebuild
 from . import agent_model      # noqa: E402,F401  model
+from . import agent_components  # noqa: E402,F401  mcp list/set + skills (component layer)

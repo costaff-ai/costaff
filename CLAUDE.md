@@ -9,10 +9,12 @@ costaff/
 ├── costaff.py               # CLI 入口（Typer group）
 ├── cli/commands/            # CLI 子命令
 │   ├── services.py          # costaff start/stop/restart/ps
-│   ├── agent.py             # `costaff agent ...` 群組 registry（純 23 行 typer.Typer 殼）
+│   ├── agent.py             # `costaff agent ...` 群組 registry（純 typer.Typer 殼）
 │   ├── agent_lifecycle.py   #   add / remove / enable / disable
 │   ├── agent_container.py   #   list / restart / rebuild
 │   ├── agent_model.py       #   model + .env 讀寫 helpers
+│   ├── agent_components.py  #   mcp list/set + skills（Component 層，跟隨 active core，與 dashboard 卡片同語意）
+│   ├── core.py              # costaff core list/use/discover（Workspace 層，multi-core 切換，與 dashboard switcher 同 registry）
 │   ├── channel.py           # costaff channel add/list/remove/rebuild
 │   ├── database.py          # costaff database backup
 │   ├── onboard.py           # costaff onboard（首次設定）
@@ -24,6 +26,8 @@ costaff/
 │   ├── config.py            # config.json 讀寫；包含 MCP env var 自動產生 + agent_mcp_filters 白名單
 │   ├── preflight.py         # `costaff start` 前的 .env 驗證 + secrets 自動產生（onboard/bootstrap 共用）
 │   ├── auth.py              # AuthManager — bearer session token + auth.json
+│   ├── cores.py             # Multi-core registry + active-core 解析（dashboard switcher 與 CLI core 群組共用）
+│   ├── agent_components.py  # Per-agent MCP 指派 + A2A card 讀取（dashboard 與 CLI 共用語意）
 │   ├── database.py          # Postgres 連線
 │   ├── audit.py             # 審計日誌
 │   ├── docker.py            # Docker compose 操作（legacy 介面）

@@ -7,6 +7,7 @@ from cli.commands.bootstrap import bootstrap
 from cli.commands.dashboard import dashboard, chat, invoke
 from cli.commands.licensing import license
 from cli.commands.agent import agent_app
+from cli.commands.core import core_app
 from cli.commands.channel import channel_app
 from cli.commands.config import config_app
 from cli.commands.database import db_app
@@ -32,6 +33,7 @@ app.command()(invoke)
 app.command()(license)
 
 # Register subgroups
+app.add_typer(core_app, name="core")
 app.add_typer(agent_app, name="agent")
 app.add_typer(channel_app, name="channel")
 app.add_typer(config_app, name="config")
