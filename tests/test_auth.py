@@ -4,6 +4,7 @@
 it between cases. The `verify_token` dependency calls FastAPI's HTTPException
 directly — we assert on that.
 """
+import json
 import time
 
 import pytest
@@ -28,11 +29,11 @@ def _reset_auth_state():
 
 def test_hash_password_returns_hex_digest_and_salt():
     digest, salt = AuthManager.hash_password("hunter2")
-    # SHA-256 hex is 64 chars
+    # PBKDF2-HMAC-SHA256 digest is 32 bytes → 64 hex chars
     assert len(digest) == 64
     assert all(c in "0123456789abcdef" for c in digest)
-    # Default salt is 16 hex chars (8 bytes)
-    assert len(salt) == 16
+    # Default salt is 32 hex chars (16 bytes)
+    assert len(salt) == 32
 
 
 def test_hash_password_is_stable_for_same_salt():
@@ -160,3 +161,71 @@ def test_get_auth_returns_none_on_corrupt_json(tmp_path, monkeypatch):
     monkeypatch.setitem(__import__("services.auth", fromlist=["PATHS"]).PATHS, "auth", str(auth_path))
     # Should not raise — just return None so the dashboard prompts setup
     assert AuthManager.get_auth() is None
+
+
+# ---------------------------------------------------------------------------
+# verify_password — new PBKDF2 records + transparent legacy upgrade
+# ---------------------------------------------------------------------------
+
+def test_save_auth_writes_pbkdf2_marker(tmp_path, monkeypatch):
+    auth_path = tmp_path / "auth.json"
+    monkeypatch.setitem(__import__("services.auth", fromlist=["PATHS"]).PATHS, "auth", str(auth_path))
+    AuthManager.save_auth("admin", "password123")
+    stored = AuthManager.get_auth()
+    assert stored["algo"] == "pbkdf2_sha256"
+    assert stored["iterations"] == 600_000
+
+
+def test_verify_password_pbkdf2_ok_and_no_upgrade(tmp_path, monkeypatch):
+    auth_path = tmp_path / "auth.json"
+    monkeypatch.setitem(__import__("services.auth", fromlist=["PATHS"]).PATHS, "auth", str(auth_path))
+    AuthManager.save_auth("admin", "s3cret")
+    stored = AuthManager.get_auth()
+    ok, needs_upgrade = AuthManager.verify_password("s3cret", stored)
+    assert ok and not needs_upgrade
+    wrong_ok, _ = AuthManager.verify_password("nope", stored)
+    assert not wrong_ok
+
+
+def test_verify_password_accepts_legacy_sha256_and_flags_upgrade():
+    """A record with no algo marker is the legacy single-round SHA-256
+    scheme — it must still verify, and signal that it should be re-hashed."""
+    import hashlib
+    salt = "deadbeef"
+    legacy = {
+        "username": "admin",
+        "salt": salt,
+        "hashed": hashlib.sha256(("oldpass" + salt).encode()).hexdigest(),
+    }
+    ok, needs_upgrade = AuthManager.verify_password("oldpass", legacy)
+    assert ok and needs_upgrade
+    bad_ok, _ = AuthManager.verify_password("wrong", legacy)
+    assert not bad_ok
+
+
+def test_login_upgrades_legacy_hash(tmp_path, monkeypatch):
+    """End-to-end: logging in against a legacy record re-writes auth.json
+    with the PBKDF2 scheme, and the next login verifies against it."""
+    import hashlib
+    from fastapi.testclient import TestClient
+    from server.app import server
+    from server.schemas import LoginRequest  # noqa: F401 (ensures schema import)
+
+    auth_path = tmp_path / "auth.json"
+    monkeypatch.setitem(__import__("services.auth", fromlist=["PATHS"]).PATHS, "auth", str(auth_path))
+    salt = "cafe1234"
+    auth_path.write_text(json.dumps({
+        "username": "admin",
+        "salt": salt,
+        "hashed": hashlib.sha256(("legacypw" + salt).encode()).hexdigest(),
+    }))
+
+    client = TestClient(server)
+    r = client.post("/api/login", json={"username": "admin", "password": "legacypw"})
+    assert r.status_code == 200 and "token" in r.json()
+
+    upgraded = AuthManager.get_auth()
+    assert upgraded["algo"] == "pbkdf2_sha256"
+    # Second login now verifies against the upgraded record
+    r2 = client.post("/api/login", json={"username": "admin", "password": "legacypw"})
+    assert r2.status_code == 200
