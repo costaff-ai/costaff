@@ -522,3 +522,32 @@ async def test_dispatch_task_rejects_unapproved_user(db_session, patched_pt):
     assert isinstance(result, str)
     # No task should have been inserted
     assert db_session.query(models.ProjectTask).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_dispatch_plan_links_chain_when_title_contains_id_literal(db_session, patched_pt):
+    """Regression: a step title containing 'ID: <hex>' must NOT be captured as
+    the task_id. dispatch_plan anchors on the full uuid4 shape, so depends_on
+    links to the real upstream task and the chain is not stranded."""
+    user_id = _make_user(db_session)
+    epic = _make_epic(db_session, user_id=user_id)
+
+    result = await pt_mod.dispatch_plan(
+        epic_id=epic.id,
+        user_id=user_id,
+        steps=[
+            {"title": "Fetch dataset ID: 2024ab", "assigned_agent": "coding", "spec": "s1"},
+            {"title": "Summarise findings", "assigned_agent": "business_analysis", "spec": "s2"},
+        ],
+        session_id="tg_sess",
+    )
+    assert not result.startswith("Error") and "could not parse" not in result
+
+    tasks = {t.title: t for t in db_session.query(models.ProjectTask).all()}
+    upstream = tasks["Fetch dataset ID: 2024ab"]
+    downstream = tasks["Summarise findings"]
+    # depends_on must be the upstream task's REAL uuid, not "2024ab" from the title
+    assert downstream.depends_on == upstream.id
+    assert downstream.depends_on != "2024ab"
+    # And the downstream is parked in backlog waiting on a resolvable upstream
+    assert downstream.status == "backlog"

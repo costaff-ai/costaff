@@ -15,6 +15,7 @@ from core import models
 from core.database import SessionLocal
 from mcp_servers.executors.project_task import execute_project_task
 from mcp_servers.setup import mcp
+from mcp_servers.task_helpers import normalize_agent_name
 from mcp_servers.tools._shared import require_approved, require_within_license
 
 logger = logging.getLogger("costaff-agent-engine")
@@ -427,8 +428,15 @@ async def dispatch_plan(
         if result.startswith("Error:") or "Internal Error" in result:
             return f"Step {idx + 1} failed to dispatch: {result}"
 
-        # Pull task_id out of the dispatch_task result string ("(ID: <uuid>, ...)")
-        m = re.search(r"ID: ([0-9a-f-]+)", result)
+        # Pull task_id out of the dispatch_task result string ("(ID: <uuid>, ...)").
+        # Anchor on the FULL uuid4 shape, not "[0-9a-f-]+": task.id is always a
+        # uuid4, whereas a step title (which appears BEFORE "ID:" in the result
+        # string) can contain a literal "ID: 42ab" and would otherwise be
+        # captured — mis-linking depends_on and stranding the rest of the chain.
+        m = re.search(
+            r"ID: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+            result,
+        )
         if not m:
             return f"Step {idx + 1}: could not parse task_id from result: {result}"
         task_id = m.group(1)
@@ -507,20 +515,9 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
         updated_count = 0
         first_task_id = None
 
-        # Normalize agent name. The caller (manager LLM) may pass any of these:
-        #   "coding", "coding_agent", "costaff-agent-coding", "business_analysis_agent"
-        # and `task.assigned_agent` recorded in DB at create-time may use a
-        # different form. Strip the "_agent" / "agent" suffix and convert
-        # hyphens to underscores so all four spellings collapse to one bare key.
-        def _norm(name: str) -> str:
-            n = (name or "").replace("-", "_")
-            if n.startswith("costaff_agent_"):
-                n = n[len("costaff_agent_"):]
-            if n.endswith("_agent"):
-                n = n[:-len("_agent")]
-            return n
-
-        norm_agent = _norm(assigned_agent)
+        # Normalize agent name so every spelling the Manager LLM might use
+        # collapses to one key (see task_helpers.normalize_agent_name).
+        norm_agent = normalize_agent_name(assigned_agent)
 
         for idx, task_id in enumerate(task_ids_ordered):
             task = db.query(models.ProjectTask).filter(models.ProjectTask.id == task_id).first()
@@ -529,7 +526,7 @@ async def update_task_queue(user_id: str, assigned_agent: str, task_ids_ordered:
                 logger.warning(f"[update_task_queue] task {task_id} not found in DB")
                 continue
 
-            task_norm = _norm(task.assigned_agent)
+            task_norm = normalize_agent_name(task.assigned_agent)
             if task_norm != norm_agent:
                 logger.warning(f"[update_task_queue] agent mismatch: task has {task.assigned_agent!r}, expected {assigned_agent!r}")
                 continue
