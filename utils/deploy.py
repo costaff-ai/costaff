@@ -20,10 +20,20 @@ from .plugin_env import _prompt_and_write_plugin_env
 from .compose import _write_channel_fragment
 
 
-def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None, build_only: bool = False) -> dict:
-    """Build (and optionally start) a local-path communication channel following CoStaff Convention."""
+def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_envs: dict = None, build_only: bool = False, core=None) -> dict:
+    """Build (and optionally start) a local-path communication channel following CoStaff Convention.
+
+    `core` (services.cores.CoreContext) targets a specific core's paths /
+    container prefix / compose project. None → the active core, which on
+    single-install hosts is the synthetic default with the exact historical
+    layout (so existing single-core behaviour is byte-identical).
+    """
     from dotenv import load_dotenv
     from services.docker import DockerManager
+
+    if core is None:
+        from services.cores import active_core
+        core = active_core()
 
     source_path = os.path.abspath(source_path)
     manifest_path = os.path.join(source_path, "costaff.channel.json")
@@ -36,35 +46,44 @@ def _deploy_local_channel(name: str, source_path: str, conf: dict, predefined_en
         manifest = json.load(f)
     description = manifest.get("description", "")
 
-    public_port = _next_available_channel_port(conf)
-    fragment_dir = os.path.join(_base_dir, "costaff-channel", name)
+    # Host ports are machine-global — reserve across every registered core.
+    from services.cores import all_used_public_ports
+    public_port = _next_available_channel_port(conf, reserved=all_used_public_ports())
+    fragment_dir = os.path.join(core.base_dir, "costaff-channel", name)
     os.makedirs(fragment_dir, exist_ok=True)
 
-    plugin_env_path = _prompt_and_write_plugin_env(manifest, fragment_dir, predefined_envs, name=name)
-    load_dotenv(PATHS["env"], override=True)
+    plugin_env_path = _prompt_and_write_plugin_env(
+        manifest, fragment_dir, predefined_envs, name=name,
+        core_env_path=core.env_path, container_prefix=core.prefix,
+    )
+    load_dotenv(core.env_path, override=True)
 
-    fragment_path, ext_services, _ = _write_channel_fragment(name, source_path, public_port, plugin_env_path)
+    fragment_path, ext_services, _ = _write_channel_fragment(
+        name, source_path, public_port, plugin_env_path, core=core)
 
     # Sync MCP_SERVER_URLS before container creation so the agent container
     # is created with the bearer-form URL instead of the anonymous default
     # from .env.template. Without this, scenarios that skip `costaff onboard`
     # (e.g. manual .env setup) end up with the manager agent hitting MCP
     # with no auth header → 401 Unauthorized.
-    from services.config import ConfigManager
-    ConfigManager.update_mcp_urls()
-    load_dotenv(PATHS["env"], override=True)
+    core.regen_mcp_urls()
+    load_dotenv(core.env_path, override=True)
 
     from rich.console import Console
     console = Console()
-    main_compose = os.path.join(_runtime_root, "docker-compose.yaml")
     import subprocess
+    cmd = DockerManager.get_cmd()
+    if core.compose_project:
+        cmd += ["-p", core.compose_project]
+    cmd += ["-f", core.main_compose, "-f", fragment_path]
     if build_only:
-        cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "build"] + ext_services
-        console.print(f"Building channel {name}...")
+        cmd += ["build"] + ext_services
+        console.print(f"Building channel {name} (core: {core.name})...")
     else:
-        cmd = DockerManager.get_cmd() + ["-f", main_compose, "-f", fragment_path, "up", "-d", "--build", "--force-recreate"]
-        console.print(f"Building and starting channel {name}...")
-    subprocess.run(cmd, cwd=_project_root)
+        cmd += ["up", "-d", "--build", "--force-recreate"]
+        console.print(f"Building and starting channel {name} (core: {core.name})...")
+    compose_cwd = core.runtime_root if os.path.isdir(core.runtime_root) else _project_root
+    subprocess.run(cmd, cwd=compose_cwd)
 
     return {
         "type": "github",

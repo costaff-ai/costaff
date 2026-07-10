@@ -34,11 +34,12 @@ def fake_git():
 
 
 class FakeCore:
-    """Stands in for services.cores.CoreContext in agent-command tests."""
+    """Stands in for services.cores.CoreContext in agent/channel command tests."""
     name = "default"
     label = "Default"
     prefix = "costaff"
     env_path = "/tmp/.env"
+    base_dir = "/tmp"
     is_default = True
 
     def __init__(self, conf):
@@ -51,6 +52,9 @@ class FakeCore:
     def write_config(self, conf):
         self._conf = conf
         self.saved += 1
+
+    def regen_external_agents_env(self):
+        pass
 
     def cn(self, suffix):
         return f"{self.prefix}-{suffix}"
@@ -236,13 +240,12 @@ def test_channel_rebuild_with_pinned_ref_uses_checkout(fake_git, fake_runtime):
 
     fake_fragment_writer = MagicMock(return_value=("/tmp/frag.yaml", ["costaff-channel-telegram"], None))
 
-    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
-         patch.object(channel_cmd.ConfigManager, "save_config"), \
+    with patch.object(channel_cmd, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(channel_cmd, "Git", return_value=fake_git), \
          patch.object(channel_cmd, "_write_channel_fragment", fake_fragment_writer), \
          patch.object(channel_cmd, "load_dotenv"), \
-         patch.object(channel_cmd, "get_runtime", return_value=fake_runtime):
-        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=True, tag=None)
+         patch.object(channel_cmd, "runtime_for", return_value=fake_runtime):
+        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=True, tag=None, core_name=None)
 
     fake_git.fetch_tags.assert_called_once_with("/tmp/tg-src")
     fake_git.checkout.assert_called_once_with("/tmp/tg-src", "v0.1.0-alpha-1")
@@ -268,17 +271,17 @@ def test_channel_rebuild_tag_override_writes_new_pin(fake_git, fake_runtime):
 
     fake_fragment_writer = MagicMock(return_value=("/tmp/frag.yaml", ["costaff-channel-telegram"], None))
 
-    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
-         patch.object(channel_cmd.ConfigManager, "save_config") as save_mock, \
+    core = FakeCore(conf)
+    with patch.object(channel_cmd, "_resolve_core", return_value=core), \
          patch.object(channel_cmd, "Git", return_value=fake_git), \
          patch.object(channel_cmd, "_write_channel_fragment", fake_fragment_writer), \
          patch.object(channel_cmd, "load_dotenv"), \
-         patch.object(channel_cmd, "get_runtime", return_value=fake_runtime):
-        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=True, tag="v0.2.0")
+         patch.object(channel_cmd, "runtime_for", return_value=fake_runtime):
+        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=True, tag="v0.2.0", core_name=None)
 
     fake_git.checkout.assert_called_once_with("/tmp/tg-src", "v0.2.0")
     assert conf["dynamic_channels"]["telegram"]["ref"] == "v0.2.0"
-    save_mock.assert_called_once()
+    assert core.saved == 1  # pin persisted via core.write_config
 
 
 # ----- update (core) --------------------------------------------------
@@ -387,13 +390,12 @@ def test_channel_rebuild_force_removes_container_before_up(fake_git, fake_runtim
     fake_runtime.force_remove_container.side_effect = lambda n: call_log.append(f"rm:{n}")
     fake_runtime.up.side_effect = lambda *a, **kw: call_log.append("up")
 
-    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
-         patch.object(channel_cmd.ConfigManager, "save_config"), \
+    with patch.object(channel_cmd, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(channel_cmd, "Git", return_value=fake_git), \
          patch.object(channel_cmd, "_write_channel_fragment", fake_fragment_writer), \
          patch.object(channel_cmd, "load_dotenv"), \
-         patch.object(channel_cmd, "get_runtime", return_value=fake_runtime):
-        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=False, tag=None)
+         patch.object(channel_cmd, "runtime_for", return_value=fake_runtime):
+        channel_cmd.channel_rebuild(name="telegram", no_cache=False, pull=False, tag=None, core_name=None)
 
     fake_runtime.force_remove_container.assert_called_once_with("costaff-channel-telegram")
     assert call_log == ["rm:costaff-channel-telegram", "up"]
@@ -472,9 +474,9 @@ def test_channel_tags_lists_origin_tags(capsys, fake_git):
     fake_git.is_repo.return_value = True
     fake_git.list_remote_tags.return_value = ["v0.2.0", "v0.1.0-alpha-1"]
 
-    with patch.object(channel_cmd.ConfigManager, "get_config", return_value=conf), \
+    with patch.object(channel_cmd, "_resolve_core", return_value=FakeCore(conf)), \
          patch.object(channel_cmd, "Git", return_value=fake_git):
-        channel_cmd.channel_tags(name="telegram")
+        channel_cmd.channel_tags(name="telegram", core_name=None)
 
     out = capsys.readouterr().out
     assert "v0.2.0" in out

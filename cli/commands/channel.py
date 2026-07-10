@@ -12,11 +12,11 @@ from rich.console import Console
 from rich.table import Table
 
 from services.config import ConfigManager
-from services.runtime import get_runtime
+from services.runtime import runtime_for
 from services.runtime.git import Git, GitError
-from utils.paths import PATHS, _project_root, _runtime_root, _base_dir
 from utils.compose import _write_channel_fragment
 from utils.deploy import _deploy_local_channel
+from .agent_lifecycle import CORE_OPT, _resolve_core
 
 console = Console()
 
@@ -41,9 +41,11 @@ def channel_add(
     github: Optional[str] = typer.Option(None, "--github", help="GitHub repository URL"),
     tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin clone to a release tag, branch, or commit (e.g. v0.1.0-alpha-1). Recorded in config and respected by `channel rebuild`."),
     env: Optional[List[str]] = typer.Option(None, "--env", "-e", help="Set environment variables"),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Add a communication channel (Auto-discovery, Local, or GitHub mode)."""
     name = name.strip().lower().replace(" ", "-")
+    core = _resolve_core(core_name)
 
     # Auto-resolve GitHub URL for official channels if no source is provided
     if not local and not github:
@@ -54,13 +56,13 @@ def channel_add(
             console.print(f"[red]Error: '{name}' is not an official channel. Please provide --github or --local URL.[/red]")
             raise typer.Exit(1)
 
-    conf = ConfigManager.get_config()
+    conf = core.core_config()
 
     if "dynamic_channels" not in conf:
         conf["dynamic_channels"] = {}
 
     if name in conf["dynamic_channels"]:
-        console.print(f"[red]Error: Channel '{name}' already exists.[/red]")
+        console.print(f"[red]Error: Channel '{name}' already exists on core '{core.name}'.[/red]")
         raise typer.Exit(1)
 
     predefined_envs = {}
@@ -71,7 +73,7 @@ def channel_add(
                 predefined_envs[k.strip()] = v.strip()
 
     if github:
-        target_src = os.path.join(_base_dir, "costaff-channel", name, "src")
+        target_src = os.path.join(core.base_dir, "costaff-channel", name, "src")
         if os.path.exists(target_src):
             if not questionary.confirm(f"Source directory {target_src} already exists. Overwrite?").ask():
                 raise typer.Exit(0)
@@ -93,24 +95,24 @@ def channel_add(
 
     if local:
         try:
-            # We'll implement _deploy_local_channel in helpers.py
-            entry = _deploy_local_channel(name, local, conf, predefined_envs=predefined_envs)
+            entry = _deploy_local_channel(name, local, conf, predefined_envs=predefined_envs, core=core)
             if tag:
                 entry["ref"] = tag
             conf["dynamic_channels"][name] = entry
-            ConfigManager.save_config(conf)
-            ConfigManager.update_external_agents_env()
-            ConfigManager.update_mcp_urls()
-            console.print(f"[green]Channel '{name}' deployed and registered.[/green]")
+            core.write_config(conf)
+            core.regen_external_agents_env()
+            core.regen_mcp_urls()
+            console.print(f"[green]Channel '{name}' deployed and registered on core '{core.name}'.[/green]")
         except Exception as e:
             console.print(f"[red]Deploy failed: {e}[/red]")
             raise typer.Exit(1)
 
 
 @channel_app.command("list")
-def channel_list():
+def channel_list(core_name: Optional[str] = CORE_OPT):
     """List all dynamic communication channels."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     channels = conf.get("dynamic_channels", {})
     if not channels:
         console.print("[yellow]No dynamic channels configured.[/yellow]")
@@ -136,16 +138,20 @@ def channel_list():
 
 
 @channel_app.command("tags")
-def channel_tags(name: str = typer.Argument(..., help="Channel name to inspect tags for")):
+def channel_tags(
+    name: str = typer.Argument(..., help="Channel name to inspect tags for"),
+    core_name: Optional[str] = CORE_OPT,
+):
     """List available release tags on the channel's origin remote.
 
     Use this before `costaff channel rebuild <name> --tag <tag>` to
     discover what versions exist. The currently pinned ref (if any) is
     annotated with ✓.
     """
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("dynamic_channels", {}):
-        console.print(f"[red]Error: Channel '{name}' not found.[/red]")
+        console.print(f"[red]Error: Channel '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
     chan_conf = conf["dynamic_channels"][name]
     source_path = chan_conf.get("source_path")
@@ -170,20 +176,21 @@ def channel_tags(name: str = typer.Argument(..., help="Channel name to inspect t
 
 
 @channel_app.command("remove")
-def channel_remove(name: str = typer.Argument(...)):
+def channel_remove(name: str = typer.Argument(...), core_name: Optional[str] = CORE_OPT):
     """Remove a dynamic channel."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("dynamic_channels", {}):
-        console.print(f"[red]Error: Channel '{name}' not found.[/red]")
+        console.print(f"[red]Error: Channel '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
 
-    if not questionary.confirm(f"Remove channel '{name}'?").ask():
+    if not questionary.confirm(f"Remove channel '{name}' from core '{core.name}'?").ask():
         return
 
     chan_conf = conf["dynamic_channels"][name]
     fragment_path = chan_conf.get("fragment_path")
-    container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
-    runtime = get_runtime()
+    container_names = chan_conf.get("container_names", [core.cn(f"channel-{name}")])
+    runtime = runtime_for(core)
 
     if fragment_path and os.path.exists(fragment_path):
         console.print(f"Stopping containers for channel [bold]{name}[/bold]...")
@@ -196,9 +203,9 @@ def channel_remove(name: str = typer.Argument(...)):
             runtime.force_remove_container(c)
 
     del conf["dynamic_channels"][name]
-    ConfigManager.save_config(conf)
-    ConfigManager.update_external_agents_env()
-    console.print(f"[green]Channel '{name}' stopped and removed.[/green]")
+    core.write_config(conf)
+    core.regen_external_agents_env()
+    console.print(f"[green]Channel '{name}' stopped and removed from core '{core.name}'.[/green]")
 
 
 @channel_app.command("rebuild")
@@ -207,18 +214,20 @@ def channel_rebuild(
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without Docker layer cache"),
     pull: bool = typer.Option(True, "--pull/--no-pull", help="Sync source from origin before rebuilding"),
     tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin to a different release tag / branch / commit. Persisted to config."),
+    core_name: Optional[str] = CORE_OPT,
 ):
     """Rebuild Docker images and restart a local channel from source."""
-    conf = ConfigManager.get_config()
+    core = _resolve_core(core_name)
+    conf = core.core_config()
     if name not in conf.get("dynamic_channels", {}):
-        console.print(f"[red]Error: Channel '{name}' not found.[/red]")
+        console.print(f"[red]Error: Channel '{name}' not found on core '{core.name}'.[/red]")
         raise typer.Exit(1)
 
     chan_conf = conf["dynamic_channels"][name]
     fragment_path = chan_conf["fragment_path"]
-    container_names = chan_conf.get("container_names", [f"costaff-channel-{name}"])
+    container_names = chan_conf.get("container_names", [core.cn(f"channel-{name}")])
     source_path = chan_conf.get("source_path", "(unknown)")
-    load_dotenv(PATHS["env"], override=True)
+    load_dotenv(core.env_path, override=True)
 
     effective_ref = tag or chan_conf.get("ref")
 
@@ -244,23 +253,23 @@ def channel_rebuild(
     # actually succeeded (else config would lie about what's on disk).
     if tag and tag != chan_conf.get("ref") and ref_sync_ok:
         chan_conf["ref"] = tag
-        ConfigManager.save_config(conf)
+        core.write_config(conf)
 
     # Regenerate compose-fragment.yaml from source so any docker-compose.yaml
     # changes (env vars, volumes, etc.) are picked up on rebuild.
     console.print(f"Regenerating compose fragment for [bold]{name}[/bold]...")
-    plugin_env_path = os.path.join(_base_dir, "costaff-channel", name, ".env")
+    plugin_env_path = os.path.join(core.base_dir, "costaff-channel", name, ".env")
     public_port = chan_conf.get("public_port")
     try:
         fragment_path, ext_services, _ = _write_channel_fragment(
-            name, source_path, public_port, plugin_env_path
+            name, source_path, public_port, plugin_env_path, core=core
         )
         container_names = ext_services
     except Exception as e:
         console.print(f"[yellow]Fragment regenerate failed ({e}); using existing fragment.[/yellow]")
 
     console.print(f"Building channel [bold]{name}[/bold] from [cyan]{source_path}[/cyan]...")
-    runtime = get_runtime()
+    runtime = runtime_for(core)
     try:
         runtime.build(container_names, fragment=fragment_path, no_cache=no_cache)
     except RuntimeError:

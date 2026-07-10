@@ -6,6 +6,27 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **`costaff channel` is multi-core aware.** `add/list/remove/rebuild/tags`
+  now accept `--core` and resolve the target core's config, container
+  prefix, workspace, `.env`, and compose project — matching `costaff
+  agent`. Channel host ports are reserved across every registered core so
+  allocation never collides. Single-install hosts are unaffected (the
+  synthetic default core reproduces the historical layout exactly).
+- **`costaff agent enable/disable/transfer` recreate the Manager.** They
+  changed config and regenerated the env but only told the user to
+  `docker restart` — which doesn't re-read env_file, so the change
+  silently didn't apply. They now recreate the Manager like add/remove.
+- **Dashboard CORS is deny-by-default.** `ALLOWED_ORIGINS` no longer
+  defaults to `*` (which let any website script the dashboard). The
+  bundled frontend is same-origin and needs no CORS; set `ALLOWED_ORIGINS`
+  only when hosting the frontend on a different origin.
+- **`costaff database backup/clean/restore` fail friendly without a DB.**
+  They dumped a raw AttributeError traceback when no database was
+  configured; now they print the same actionable message as `db migrate`
+  and exit non-zero (restore also exits non-zero on a missing file).
+
 ### Added
 
 - **Durable notification outbox.** A channel push that fails (Telegram 5xx,

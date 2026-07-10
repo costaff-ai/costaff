@@ -14,9 +14,19 @@ import os
 from .paths import PATHS, _workspace_root
 
 
-def _write_channel_fragment(name: str, source_path: str, public_port: int, plugin_env_path: str) -> tuple[str, list, dict]:
-    """Generate compose-fragment.yaml from the source docker-compose.yaml. Returns (fragment_path, ext_services, manifest)."""
+def _write_channel_fragment(name: str, source_path: str, public_port: int, plugin_env_path: str, core=None) -> tuple[str, list, dict]:
+    """Generate compose-fragment.yaml from the source docker-compose.yaml. Returns (fragment_path, ext_services, manifest).
+
+    `core` (services.cores.CoreContext) targets a specific core's workspace,
+    container prefix, and env file. None → the historical single-install
+    layout (prefix "costaff", global workspace + .env), so existing callers
+    are unaffected.
+    """
     import yaml as _yaml
+
+    prefix = core.prefix if core else "costaff"
+    workspace_root = core.workspace_root if core else _workspace_root
+    env_path = core.env_path if core else PATHS["env"]
 
     manifest_path = os.path.join(source_path, "costaff.channel.json")
     if not os.path.exists(manifest_path):
@@ -37,13 +47,13 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
         src_compose = _yaml.safe_load(f)
 
     # Plan B: channels get shared bind mount only (read agent results, accept uploads)
-    shared_host_dir = os.path.join(_workspace_root, "shared")
+    shared_host_dir = os.path.join(workspace_root, "shared")
     os.makedirs(shared_host_dir, exist_ok=True)
     CONTAINER_SHARED = "/app/data/shared"
 
     services_fragment = {}
     for svc, svc_def in src_compose.get("services", {}).items():
-        ext_svc = f"costaff-channel-{name}-{svc}" if svc != a2a_service else f"costaff-channel-{name}"
+        ext_svc = f"{prefix}-channel-{name}-{svc}" if svc != a2a_service else f"{prefix}-channel-{name}"
         svc_def = svc_def.copy()
         # Force container_name so downstream tooling can find containers by names in config.json
         svc_def["container_name"] = ext_svc
@@ -92,7 +102,7 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
         if not has_shared:
             new_vols.append(f"{shared_host_dir}:{CONTAINER_SHARED}")
         svc_def["volumes"] = new_vols
-        svc_def["env_file"] = [PATHS["env"], plugin_env_path]
+        svc_def["env_file"] = [env_path, plugin_env_path]
         services_fragment[ext_svc] = svc_def
 
     fragment = {
