@@ -23,12 +23,20 @@ def _agent_base() -> str:
     return f"http://localhost:{port}"
 
 
-def dashboard(port: int = 8501):
+def dashboard(
+    port: int = 8501,
+    host: str = typer.Option(
+        "127.0.0.1", "--host",
+        help="Interface to bind. Localhost-only by default: before the admin "
+        "account exists, /api/setup is open to whoever reaches it first. "
+        "Pass --host 0.0.0.0 to expose on the network (firewall/tunnel it).",
+    ),
+):
     """Launch the Web Dashboard."""
     load_dotenv(PATHS["env"], override=False)
     console.print(f"Launching Dashboard at http://localhost:{port}...")
     threading.Thread(target=lambda: (time.sleep(1.5), webbrowser.open(f"http://localhost:{port}")), daemon=True).start()
-    uvicorn.run(server, host="0.0.0.0", port=port, log_level="error")
+    uvicorn.run(server, host=host, port=port, log_level="error")
 
 
 def chat(app_name: str = "costaff_agent"):
@@ -81,7 +89,7 @@ def _run_request(app_name, uid, sid, prompt):
         "sessionId": sid,
         "newMessage": {"role": "user", "parts": [{"text": f"(Context ID: {uid}) {prompt}"}]}
     }
-    
+
     try:
         console.print("[dim]Thinking...[/dim]")
         with httpx.Client(timeout=None) as client:
@@ -95,16 +103,16 @@ def _run_request(app_name, uid, sid, prompt):
                 author = ev.get("author", "unknown")
                 content = ev.get("content", {})
                 parts = content.get("parts", [])
-                
+
                 # Filter out boring internal initialization
                 if any(p.get("functionCall", {}).get("name") == "get_apis" for p in parts):
                     continue
-                
+
                 # Show A2A Delegation
                 if "transferToAgent" in ev.get("actions", {}):
                     target = ev["actions"]["transferToAgent"]
                     console.print(f"📢 [bold yellow]>>> Delegating to: {target}[/bold yellow]")
-                
+
                 # Show Tool Calls
                 for p in parts:
                     if "functionCall" in p:

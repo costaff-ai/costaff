@@ -4,7 +4,10 @@ services:
     container_name: costaff-mcp-costaff
     restart: always
     volumes:
-      - ${COSTAFF_WORKSPACE_DIR}:/app/data
+      # `:?` makes compose fail loudly when the var is missing instead of
+      # silently mounting an anonymous volume (or `/shared` from the host
+      # root for the manager below). onboard/bootstrap/install.sh write it.
+      - ${COSTAFF_WORKSPACE_DIR:?COSTAFF_WORKSPACE_DIR must be set in .env - run costaff onboard}:/app/data
       # Host license mounted read-only. Defaults to /dev/null when no
       # license is applied — load() isfile-guards so that degrades to OSS
       # cleanly instead of crashing. `costaff license apply` sets
@@ -28,11 +31,15 @@ services:
     container_name: costaff-agent-costaff
     restart: on-failure
     ports:
-      - "${COSTAFF_AGENT_PORT:-18080}:8080"
+      # adk web has NO authentication — published on localhost only by
+      # default. Hosts that must expose it to other machines (e.g. a
+      # federated WebChat Enterprise routing to this manager) opt in with
+      # COSTAFF_AGENT_BIND=0.0.0.0 in .env, behind a firewall or tunnel.
+      - "${COSTAFF_AGENT_BIND:-127.0.0.1}:${COSTAFF_AGENT_PORT:-18080}:8080"
     env_file:
       - .env
     volumes:
-      - ${COSTAFF_WORKSPACE_DIR}/shared:/app/data/shared
+      - ${COSTAFF_WORKSPACE_DIR:?COSTAFF_WORKSPACE_DIR must be set in .env - run costaff onboard}/shared:/app/data/shared
     environment:
       - MCP_SERVER_URLS=${MCP_SERVER_URLS}
       - ADK_SESSION_SERVICE_URI=${ADK_SESSION_SERVICE_URI:?ADK_SESSION_SERVICE_URI must be set in .env}
@@ -51,7 +58,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-costaff_pass}
       - POSTGRES_DB=${POSTGRES_DB:-costaff_db}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Containers reach Postgres via the internal network (postgres:5432);
+      # this published port exists only for host-side CLI/db tools, so it
+      # stays on localhost. Set POSTGRES_BIND=0.0.0.0 to expose it.
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - costaff_db_data:/var/lib/postgresql/data
 

@@ -62,7 +62,13 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
         if svc == a2a_service:
             svc_def.setdefault("environment", [])
             svc_def["environment"] += [f"PORT={port}"]
-            svc_def["ports"] = [f"0.0.0.0:{public_port}:{port}"]
+            # Localhost by default (same as agent fragments in utils/deploy).
+            # A channel that must accept traffic from other machines directly
+            # (no tunnel / reverse proxy) opts in with
+            # COSTAFF_CHANNEL_BIND=0.0.0.0 at `channel add` time; the value
+            # is baked into the fragment. Existing fragments are untouched.
+            bind = os.getenv("COSTAFF_CHANNEL_BIND", "127.0.0.1")
+            svc_def["ports"] = [f"{bind}:{public_port}:{port}"]
 
         # Inject SHARED_DIR env var
         env_list = svc_def.get("environment", [])

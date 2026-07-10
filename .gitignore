@@ -17,6 +17,12 @@ dist/
 .env
 .env.local
 
+# Runtime state the CLI/dashboard writes next to the code (config.json can
+# hold plaintext MCP auth headers, auth.json holds the admin password hash)
+config.json
+auth.json
+mcp_servers/costaff/server.json
+
 # OS
 .DS_Store
 
