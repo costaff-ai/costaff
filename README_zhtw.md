@@ -218,9 +218,19 @@ costaff agent add my-agent --url http://my-agent.internal
 
 內建的 **Webchat** Channel 可以讓你立即開始使用，無需設定任何 Telegram、Discord 或 Line Token。
 
+macOS 或 Ubuntu 一行安裝：
+
 ```bash
-# 1. 安裝 CLI
-pip install -e .
+curl -fsSL https://raw.githubusercontent.com/costaff-ai/costaff/main/install.sh | bash
+```
+
+安裝器會偵測作業系統並補齊相依套件（Docker、Python、git），把 repo clone
+到 `~/.costaff/costaff`、建立獨立 venv、安裝 `costaff` CLI 並寫入 workspace
+路徑。接著在你自己的終端機重新載入 shell 並執行設定精靈：
+
+```bash
+# 1. 重新載入 shell（安裝器會告訴你是 ~/.zshrc 還是 ~/.bashrc）
+source ~/.zshrc
 
 # 2. 執行設定精靈（只需填入 Gemini API Key）
 costaff onboard
@@ -232,8 +242,19 @@ costaff start
 costaff dashboard
 ```
 
-`costaff start` 會先做 **preflight 檢查**（API Key、資料庫連線、密鑰），
-缺什麼會直接告訴你怎麼修，而不是讓容器無聲地 crash-loop。
+> **為什麼精靈不是自動跑的？** 用 `curl … | bash` 執行時，安裝器沒有互動式
+> 終端機可以提問，因此會偵測到這一點並交棒給 `costaff onboard`，由你在自己的
+> shell 手動執行（如上）。若你改成把 `install.sh` 下載後在終端機直接執行，精靈
+> 會自動啟動。
+
+`costaff start` 會先做 **preflight 檢查**（API Key、資料庫連線、密鑰、workspace
+路徑），缺什麼會直接告訴你怎麼修，而不是讓容器無聲地 crash-loop。
+
+> **手動安裝（進階）。** 若不想用安裝器，**必須**把 repo clone 到
+> `~/.costaff/costaff`（`.env`、`config.json` 與 docker-compose 都以此為基準），
+> 然後 `pip install -e .` → `costaff onboard` → `costaff start`。`costaff onboard`
+> 會自動寫入 `COSTAFF_WORKSPACE_DIR` 與隨機 Postgres 密碼，不需要手動編輯
+> `.env`。非互動環境請改用 `costaff bootstrap --gemini-key <key>`。
 
 開啟 **http://localhost:8501**，進入 **Chat**，即可立即開始與 Agent 對話。
 若有任何異常，先跑 `costaff doctor` —— 它會逐項診斷並在結尾列出**建議修復步驟**。

@@ -29,10 +29,19 @@ automatically.
 curl -fsSL https://raw.githubusercontent.com/costaff-ai/costaff/main/install.sh | bash
 ```
 
-The installer is interactive. When the **setup wizard** appears:
+This installs everything, then hands off to the setup wizard. Because
+`curl … | bash` has no interactive terminal, the wizard can't run inside
+the pipe — reload your shell and start it yourself:
 
-- Paste your **Gemini API key** when prompted — the wizard verifies it
-  live against the Gemini API and warns immediately if it's rejected
+```bash
+source ~/.zshrc      # or ~/.bashrc on Ubuntu — the installer tells you which
+costaff onboard
+```
+
+In the wizard:
+
+- Paste your **Gemini API key** when prompted — it's verified live
+  against the Gemini API and warns immediately if it's rejected
 - In the channel list, **WebChat is pre-selected** — just press Enter
   to confirm (it's the zero-token way to chat from your browser)
 - Create a username + password for the operator dashboard (or skip —
@@ -41,8 +50,8 @@ The installer is interactive. When the **setup wizard** appears:
 Re-running `costaff onboard` later is always safe: every prompt
 defaults to your existing settings.
 
-If the installer asks you to log out and back in (Linux Docker group
-membership), do that, then run `costaff onboard` to resume the wizard.
+If the installer asks you to log out and back in first (Linux Docker
+group membership), do that before running `costaff onboard`.
 
 ---
 

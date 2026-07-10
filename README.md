@@ -92,17 +92,30 @@ The installer:
 2. Clones the CoStaff repo to `~/.costaff/costaff`.
 3. Creates an isolated Python virtualenv at `~/.costaff/.venv`.
 4. Installs the `costaff` CLI into that venv and adds it to your `PATH`.
-5. Launches the **setup wizard** — asks for your AI provider key, admin
-   credentials, and which channels (if any) you want to set up.
+5. Writes the workspace path into `.env` so the containers know where the
+   shared data directory lives.
 
-If the installer prints **"manual steps"** at the end (e.g. "log out and
-log back in for Docker group membership"), follow them, then run
-`costaff onboard` yourself.
+Then reload your shell and run the **setup wizard** — it asks for your AI
+provider key, admin credentials, and which channels (if any) to set up:
 
-> **Headless / CI install?** `costaff bootstrap` is the non-interactive
-> equivalent of `onboard` — it reads config from environment variables
-> and auto-generates the security secrets, so you can provision a host
-> without the wizard.
+```bash
+source ~/.zshrc      # or ~/.bashrc on Ubuntu — the installer tells you which
+costaff onboard
+```
+
+> **Why isn't the wizard automatic?** Piping the installer through
+> `curl … | bash` gives it no interactive terminal, so it can't prompt.
+> The installer detects this and hands off to `costaff onboard`, which you
+> run yourself in your own shell (above). If you instead download and run
+> `install.sh` directly in a terminal, it launches the wizard for you.
+> Either way, if the installer prints **"manual steps"** at the end (e.g.
+> "log out and back in for Docker group membership"), do those first.
+
+> **Headless / CI install?** `costaff bootstrap --gemini-key <key>` is the
+> non-interactive equivalent of `onboard` — it reads config from flags or
+> environment variables, auto-generates the security secrets and Postgres
+> password, and writes the workspace path, so you can provision a host
+> without any prompts.
 
 ---
 
