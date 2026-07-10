@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -e
+# pipefail: without it a pipeline's exit code is the LAST command's, so e.g.
+# a failed `curl | sudo bash` would be silently swallowed under plain -e.
+set -eo pipefail
 
 # =============================================================================
 # CoStaff - Installer
@@ -298,6 +300,14 @@ print_manual_steps() {
 run_onboard() {
     if [ ${#MANUAL_STEPS[@]} -gt 0 ]; then
         # There are manual steps — don't auto-run onboard
+        return
+    fi
+
+    if [ ! -t 0 ]; then
+        # stdin is a pipe (`curl … | bash`): the interactive wizard would
+        # EOF on every prompt and write a half-empty .env. Hand off instead.
+        warn "Skipping the setup wizard — no terminal attached (piped install)."
+        echo -e "  Run it yourself next: ${GREEN}${BOLD}costaff onboard${RESET}"
         return
     fi
 

@@ -9,7 +9,11 @@ from rich.console import Console
 from rich.panel import Panel
 
 from services.config import ConfigManager
-from services.preflight import ensure_security_keys
+from services.preflight import (
+    ensure_postgres_password,
+    ensure_security_keys,
+    ensure_workspace_dir,
+)
 from services.runtime import get_runtime
 from utils.paths import PATHS, _project_root, _runtime_root, _base_dir
 
@@ -90,6 +94,16 @@ def _print_next_steps() -> None:
 
 def onboard():
     """Run configuration wizard."""
+    import sys
+    if not sys.stdin.isatty():
+        # Under `curl … | bash` (or any pipe) every questionary prompt EOFs
+        # to None and we'd write a half-empty .env. Refuse instead.
+        console.print(
+            "[red]costaff onboard is interactive and needs a terminal (TTY).[/red]\n"
+            "Run [bold]costaff onboard[/bold] directly in your shell, or use "
+            "[bold]costaff bootstrap --gemini-key <key>[/bold] for non-interactive setup."
+        )
+        raise typer.Exit(1)
     os.makedirs(os.path.dirname(PATHS["env"]), exist_ok=True)
     if not os.path.exists(PATHS["env"]):
         template_path = os.path.join(_project_root, ".env.template")
@@ -102,15 +116,26 @@ def onboard():
                 pass
             console.print(f"[yellow]Warning: {template_path} not found. Created a blank {PATHS['env']}.[/yellow]")
 
+    # First-run env repair BEFORE any prompt: the DB-URI default below must
+    # interpolate the (possibly freshly rotated) Postgres password, and the
+    # compose bind mount hard-requires COSTAFF_WORKSPACE_DIR.
+    if ensure_workspace_dir(PATHS["env"]):
+        console.print("[green]Security: COSTAFF_WORKSPACE_DIR written to .env.[/green]")
+    if ensure_postgres_password(PATHS["env"]):
+        console.print("[green]Security: generated a random Postgres password (fresh install).[/green]")
+
     # Re-running onboard must never wipe a working setup: every prompt below
     # defaults to the value already in .env.
     env = dotenv_values(PATHS["env"])
 
     console.print(Panel.fit("🤖 [bold blue]CoStaff Onboarding[/bold blue]"))
+    pg_user = _existing(env, "POSTGRES_USER") or "costaff"
+    pg_pass = _existing(env, "POSTGRES_PASSWORD") or "costaff_pass"
+    pg_db = _existing(env, "POSTGRES_DB") or "costaff_db"
     db_uri = questionary.text(
         "PostgreSQL URI:",
         default=_existing(env, "ADK_SESSION_SERVICE_URI")
-        or "postgresql+asyncpg://costaff:costaff_pass@postgres:5432/costaff_db"
+        or f"postgresql+asyncpg://{pg_user}:{pg_pass}@postgres:5432/{pg_db}"
     ).ask()
 
     console.print(Panel.fit("🤖 [bold blue]Model Configuration[/bold blue]"))

@@ -79,10 +79,19 @@ def bootstrap(
     set_key(PATHS["env"], "COSTAFF_AGENT_GEMINI_MODEL", gemini_model, quote_mode="never")
     set_key(PATHS["env"], "COSTAFF_PREFERRED_LANGUAGE", language)
 
-    # Same secrets `costaff onboard` generates — a CI deploy must not run
-    # with the template ID_SALT or unauthenticated internal APIs.
-    from services.preflight import ensure_security_keys
+    # Same first-run repairs `costaff onboard` performs — a CI deploy must
+    # not run with the template ID_SALT, unauthenticated internal APIs, the
+    # default Postgres password, or a missing workspace bind-mount path.
+    from services.preflight import (
+        ensure_postgres_password,
+        ensure_security_keys,
+        ensure_workspace_dir,
+    )
     generated = ensure_security_keys(PATHS["env"])
+    if ensure_workspace_dir(PATHS["env"]):
+        generated.append("COSTAFF_WORKSPACE_DIR")
+    if ensure_postgres_password(PATHS["env"]):
+        generated.append("POSTGRES_PASSWORD")
     if generated:
         console.print(f"[green]✔ Generated secrets:[/green] {', '.join(generated)}")
 

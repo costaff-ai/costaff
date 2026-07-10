@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from dotenv import dotenv_values, set_key
 
-from utils.paths import PATHS
+from utils.paths import PATHS, _workspace_root
 
 DEFAULT_ID_SALT = "change-me-to-a-random-string"
 
@@ -81,9 +81,9 @@ def check_env(env: dict | None = None) -> list[Issue]:
     if not _val(env, "ADK_SESSION_SERVICE_URI"):
         issues.append(Issue(
             "ADK_SESSION_SERVICE_URI is not set (PostgreSQL connection string)",
-            "Run `costaff onboard` — the default "
-            "postgresql+asyncpg://costaff:costaff_pass@postgres:5432/costaff_db "
-            "works with the bundled Postgres container.",
+            "Run `costaff onboard` — it writes a URI that works with the "
+            "bundled Postgres container "
+            "(postgresql+asyncpg://<user>:<password>@postgres:5432/<db>).",
             fatal=True,
         ))
 
@@ -104,9 +104,11 @@ def check_env(env: dict | None = None) -> list[Issue]:
     if not _val(env, "COSTAFF_WORKSPACE_DIR"):
         issues.append(Issue(
             "COSTAFF_WORKSPACE_DIR is not set",
-            "The shared /app/data bind mount falls back to an anonymous "
-            "volume. Add COSTAFF_WORKSPACE_DIR=$HOME/.costaff/workspace "
-            f"to {PATHS['env']} (install.sh writes this automatically).",
+            "docker-compose.yaml bind-mounts it at /app/data and refuses to "
+            "start without it. Run `costaff onboard` (writes it "
+            "automatically), or add COSTAFF_WORKSPACE_DIR=$HOME/.costaff/"
+            f"workspace to {PATHS['env']}.",
+            fatal=True,
         ))
 
     return issues
@@ -139,3 +141,62 @@ def ensure_security_keys(env_path: str | None = None) -> list[str]:
         generated.append("ID_SALT")
 
     return generated
+
+
+def ensure_workspace_dir(env_path: str | None = None) -> bool:
+    """Write COSTAFF_WORKSPACE_DIR (and create the directory) when missing.
+
+    docker-compose.yaml hard-requires it for the /app/data bind mount.
+    install.sh writes it, but `costaff bootstrap` and manual installs must
+    not depend on that. Returns True when the key was written.
+    """
+    env_path = env_path or PATHS["env"]
+    existing = dotenv_values(env_path) if os.path.exists(env_path) else {}
+    workspace = _val(existing, "COSTAFF_WORKSPACE_DIR") or _workspace_root
+    os.makedirs(os.path.join(workspace, "shared"), exist_ok=True)
+    if _val(existing, "COSTAFF_WORKSPACE_DIR"):
+        return False
+    set_key(env_path, "COSTAFF_WORKSPACE_DIR", workspace, quote_mode="never")
+    return True
+
+
+def _postgres_volume_exists() -> bool | None:
+    """True/False when Docker answers definitively, None when unreachable."""
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["docker", "volume", "inspect", "costaff_db_data"],
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        return None
+    if r.returncode == 0:
+        return True
+    err = (r.stderr or b"").decode(errors="replace").lower()
+    return False if "no such volume" in err else None
+
+
+def ensure_postgres_password(env_path: str | None = None) -> bool:
+    """Replace the template `costaff_pass` with a random password — fresh installs only.
+
+    Rotating an EXISTING install would lock the stack out of its own DB (the
+    postgres image only applies POSTGRES_PASSWORD when the data volume is
+    first initialized), so this only fires when the bundled volume verifiably
+    does not exist yet AND the configured DB URI still carries the default
+    credentials. The .env.template URI interpolates ${POSTGRES_PASSWORD}, so
+    rewriting the one key updates compose and every dotenv reader together.
+    Returns True when a password was generated.
+    """
+    env_path = env_path or PATHS["env"]
+    existing = dotenv_values(env_path) if os.path.exists(env_path) else {}
+    if _val(existing, "POSTGRES_PASSWORD") not in ("", "costaff_pass"):
+        return False
+    uri = _val(existing, "ADK_SESSION_SERVICE_URI")
+    if uri and "costaff_pass" not in uri:
+        return False  # custom URI that doesn't use the default credentials
+    if _postgres_volume_exists() is not False:
+        return False  # volume exists, or Docker unreachable — don't risk it
+    # token_urlsafe → [A-Za-z0-9_-], safe to embed in the URI unescaped.
+    set_key(env_path, "POSTGRES_PASSWORD", _secrets.token_urlsafe(24),
+            quote_mode="never")
+    return True
