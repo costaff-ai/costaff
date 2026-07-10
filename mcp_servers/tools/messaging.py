@@ -14,6 +14,7 @@ from core.notifiers.telegram import (
 from core.notifiers.line_notifier import send_line_notification
 from core.notifiers.discord import send_discord_file, send_discord_notification
 from core.notifiers.slack_notifier import send_slack_file, send_slack_notification
+from core.notifiers.webchat import send_webchat_file, send_webchat_notification
 from mcp_servers.setup import mcp, tz
 
 
@@ -80,9 +81,15 @@ async def send_message_now(
             await asyncio.to_thread(send_slack_file, target_id, fp)
     elif chan == "line": success = await send_line_notification(target_id, body)
     elif chan == "webchat":
-        # Webchat uses the regular notification flow (events)
-        # Here we just mark as success if we found a valid session
-        success = True if session_id else False
+        # Same delivery path as the dispatcher (core/notifiers/dispatcher.py):
+        # HTTP push to the WebChat channel's internal endpoint. This branch
+        # used to return "Sent." without sending anything — direct sub-agent
+        # messages to WebChat users were silently dropped.
+        success = await asyncio.to_thread(
+            send_webchat_notification, target_id, body, session_id=session_id)
+        for fp in _extract_file_paths(body):
+            await asyncio.to_thread(
+                send_webchat_file, target_id, fp, session_id=session_id)
 
     # Log as a completed reminder
     db = SessionLocal()
