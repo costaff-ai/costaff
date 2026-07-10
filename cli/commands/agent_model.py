@@ -1,16 +1,22 @@
 """`costaff agent model` — view and set per-agent LLM model configuration.
 
-Each agent declares two env vars in its config.json entry:
-  - `provider_env_var` — e.g. `CODING_AGENT_MODEL_PROVIDER`
-  - `model_env_var`    — e.g. `CODING_AGENT_MODEL`
+Write targets differ by agent kind:
+  - core agent (costaff-agent-costaff): env vars live in the CORE .env
+    (compose `env_file: - .env`); names hard-coded in `_CORE_AGENT`.
+  - external agents: env vars live in the PLUGIN .env next to the compose
+    fragment. The fragment wires `env_file: [core .env, plugin .env]` with
+    the plugin file LAST, so it wins — writing the core .env for these
+    agents is a silent no-op (the historical bug this module regressed on).
 
-This command reads/writes them in the core .env file. The core agent
-(costaff-agent-costaff) doesn't appear in `external_agents`, so its env
-vars are hard-coded in `_CORE_AGENT`.
+The env-var names come from the agent's config.json entry
+(`model_env_var` / `provider_env_var`, recorded by `agent add`); entries
+created before v0.1.0 lack them, so we recover the name from the agent's
+manifest on disk.
 
 Decorators register against the `agent_app` Typer instance defined in
 `cli/commands/agent.py`.
 """
+import json
 import os
 from typing import Optional
 
@@ -43,9 +49,14 @@ def _read_env(path: str) -> list[str]:
 
 
 def _write_env_key(path: str, key: str, value: str):
-    """Update or append a key=value in the .env file."""
+    """Update or append a key=value in the .env file.
+
+    No quotes: docker compose's env_file parser hands single-quoted values
+    through literally (see services/config.py) — same reason every other
+    .env writer in the repo uses set_key(quote_mode="never").
+    """
     lines = _read_env(path)
-    new_line = f"{key}='{value}'\n"
+    new_line = f"{key}={value}\n"
     found = False
     for i, line in enumerate(lines):
         stripped = line.strip()
@@ -57,6 +68,41 @@ def _write_env_key(path: str, key: str, value: str):
         lines.append(new_line)
     with open(path, "w") as f:
         f.writelines(lines)
+
+
+def _plugin_env_path(agent_conf: dict) -> str:
+    """The plugin .env next to the agent's compose fragment ('' if none)."""
+    frag = agent_conf.get("fragment_path", "")
+    return os.path.join(os.path.dirname(frag), ".env") if frag else ""
+
+
+def _model_env_var_for(agent_conf: dict) -> str:
+    """model_env_var from the config entry, else from the manifest on disk
+    (entries created before v0.1.0 didn't record it)."""
+    declared = agent_conf.get("model_env_var", "")
+    if declared:
+        return declared
+    src = agent_conf.get("source_path", "")
+    if src:
+        try:
+            with open(os.path.join(src, "costaff.agent.json")) as f:
+                return json.load(f).get("model_env_var", "") or ""
+        except (OSError, ValueError):
+            return ""
+    return ""
+
+
+def _external_target(agent_name: str, agent_conf: dict) -> dict:
+    """Build the write-target descriptor for an external agent."""
+    return {
+        "name": agent_name,
+        "model_env_var": _model_env_var_for(agent_conf),
+        "provider_env_var": agent_conf.get(
+            "provider_env_var",
+            "COSTAFF_AGENT_MODEL_PROVIDER" if _model_env_var_for(agent_conf) else "",
+        ),
+        "env_path": _plugin_env_path(agent_conf),
+    }
 
 
 def _read_env_key(path: str, key: str) -> str:
@@ -100,40 +146,39 @@ def agent_model(
         table.add_row("costaff-agent-costaff (core)", core_provider, core_model, "—")
 
         for agent_name, agent_conf in agents.items():
-            p_var = agent_conf.get("provider_env_var", "")
-            m_var = agent_conf.get("model_env_var", "")
-            p_val = (_read_env_key(env_path, p_var) if p_var else "") or global_provider
-            m_val = (_read_env_key(env_path, m_var) if m_var else "") or "gemini-3-flash-preview"
+            t = _external_target(agent_name, agent_conf)
+            # Effective value = plugin .env (wins in env_file order) → core .env
+            def _eff(var: str) -> str:
+                if not var:
+                    return ""
+                return (
+                    (_read_env_key(t["env_path"], var) if t["env_path"] else "")
+                    or _read_env_key(env_path, var)
+                )
+            p_val = _eff(t["provider_env_var"]) or global_provider
+            m_val = _eff(t["model_env_var"]) or "gemini-3-flash-preview"
             api = _read_env_key(env_path, "LITELLM_API_BASE") if p_val == "litellm" else "—"
             table.add_row(agent_name, p_val, m_val, api or "—")
 
         console.print(table)
         return
 
-    # Determine which agent(s) to configure
-    targets: list[dict] = []  # each dict: {name, model_env_var, provider_env_var}
+    # Determine which agent(s) to configure. Each target carries its OWN
+    # env_path — core .env for the core agent, plugin .env for externals.
+    targets: list[dict] = []
 
     if name is None:
         # Global: apply to all
-        targets.append(_CORE_AGENT)
+        targets.append({**_CORE_AGENT, "env_path": env_path})
         for agent_name, agent_conf in agents.items():
-            targets.append({
-                "name": agent_name,
-                "model_env_var": agent_conf.get("model_env_var", ""),
-                "provider_env_var": agent_conf.get("provider_env_var", ""),
-            })
+            targets.append(_external_target(agent_name, agent_conf))
     elif name == "costaff-agent-costaff":
-        targets.append(_CORE_AGENT)
+        targets.append({**_CORE_AGENT, "env_path": env_path})
     else:
         if name not in agents:
             console.print(f"[red]Error: Agent '{name}' not found. Use 'costaff agent list' to see available agents.[/red]")
             raise typer.Exit(1)
-        a = agents[name]
-        targets.append({
-            "name": name,
-            "model_env_var": a.get("model_env_var", ""),
-            "provider_env_var": a.get("provider_env_var", ""),
-        })
+        targets.append(_external_target(name, agents[name]))
 
     # Interactive selection if no flags given
     final_provider = provider
@@ -171,25 +216,51 @@ def agent_model(
                 default=_read_env_key(env_path, "LITELLM_API_KEY") or "",
             ).ask()
 
-    # Write env vars
+    # Write env vars — each target into its OWN env file. Success is only
+    # claimed for agents that were actually written; a target with no model
+    # surface (url-type remote agent, or a plugin without model_env_var) is
+    # reported instead of silently "succeeding".
+    configured: list[str] = []
+    skipped: list[str] = []
     for t in targets:
+        target_env = t.get("env_path", "")
+        writable = target_env and (t.get("model_env_var") or t.get("provider_env_var"))
+        if not writable:
+            skipped.append(t["name"])
+            continue
         if t.get("provider_env_var"):
-            _write_env_key(env_path, t["provider_env_var"], final_provider)
+            _write_env_key(target_env, t["provider_env_var"], final_provider)
         if t.get("model_env_var") and final_model:
-            _write_env_key(env_path, t["model_env_var"], final_model)
+            _write_env_key(target_env, t["model_env_var"], final_model)
+        if final_provider == "litellm":
+            # LiteLLM connection settings are read inside the agent's own
+            # containers, so they go to the same per-target env file.
+            if api_base:
+                _write_env_key(target_env, "LITELLM_API_BASE", api_base)
+            if api_key:
+                _write_env_key(target_env, "LITELLM_API_KEY", api_key)
+            if final_model:
+                _write_env_key(target_env, "LITELLM_MODEL_NAME", final_model)
+        configured.append(t["name"])
 
-    if final_provider == "litellm":
-        if api_base:
-            _write_env_key(env_path, "LITELLM_API_BASE", api_base)
-        if api_key:
-            _write_env_key(env_path, "LITELLM_API_KEY", api_key)
-        if final_model:
-            _write_env_key(env_path, "LITELLM_MODEL_NAME", final_model)
+    for s in skipped:
+        console.print(
+            f"[yellow]Skipped '{s}': no model configuration surface — the "
+            f"agent is managed remotely (url type) or its entry/manifest "
+            f"declares no model_env_var.[/yellow]"
+        )
+    if not configured:
+        console.print("[red]No agent was updated.[/red]")
+        raise typer.Exit(1)
 
-    agent_label = name or "all agents"
-    console.print(f"[green]Model updated for {agent_label}: provider=[bold]{final_provider}[/bold], model=[bold]{final_model}[/bold][/green]")
-
-    if name and name != "costaff-agent-costaff" and agents.get(name, {}).get("type") == "github":
-        console.print(f"[yellow]Run 'costaff agent restart {name}' to apply changes.[/yellow]")
+    console.print(
+        f"[green]Model updated for {', '.join(configured)}: "
+        f"provider=[bold]{final_provider}[/bold], model=[bold]{final_model}[/bold][/green]"
+    )
+    if configured == ["costaff-agent-costaff"]:
+        console.print("[yellow]Run 'costaff restart' to apply (env_file is only read at container creation).[/yellow]")
     else:
-        console.print("[yellow]Run 'costaff start' or restart the affected agent to apply changes.[/yellow]")
+        console.print(
+            "[yellow]Run 'costaff agent rebuild <name> --no-pull' on each updated agent "
+            "to apply (env_file is only read at container creation; plain restart is not enough).[/yellow]"
+        )

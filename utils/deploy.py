@@ -305,4 +305,11 @@ def _deploy_local_agent(
     if manifest.get("mcp_configurable"):
         result_dict["mcp_configurable"] = True
         result_dict["mcp_env_var"] = manifest.get("mcp_env_var", name.replace("-", "_").upper() + "_MCP_URLS")
+    # Record the model surface so `costaff agent model` can actually write
+    # it later. The provider key is the generic name scoped by the plugin
+    # .env (last in env_file order, so it wins inside this agent's
+    # containers without touching the manager's global provider).
+    if manifest.get("model_env_var"):
+        result_dict["model_env_var"] = manifest["model_env_var"]
+        result_dict["provider_env_var"] = "COSTAFF_AGENT_MODEL_PROVIDER"
     return result_dict
