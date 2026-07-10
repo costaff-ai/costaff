@@ -186,7 +186,10 @@ def _update_all_plugins(tag: Optional[str]) -> None:
         for n in names:
             console.print(f"\n[bold]{kind}[/bold] [cyan]{n}[/cyan]")
             try:
-                rebuild(name=n, no_cache=False, pull=True, tag=tag)
+                # core_name MUST be passed explicitly: these command funcs
+                # are called directly (not via Typer), so an omitted --core
+                # would default to the OptionInfo sentinel, not None.
+                rebuild(name=n, no_cache=False, pull=True, tag=tag, core_name=None)
                 ok.append(n)
             except (typer.Exit, SystemExit, Exception) as e:  # noqa: BLE001
                 # Per-plugin isolation: log and keep going. The rebuild

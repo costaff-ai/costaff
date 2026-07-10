@@ -32,6 +32,12 @@ CORE_OPT = typer.Option(None, "--core", help="Target core (see `costaff core lis
 
 def _resolve_core(name):
     """--core resolution shared by every agent command."""
+    # When a command function is invoked directly in Python (e.g. the
+    # `update --all` fan-out) rather than through Typer, an unset --core
+    # arrives as the OptionInfo sentinel, not None. Treat any non-string as
+    # "unset" so it resolves to the active core instead of raising.
+    if not isinstance(name, str):
+        name = None
     try:
         return get_core(name)
     except ValueError as e:

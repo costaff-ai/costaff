@@ -36,6 +36,19 @@ def test_update_all_rebuilds_source_plugins_and_skips_remote(monkeypatch):
     assert calls[0][1]["name"] == "coding"
     assert calls[0][1]["tag"] == "v0.1.0-alpha-2"
     assert calls[1][1]["name"] == "telegram"
+    # Regression: core_name MUST be passed explicitly as None — otherwise the
+    # rebuild funcs receive the Typer OptionInfo sentinel and every rebuild
+    # dies in _resolve_core, silently making `update --all` a no-op.
+    assert calls[0][1]["core_name"] is None
+    assert calls[1][1]["core_name"] is None
+
+
+def test_resolve_core_tolerates_option_info_sentinel():
+    """Calling a command func directly (as update --all does) passes the
+    OptionInfo default, not None. _resolve_core must treat it as unset."""
+    from cli.commands.agent_lifecycle import _resolve_core, CORE_OPT
+    core = _resolve_core(CORE_OPT)  # must NOT raise typer.Exit
+    assert core.name  # resolves to a real (active/default) core
 
 
 def test_update_all_continues_after_one_failure(monkeypatch):
