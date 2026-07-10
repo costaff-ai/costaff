@@ -14,6 +14,7 @@ from mcp_servers.executors.project_task import (
     execute_project_task,
     fail_task_and_notify,
 )
+from mcp_servers.task_helpers import normalize_agent_name
 
 # Grace age for the PERIODIC orphan sweep. Live executors are excluded via
 # RUNNING_TASKS, so this only shields 'doing' rows written by someone other
@@ -117,15 +118,17 @@ async def poll_queued_tasks():
                 models.ProjectTask.created_at.asc()
             ).all()
 
-            # Group by agent — only start one task per agent at a time
+            # Group by agent — only start one task per agent at a time.
+            # Normalize names so "coding"/"coding_agent" count as one agent
+            # (a raw compare would let both run → the anyio race).
             agents_busy = set()
             doing = db.query(models.ProjectTask).filter(models.ProjectTask.status == "doing").all()
             for t in doing:
                 if t.assigned_agent:
-                    agents_busy.add(t.assigned_agent)
+                    agents_busy.add(normalize_agent_name(t.assigned_agent))
 
             for task in queued:
-                agent = task.assigned_agent or "costaff_agent"
+                agent = normalize_agent_name(task.assigned_agent or "costaff_agent")
                 if agent not in agents_busy:
                     agents_busy.add(agent)
                     asyncio.create_task(execute_project_task(task.id))

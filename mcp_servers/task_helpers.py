@@ -10,6 +10,26 @@ import os
 from core import models
 
 
+def normalize_agent_name(name: str) -> str:
+    """Collapse the many spellings the Manager LLM uses for one agent.
+
+    The Manager passes any of "coding" / "coding_agent" /
+    "costaff-agent-coding" / "business_analysis_agent", and the form stored
+    on a task at create-time may differ from the form a later call uses.
+    Every per-agent identity comparison (serialization busy-check, queue
+    advance, poll) MUST go through this — a raw `==` lets two spellings of
+    the SAME physical agent run concurrently, defeating the one-task-per-
+    agent guarantee that keeps concurrent MCP sessions (→ the anyio
+    cancel-scope race) from happening.
+    """
+    n = (name or "").replace("-", "_")
+    if n.startswith("costaff_agent_"):
+        n = n[len("costaff_agent_"):]
+    if n.endswith("_agent"):
+        n = n[:-len("_agent")]
+    return n
+
+
 def get_user_channel_info(user_id: str, db) -> tuple:
     """Look up the user's primary notification channel from IdentityMap.
 

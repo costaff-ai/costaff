@@ -11,7 +11,7 @@ from core.license import LicenseManager
 from mcp_servers.setup import logger
 from core.notifiers.dispatcher import dispatch_notification
 from core.notifiers.result_envelope import parse_result_envelope
-from mcp_servers.task_helpers import get_user_channel_info, build_task_spec
+from mcp_servers.task_helpers import get_user_channel_info, build_task_spec, normalize_agent_name
 
 
 class OutputVerificationError(Exception):
@@ -160,20 +160,26 @@ async def execute_project_task(task_id: str):
         # poll_queued_tasks re-fires it once the agent frees up.
         # NOTE: no await between this check and the 'doing' commit below —
         # that ordering is what makes the check race-free on one event loop.
+        # Compare NORMALIZED agent names: "coding" and "coding_agent" are the
+        # same physical sub-agent, and a raw `==` would let both run at once.
         if task.assigned_agent:
-            busy = (
-                db.query(models.ProjectTask.id)
+            my_agent = normalize_agent_name(task.assigned_agent)
+            doing = (
+                db.query(models.ProjectTask.id, models.ProjectTask.assigned_agent)
                 .filter(
-                    models.ProjectTask.assigned_agent == task.assigned_agent,
                     models.ProjectTask.status == "doing",
                     models.ProjectTask.id != task.id,
                 )
-                .first()
+                .all()
+            )
+            busy = next(
+                (tid for tid, ag in doing if normalize_agent_name(ag) == my_agent),
+                None,
             )
             if busy:
                 logger.info(
                     f"ProjectTask {task_id} deferred — agent "
-                    f"{task.assigned_agent} is already running task {busy[0]}"
+                    f"{task.assigned_agent} is already running task {busy}"
                 )
                 return
 
@@ -241,6 +247,14 @@ async def execute_project_task(task_id: str):
                 "[execute_project_task] task %s blocked by license gate",
                 task_id,
             )
+            # Advance the queue so this agent's other work isn't blocked and,
+            # crucially, so downstream tasks depending on this one cascade to
+            # failed instead of stranding in backlog forever (the normal
+            # failure paths do this; the license gate used to just return).
+            if task.assigned_agent:
+                asyncio.create_task(_advance_agent_queue(
+                    task.assigned_agent, task.user_id, finished_task_id=task_id
+                ))
             return
 
         # Register BEFORE the commit: there must be no instant where the DB
@@ -597,16 +611,23 @@ async def _advance_agent_queue(agent_id: str, user_id: str, finished_task_id: st
                     db.commit() # Commit each change immediately to avoid race
                     asyncio.create_task(execute_project_task(dep_task.id))
 
-        # 2. Advance the original agent's own queue (existing logic)
-        next_task = (
+        # 2. Advance the original agent's own queue. Match on NORMALIZED agent
+        # name so a task stored as "coding_agent" is still picked up when the
+        # finished task was "coding" (else that agent's queue would stall until
+        # the 5s poll happens to catch it).
+        norm_agent = normalize_agent_name(agent_id)
+        candidates = (
             db.query(models.ProjectTask)
             .filter(
-                models.ProjectTask.assigned_agent == agent_id,
                 models.ProjectTask.user_id == user_id,
-                models.ProjectTask.status == "queued"
+                models.ProjectTask.status == "queued",
             )
             .order_by(models.ProjectTask.queue_order.asc().nullslast(), models.ProjectTask.created_at.asc())
-            .first()
+            .all()
+        )
+        next_task = next(
+            (t for t in candidates if normalize_agent_name(t.assigned_agent) == norm_agent),
+            None,
         )
         if next_task:
             logger.info(f"Advancing queue: next task for {agent_id} is {next_task.id}")

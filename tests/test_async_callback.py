@@ -434,3 +434,69 @@ async def test_agent_busy_defers_second_task(db_session, monkeypatch):
     db_session.expire_all()
     assert db_session.get(models.ProjectTask, waiting.id).status == "queued"
     assert run_calls == []
+
+
+@pytest.mark.asyncio
+async def test_license_block_cascades_to_downstream(db_session, monkeypatch):
+    """Regression: a license-gate failure used to `return` without advancing
+    the queue, stranding backlog dependents forever. It must now advance so
+    downstream tasks cascade to failed like any other upstream failure."""
+    upstream = _make_task(db_session, status="queued")
+    upstream_id = upstream.id
+    downstream = _make_task(db_session, status="backlog")
+    downstream_id = downstream.id
+    downstream.depends_on = upstream_id
+    db_session.commit()
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(
+        "mcp_servers.tools._shared.require_within_license",
+        lambda db: "⛔ OSS usage limit reached — apply a license to continue.",
+    )
+
+    async def fake_dispatch(channel, recipient, body, sid):
+        pass
+    monkeypatch.setattr(executor_mod, "dispatch_notification", fake_dispatch)
+
+    await executor_mod.execute_project_task(upstream_id)
+    # Let the queue-advance + cascaded downstream execute run
+    for _ in range(10):
+        await asyncio.sleep(0)
+    for t in list(asyncio.all_tasks()):
+        if t is not asyncio.current_task():
+            t.cancel()
+
+    db_session.expire_all()
+    assert db_session.get(models.ProjectTask, upstream_id).status == "failed"
+    # Downstream must not be left in backlog — it cascades to failed
+    assert db_session.get(models.ProjectTask, downstream_id).status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_agent_busy_defers_across_name_spellings(db_session, monkeypatch):
+    """Regression: the busy-check compares NORMALIZED agent names. A task
+    stored as 'coding' running must defer a second task stored as
+    'coding_agent' — they are the same physical sub-agent, and letting both
+    run concurrently is exactly the anyio cancel-scope race the
+    serialization is meant to prevent."""
+    running = _make_task(db_session, status="doing")
+    running.assigned_agent = "coding"
+    waiting = _make_task(db_session, status="queued")
+    waiting.assigned_agent = "coding_agent"  # same agent, different spelling
+    db_session.commit()
+    waiting_id = waiting.id
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    run_calls = []
+
+    async def fake_run(app, uid, sid, prompt):
+        run_calls.append(sid)
+        return "must not run — agent busy under a different spelling"
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+
+    await executor_mod.execute_project_task(waiting_id)
+
+    db_session.expire_all()
+    assert db_session.get(models.ProjectTask, waiting_id).status == "queued"
+    assert run_calls == []
