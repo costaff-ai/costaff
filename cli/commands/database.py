@@ -16,6 +16,21 @@ console = Console()
 db_app = typer.Typer(help="Manage database.")
 
 
+def _require_engine():
+    """Return the DB engine, or print a friendly message and exit.
+
+    get_engine() returns None when ADK_SESSION_SERVICE_URI is unset. Without
+    this guard backup/clean/restore called .connect() on None and dumped a
+    raw AttributeError traceback (db migrate/history already handled this).
+    """
+    engine = DatabaseManager.get_engine()
+    if engine is None:
+        console.print("[red]No database configured (ADK_SESSION_SERVICE_URI missing in .env).[/red]")
+        console.print("[dim]Run `costaff onboard`, or start the stack with `costaff start`.[/dim]")
+        raise typer.Exit(1)
+    return engine
+
+
 @db_app.command("info")
 def info():
     """Show DB info and statistics."""
@@ -32,7 +47,7 @@ def info():
 def backup(output: str = typer.Argument(None)):
     """Create full DB backup."""
     output = output or f"costaff_backup_{int(time.time())}.json"
-    engine = DatabaseManager.get_engine()
+    engine = _require_engine()
     tables = ["events", "sessions", "user_states", "reminders", "regular_works", "epics", "stories", "project_tasks", "task_comments", "diary", "identity_maps", "file_tasks", "user_contacts", "contacts"]
     data = {"version": VERSION, "timestamp": datetime.now().isoformat(), "tables": {}}
     with engine.connect() as conn:
@@ -57,12 +72,13 @@ def restore(file_path: str):
     """Restore from JSON backup."""
     import os
     if not os.path.exists(file_path):
-        return console.print("File not found.")
+        console.print(f"[red]File not found: {file_path}[/red]")
+        raise typer.Exit(1)
+    engine = _require_engine()
     with open(file_path, "r") as f:
         data = json.load(f)
     if not questionary.confirm("Overwrite existing data?").ask():
         return
-    engine = DatabaseManager.get_engine()
     with engine.connect() as conn:
         for t, rows in data.get("tables", {}).items():
             if not rows:
@@ -134,7 +150,7 @@ def history():
 def clean():
     """Wipe database data."""
     if questionary.confirm("Wipe all data?").ask():
-        engine = DatabaseManager.get_engine()
+        engine = _require_engine()
         tables = ["events", "sessions", "user_states", "reminders", "regular_works", "epics", "stories", "project_tasks", "task_comments", "diary", "identity_maps", "file_tasks", "user_contacts", "contacts"]
         with engine.connect() as conn:
             for t in tables:

@@ -287,8 +287,8 @@ def agent_enable(name: str = typer.Argument(...), core_name: Optional[str] = COR
         conf["coding_agent_enabled"] = True
     core.write_config(conf)
     core.regen_external_agents_env()
+    core.recreate_manager()
     console.print(f"[green]Agent '{name}' enabled on core '{core.name}'.[/green]")
-    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply changes.[/yellow]")
 
 
 @agent_app.command("transfer")
@@ -327,9 +327,9 @@ def agent_transfer(
         entry["transfer"] = False
     core.write_config(conf)
     core.regen_external_agents_env()
+    core.recreate_manager()
     state = "transfer (sub_agents)" if enable else "AgentTool (default)"
-    console.print(f"[green]'{name}' is now wired via {state}.[/green]")
-    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply; re-run tests/test_remote_agent_tools.py.[/yellow]")
+    console.print(f"[green]'{name}' is now wired via {state} (Manager recreated).[/green]")
 
 
 @agent_app.command("disable")
@@ -345,5 +345,5 @@ def agent_disable(name: str = typer.Argument(...), core_name: Optional[str] = CO
         conf["coding_agent_enabled"] = False
     core.write_config(conf)
     core.regen_external_agents_env()
+    core.recreate_manager()
     console.print(f"[green]Agent '{name}' disabled on core '{core.name}'.[/green]")
-    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply changes.[/yellow]")

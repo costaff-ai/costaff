@@ -35,13 +35,19 @@ def _setup_logging() -> None:
 _setup_logging()
 
 server = FastAPI(title="CoStaff Dashboard")
-_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
-server.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# The bundled dashboard serves its frontend from THIS app, so browser calls
+# to /api/* are same-origin and need no CORS at all. Default to deny
+# cross-origin (empty allow-list) instead of the old "*", which let any
+# website script the dashboard. Only set ALLOWED_ORIGINS (comma-separated,
+# or "*") when you host the frontend on a different origin.
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if _allowed_origins:
+    server.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 server.mount("/css", StaticFiles(directory=os.path.join(PATHS["frontend"], "css")), name="css")
 server.mount("/js", StaticFiles(directory=os.path.join(PATHS["frontend"], "js")), name="js")
 server.mount("/views", StaticFiles(directory=os.path.join(PATHS["frontend"], "views")), name="views")
