@@ -159,10 +159,21 @@ async def run_adk_prompt(app: str, uid: str, sid: str, prompt: Optional[str] = N
                 try:
                     res = await client.post(f"{ADK_URL}/run", json=payload, headers=headers)
                     if res.status_code == 200:
+                        # Find the latest agent event with NON-EMPTY text. A
+                        # part can carry {"text": ""} (a tool-only final turn),
+                        # and the old `if txts:` returned that empty string —
+                        # bypassing the summarize retry and letting the executor
+                        # mark the task done with an empty deliverable.
+                        reply = None
                         for event in reversed(res.json()):
                             if event.get("author") != "user" and "content" in event:
                                 txts = [p.get("text", "") for p in event["content"].get("parts", []) if "text" in p]
-                                if txts: return "".join(txts).strip()
+                                joined = "".join(txts).strip()
+                                if joined:
+                                    reply = joined
+                                    break
+                        if reply:
+                            return reply
                         preferred_lang = os.getenv("COSTAFF_PREFERRED_LANGUAGE", "English")
                         payload["newMessage"] = {"role": "user", "parts": [{"text": f"The task is complete. Please summarize the result for the user in {preferred_lang}."}]}
                         continue
