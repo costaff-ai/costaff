@@ -22,7 +22,10 @@ async def send_line_notification(user_id: str, message: str):
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
     if not token:
         logger.error("LINE_CHANNEL_ACCESS_TOKEN not found")
-        return
+        # Return False (not None): the dispatcher treats a falsy-but-not-False
+        # result as success, so a bare `return` here would mark an undelivered
+        # message as sent and skip the retry outbox.
+        return False
 
     # LINE text messages render no Markdown — strip every sigil so the
     # user does NOT see raw '##' / '**' / backticks. See

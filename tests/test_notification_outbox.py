@@ -116,6 +116,25 @@ async def test_retry_loop_backs_off_then_dies(db_session, monkeypatch):
     assert refreshed.status == "dead"  # hit max_attempts
 
 
+async def test_send_treats_none_return_as_failure(db_session, monkeypatch):
+    """Regression: LINE's notifier returns None when its token is missing.
+    _send_to_channel must treat a non-True result as failure (was
+    `ok is not False`, which swallowed None as success and skipped the
+    outbox → silent message loss)."""
+    async def line_none(target, body):
+        return None  # LINE with a missing access token
+    monkeypatch.setattr(disp, "send_line_notification", line_none)
+
+    ok = await disp._send_to_channel("line", "u1", "hi")
+    assert ok is False
+
+    # And via the full dispatch path it must enqueue for retry, not vanish
+    delivered = await disp.dispatch_notification("line", "u1", "hi")
+    assert delivered is False
+    rows = _outbox(db_session)
+    assert len(rows) == 1 and rows[0].status == "pending" and rows[0].channel == "line"
+
+
 async def test_retry_loop_skips_not_yet_due(db_session, monkeypatch):
     db_session.add(models.NotificationOutbox(
         channel="telegram", recipient="u1", message="hi", status="pending",

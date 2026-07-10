@@ -88,9 +88,10 @@ async def _send_to_channel(
     else:
         logger.warning("[dispatch] unknown channel %r — cannot deliver", channel)
         return False
-    # Notifiers return None on some success paths; treat only explicit False
-    # as failure so we don't spuriously enqueue.
-    return ok is not False
+    # Every notifier returns True only on a confirmed send. Require exactly
+    # that — an earlier `ok is not False` swallowed LINE's None-on-missing-
+    # token as success, silently losing the message and skipping the outbox.
+    return ok is True
 
 
 async def dispatch_notification(
