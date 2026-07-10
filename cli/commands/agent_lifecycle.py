@@ -198,11 +198,14 @@ def agent_add(
         agent_key = name.replace("-", "_")
         am = conf.setdefault("agent_mcps", {})
 
-        # Ensure Root Agent can see this new specialist's tools
-        if "costaff_agent" not in am:
-            am["costaff_agent"] = ["costaff"]
-        if name not in am["costaff_agent"]:
-            am["costaff_agent"].append(name)
+        # Do NOT add this MCP to the manager (agent_mcps.costaff_agent). The
+        # manager reaches specialists via A2A AgentTool, not via their MCP;
+        # loading N streamable MCPs into the manager triggers the ADK anyio
+        # cancel-scope race (see services/config.update_mcp_urls, which warns
+        # about exactly this). Keep the manager on its own MCP only; operators
+        # who really want a sub-agent's tools in the manager can edit
+        # config.json → agent_mcps.costaff_agent by hand.
+        am.setdefault("costaff_agent", ["costaff"])
 
         # Ensure Specialist can see its own tools + core tools
         if agent_key not in am:
@@ -274,8 +277,26 @@ def agent_remove(
     del conf["external_agents"][name]
     if name == "costaff-agent-coding":
         conf["coding_agent_enabled"] = False
+
+    # Tear down the MCP wiring `agent add` created for a configurable agent —
+    # otherwise the dead MCP lingers in `mcp` / `agent_mcps` / `agent_mcp_filters`
+    # and the next `update_mcp_urls` (costaff start, or the next agent add)
+    # regenerates a URL for the removed `<prefix>-mcp-<name>` container and
+    # feeds it back into the manager env.
+    agent_key = name.replace("-", "_")
+    if name in conf.get("mcp", []):
+        conf["mcp"].remove(name)
+    am = conf.get("agent_mcps", {})
+    am.pop(agent_key, None)
+    # Defensive: drop the name from the manager's list too, in case an older
+    # `agent add` (pre-fix) had appended it there.
+    if name in am.get("costaff_agent", []):
+        am["costaff_agent"].remove(name)
+    conf.get("agent_mcp_filters", {}).pop(agent_key, None)
+
     core.write_config(conf)
     core.regen_external_agents_env()
+    core.regen_mcp_urls()
     core.recreate_manager()
     console.print(f"[green]Agent '{name}' stopped and removed from core '{core.name}'.[/green]")
 

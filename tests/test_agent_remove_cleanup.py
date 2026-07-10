@@ -43,6 +43,9 @@ class _FakeCore:
     def regen_external_agents_env(self):
         pass
 
+    def regen_mcp_urls(self):
+        pass
+
     def recreate_manager(self):
         self.recreated = True
 
