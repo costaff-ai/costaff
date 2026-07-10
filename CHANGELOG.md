@@ -4,9 +4,38 @@ All notable changes to this project are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
-This repository is **private** — for internal / paid-tier consumption only.
-
 ## [Unreleased]
+
+### Fixed
+
+- **Task lifecycle — no more stranded tasks.** Startup orphan recovery now
+  reaps EVERY `doing` row unconditionally (executors die with the process;
+  the old 30-minute age gate stranded tasks when the container restarted
+  within 30 minutes of a task starting), plus a periodic sweep catches
+  workers lost mid-life. Reaped tasks now notify the user, finalize the
+  live progress panel, and advance the agent's queue. A failed upstream
+  task now cascades `failed` down its dependency chain instead of leaving
+  downstream tasks spinning in `queued` forever.
+- **Per-agent serialization enforced in the executor.** A second task for
+  an agent that is already running one is deferred back to the queue —
+  concurrent MCP sessions on one sub-agent trigger the anyio cancel-scope
+  race, so this is now a structural guarantee instead of a convention.
+- **`costaff agent model` really persists for external agents.** It now
+  writes the agent's plugin `.env` (which wins in `env_file` order), backs
+  the env-var names into new `agent add` entries, recovers them from the
+  manifest for pre-v0.1.0 entries, and exits non-zero instead of printing
+  a fake success when the agent has no model surface (url-type).
+- **`send_message_now` to WebChat actually sends.** The webchat branch
+  used to return "Sent." without delivering anything; it now pushes
+  through the same channel endpoint the notification dispatcher uses.
+
+### Security
+
+- Every published port now binds `127.0.0.1` by default (manager ADK web,
+  bundled Postgres, dashboard, channel fragments) with per-host opt-out
+  env vars; fresh installs generate a random Postgres password; corrupt
+  `config.json` aborts loudly instead of being overwritten with defaults;
+  retry-exhausted agent runs are recorded as `failed`, not `done`.
 
 ## [0.1.0-beta-1] - 2026-07-08
 
