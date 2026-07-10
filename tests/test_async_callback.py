@@ -362,3 +362,75 @@ async def test_retry_exhausted_sentinel_marks_task_failed(db_session, monkeypatc
     # The user hears about the failure, not a "⚠️ …" success message
     assert len(dispatch_calls) == 1
     assert dispatch_calls[0][2] == "Manager explains the outage"
+
+
+@pytest.mark.asyncio
+async def test_failed_dependency_cascades_instead_of_spinning(db_session, monkeypatch):
+    """Regression for GA audit: a downstream task whose upstream FAILED used
+    to sit in 'queued' forever, re-fired by the 5s poll and early-returning
+    each time — never failed, never reported. It must cascade to 'failed'
+    and notify the user."""
+    upstream_id = _make_task(db_session, status="failed").id
+    downstream = _make_task(db_session, status="queued")
+    downstream_id = downstream.id
+    downstream.depends_on = upstream_id
+    db_session.commit()
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    run_calls = []
+
+    async def fake_run(app, uid, sid, prompt):
+        run_calls.append(sid)
+        return "should never run"
+
+    dispatch_calls = []
+
+    async def fake_dispatch(channel, recipient, body, sid):
+        dispatch_calls.append((channel, recipient, body, sid))
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+    monkeypatch.setattr(executor_mod, "dispatch_notification", fake_dispatch)
+
+    await executor_mod.execute_project_task(downstream_id)
+    for t in list(asyncio.all_tasks()):
+        if t is not asyncio.current_task():
+            t.cancel()
+
+    db_session.expire_all()
+    assert db_session.get(models.ProjectTask, downstream_id).status == "failed"
+    assert run_calls == []  # the agent must never be invoked
+    # The user is told the chain broke
+    assert len(dispatch_calls) == 1
+    assert "failed" in dispatch_calls[0][2].lower()
+    # An issue comment documents the upstream link
+    issues = [
+        c for c in db_session.query(models.TaskComment)
+        .filter(models.TaskComment.task_id == downstream_id).all()
+        if c.type == "issue"
+    ]
+    assert issues and upstream_id in issues[0].content
+
+
+@pytest.mark.asyncio
+async def test_agent_busy_defers_second_task(db_session, monkeypatch):
+    """Per-agent serialization: while one task is 'doing', a second task for
+    the SAME agent must stay 'queued' (poll re-fires it later) — concurrent
+    MCP sessions on one sub-agent trigger the anyio cancel-scope race."""
+    running = _make_task(db_session, status="doing")
+    waiting = _make_task(db_session, status="queued")
+    assert running.assigned_agent == waiting.assigned_agent
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    run_calls = []
+
+    async def fake_run(app, uid, sid, prompt):
+        run_calls.append(sid)
+        return "must not execute while agent is busy"
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+
+    await executor_mod.execute_project_task(waiting.id)
+
+    db_session.expire_all()
+    assert db_session.get(models.ProjectTask, waiting.id).status == "queued"
+    assert run_calls == []

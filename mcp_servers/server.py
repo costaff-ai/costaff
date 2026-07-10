@@ -17,7 +17,7 @@ from mcp_servers.tools import user, messaging, reminders, regular_works, epics, 
 # Import background task functions
 from mcp_servers.background import (
     sync_database_tasks, poll_queued_tasks, _ensure_default_regular_works,
-    recover_orphaned_tasks,
+    recover_orphaned_tasks, orphan_sweep_loop,
 )
 from mcp_servers.executors.reminder import execute_reminder
 
@@ -38,9 +38,12 @@ async def startup():
         scheduler.start()
 
     # Recover orphaned ProjectTasks — anything stuck in 'doing' from before
-    # this MCP container started up. Must run before the queue polling kicks
-    # in so we don't accidentally pick up a stale 'doing' record as 'busy'.
-    recover_orphaned_tasks()
+    # this MCP container started up. All executors died with the previous
+    # process, so max_age_minutes=0 reaps every 'doing' row unconditionally
+    # (the old 30-minute gate left restart-within-30min tasks stuck forever).
+    # Must run before the queue polling kicks in so a stale 'doing' record
+    # isn't counted as 'busy'.
+    await recover_orphaned_tasks(max_age_minutes=0)
 
     # Ensure default global Regular Works exist (shared across all users)
     _ensure_default_regular_works()
@@ -67,6 +70,7 @@ async def startup():
 
     asyncio.create_task(sync_database_tasks())
     asyncio.create_task(poll_queued_tasks())
+    asyncio.create_task(orphan_sweep_loop())
     logger.info("CoStaff Agent Engine online.")
 
 

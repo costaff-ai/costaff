@@ -113,6 +113,14 @@ def _verify_declared_outputs(result_text: str, agent_name: str | None = None) ->
     return missing
 
 
+# Task IDs whose executor coroutine is alive in THIS process. The orphan
+# sweep (background.recover_orphaned_tasks) skips these, so a 'doing' row
+# not in this set is verifiably not being executed here — the only place
+# executors run. Registered just before the 'doing' commit, discarded in
+# the executor's finally.
+RUNNING_TASKS: set = set()
+
+
 async def execute_project_task(task_id: str):
     """Execute a ProjectTask by calling costaff_agent with full project context."""
     db = SessionLocal()
@@ -124,8 +132,49 @@ async def execute_project_task(task_id: str):
         # Check dependency
         if task.depends_on:
             dep = db.query(models.ProjectTask).filter(models.ProjectTask.id == task.depends_on).first()
+            if dep and dep.status == "failed":
+                # Upstream died — fail this task too instead of leaving it
+                # 'queued' where the 5s poll would re-fire it forever. The
+                # queue-advance inside fail_task_and_notify wakes OUR
+                # dependents, so the failure cascades down the whole chain
+                # link by link.
+                logger.warning(
+                    f"ProjectTask {task_id} failing: upstream dependency "
+                    f"{task.depends_on} failed"
+                )
+                await fail_task_and_notify(
+                    db, task,
+                    f"Upstream task '{dep.title}' (id={dep.id}) failed, so "
+                    f"this dependent task cannot run. Re-dispatch the chain "
+                    f"once the upstream problem is fixed.",
+                )
+                return
             if dep and dep.status not in ("done",):
                 logger.info(f"ProjectTask {task_id} waiting on dependency {task.depends_on}")
+                return
+
+        # Per-agent serialization: one running task per agent at a time.
+        # Concurrent MCP sessions on the same sub-agent are the driver of
+        # the anyio cancel-scope race, so this is a hard guarantee, not a
+        # scheduling preference. The task stays 'queued' and
+        # poll_queued_tasks re-fires it once the agent frees up.
+        # NOTE: no await between this check and the 'doing' commit below —
+        # that ordering is what makes the check race-free on one event loop.
+        if task.assigned_agent:
+            busy = (
+                db.query(models.ProjectTask.id)
+                .filter(
+                    models.ProjectTask.assigned_agent == task.assigned_agent,
+                    models.ProjectTask.status == "doing",
+                    models.ProjectTask.id != task.id,
+                )
+                .first()
+            )
+            if busy:
+                logger.info(
+                    f"ProjectTask {task_id} deferred — agent "
+                    f"{task.assigned_agent} is already running task {busy[0]}"
+                )
                 return
 
         logger.info(f"Executing ProjectTask {task_id}: {task.title}")
@@ -194,6 +243,9 @@ async def execute_project_task(task_id: str):
             )
             return
 
+        # Register BEFORE the commit: there must be no instant where the DB
+        # says 'doing' but the orphan sweep can't see a live owner.
+        RUNNING_TASKS.add(task_id)
         task.status = "doing"
         task.updated_at = datetime.utcnow()
         db.commit()
@@ -464,7 +516,63 @@ async def execute_project_task(task_id: str):
 
 
     finally:
+        RUNNING_TASKS.discard(task_id)
         db.close()
+
+
+async def fail_task_and_notify(db, task, reason: str):
+    """Mark `task` failed and do everything a failure must trigger:
+
+    issue TaskComment → live progress panel finalized → user notified →
+    agent queue advanced (which wakes dependents, so a chain failure
+    cascades instead of stranding downstream tasks in backlog/queued).
+    Every step past the commit is best-effort — a notifier outage must not
+    undo the state change.
+    """
+    task.status = "failed"
+    task.updated_at = datetime.utcnow()
+    db.add(models.TaskComment(
+        id=str(uuid.uuid4()),
+        task_id=task.id,
+        user_id=task.user_id,
+        author=task.assigned_agent or "costaff_agent",
+        content=f"## ❌ Task failed\n{reason}",
+        type="issue",
+        created_at=datetime.utcnow(),
+    ))
+    db.commit()
+
+    try:
+        from core.notifiers.progress_panel import panel_finalize
+        await panel_finalize(f"task_{task.id}", "failed")
+    except Exception:
+        logger.exception("[fail_task_and_notify] panel finalize swallowed")
+
+    channel, recipient = task.channel, task.recipient
+    if not channel or not recipient:
+        try:
+            ch2, rc2 = get_user_channel_info(task.user_id, db)
+            channel = channel or ch2
+            recipient = recipient or rc2
+        except Exception:
+            logger.exception("[fail_task_and_notify] channel lookup failed")
+    if channel and recipient:
+        try:
+            await dispatch_notification(
+                channel, recipient,
+                f"❌ Task '{task.title}' (id={task.id}) failed: {reason[:300]}",
+                task.session_id or f"task_{task.id}",
+            )
+        except Exception:
+            logger.exception(
+                "[fail_task_and_notify] user notification failed for task %s",
+                task.id,
+            )
+
+    if task.assigned_agent:
+        asyncio.create_task(_advance_agent_queue(
+            task.assigned_agent, task.user_id, finished_task_id=task.id
+        ))
 
 
 async def _advance_agent_queue(agent_id: str, user_id: str, finished_task_id: str = None):

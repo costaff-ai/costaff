@@ -9,13 +9,20 @@ from core.database import SessionLocal
 from mcp_servers.setup import logger, scheduler, scheduled_job_ids, tz
 from mcp_servers.executors.reminder import execute_reminder
 from mcp_servers.executors.regular_work import execute_regular_work
-from mcp_servers.executors.project_task import execute_project_task
+from mcp_servers.executors.project_task import (
+    RUNNING_TASKS,
+    execute_project_task,
+    fail_task_and_notify,
+)
 
-# Window after which a 'doing' task with no progress is assumed orphaned.
-# An asyncio worker that's actually alive will update `updated_at` (via status
-# changes, comments, or callbacks) well within this window, so anything older
-# is almost certainly a leftover from a container restart.
+# Grace age for the PERIODIC orphan sweep. Live executors are excluded via
+# RUNNING_TASKS, so this only shields 'doing' rows written by someone other
+# than an executor (e.g. the Manager moving a Kanban card via
+# update_task_status) from being reaped the moment they appear.
 ORPHAN_THRESHOLD_MINUTES = 30
+
+# How often the periodic sweep re-scans for orphans.
+ORPHAN_SWEEP_INTERVAL_SECONDS = 300
 
 
 async def sync_database_tasks():
@@ -186,50 +193,56 @@ _DEFAULT_REGULAR_WORKS = [
 ]
 
 
-def recover_orphaned_tasks() -> int:
-    """Mark ProjectTasks stuck in 'doing' as 'failed' on MCP startup.
+async def recover_orphaned_tasks(max_age_minutes: int = ORPHAN_THRESHOLD_MINUTES) -> int:
+    """Fail 'doing' ProjectTasks that no executor in this process owns.
 
-    When the MCP container restarts mid-task, the asyncio worker running
-    `execute_project_task` dies but the DB record stays in 'doing'. Without
-    cleanup, the Manager sees the stale record and reports the task as
-    in-progress for the rest of the conversation, blocking the user from
-    re-queueing the same work.
+    Every executor runs inside THIS MCP process and registers itself in
+    RUNNING_TASKS, so a 'doing' row outside that set is verifiably
+    orphaned — a container restart killed its worker, or a fire-and-forget
+    asyncio task was lost mid-life.
 
-    This runs once at startup, before the scheduler starts and before any
-    polling. Tasks last updated more than ORPHAN_THRESHOLD_MINUTES ago are
-    flipped to 'failed' with a TaskComment that explains the reason.
+    Called two ways:
+    - startup (max_age_minutes=0): RUNNING_TASKS is empty after a restart,
+      so EVERY 'doing' row is reaped immediately. The old 30-minute age
+      gate left a window — restart within 30 minutes of a task starting
+      and it stayed 'doing' forever, blocking the agent's whole queue.
+    - periodic sweep (default age): catches workers lost while the process
+      keeps running. The age gate only shields non-executor writers (e.g.
+      Manager moving a Kanban card to 'doing' by hand).
 
-    Returns the number of tasks recovered. Logged once for ops visibility.
+    Each reaped task goes through fail_task_and_notify: issue comment,
+    progress-panel finalize, user notification, and queue advance — so the
+    agent's queue unblocks and dependents cascade instead of stranding.
+
+    Returns the number of tasks recovered. Logged for ops visibility.
     """
     db = SessionLocal()
     recovered = 0
     try:
-        cutoff = datetime.utcnow() - timedelta(minutes=ORPHAN_THRESHOLD_MINUTES)
+        cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
         stuck = db.query(models.ProjectTask).filter(
             models.ProjectTask.status == "doing",
             models.ProjectTask.updated_at < cutoff,
         ).all()
 
         for task in stuck:
+            if task.id in RUNNING_TASKS:
+                continue  # a live executor in this process owns it
             stuck_since = task.updated_at  # capture BEFORE we overwrite it
-            task.status = "failed"
-            task.updated_at = datetime.utcnow()
-            db.add(models.TaskComment(
-                id=str(uuid.uuid4()),
-                task_id=task.id,
-                user_id=task.user_id,
-                author=task.assigned_agent or "costaff_agent",
-                content=(
-                    f"## Task orphaned\n"
-                    f"This task was stuck in 'doing' status for over "
-                    f"{ORPHAN_THRESHOLD_MINUTES} minutes without progress. "
-                    f"The MCP container likely restarted while the task was "
-                    f"running, killing the asyncio worker. The task has been "
-                    f"marked failed; re-queue it if you still need the result."
-                ),
-                type="issue",
-                created_at=datetime.utcnow(),
-            ))
+            try:
+                await fail_task_and_notify(
+                    db, task,
+                    "This task was orphaned — stuck in 'doing' with no live "
+                    "worker (the MCP container likely restarted while it was "
+                    "running). It has been marked failed; re-queue it if "
+                    "you still need the result.",
+                )
+            except Exception:
+                db.rollback()
+                logger.exception(
+                    "recover_orphaned_tasks: failed to reap task %s", task.id
+                )
+                continue
             recovered += 1
             logger.warning(
                 f"recover_orphaned_tasks: task {task.id} ({task.title!r}) "
@@ -237,7 +250,6 @@ def recover_orphaned_tasks() -> int:
             )
 
         if recovered:
-            db.commit()
             logger.info(f"recover_orphaned_tasks: recovered {recovered} orphaned tasks")
     except Exception:
         db.rollback()
@@ -245,6 +257,23 @@ def recover_orphaned_tasks() -> int:
     finally:
         db.close()
     return recovered
+
+
+async def orphan_sweep_loop():
+    """Periodic safety net behind the startup recovery.
+
+    The startup pass only helps when the process restarts; a worker lost
+    mid-life (fire-and-forget task garbage-collected or cancelled) leaves
+    its row 'doing' with the process still up. This loop re-runs the same
+    sweep — RUNNING_TASKS keeps genuinely live tasks safe no matter how
+    long they run.
+    """
+    while True:
+        await asyncio.sleep(ORPHAN_SWEEP_INTERVAL_SECONDS)
+        try:
+            await recover_orphaned_tasks(ORPHAN_THRESHOLD_MINUTES)
+        except Exception:
+            logger.exception("orphan_sweep_loop error")
 
 
 def _ensure_default_regular_works(user_id: str = None):
