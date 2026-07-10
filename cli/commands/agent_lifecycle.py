@@ -18,6 +18,7 @@ import typer
 from rich.console import Console
 
 from services.cores import get_core
+from services.runtime import runtime_for
 from services.runtime.git import Git, GitError
 from utils.paths import _project_root
 from utils.deploy import _deploy_local_agent
@@ -238,13 +239,39 @@ def agent_remove(
         raise typer.Exit(1)
     if not yes and not questionary.confirm(f"Remove agent '{name}' from core '{core.name}'?").ask():
         return
+
+    # Stop and remove the agent's containers BEFORE dropping its config entry —
+    # otherwise the container keeps running and holds its host port, and the
+    # next `agent add` reuses that (now-free-in-config) port and fails to bind.
+    # Mirrors `channel remove` / `platform remove`. (url-type agents have no
+    # fragment/containers — nothing to stop.)
+    entry = conf["external_agents"][name]
+    fragment_path = entry.get("fragment_path")
+    container_names = entry.get("container_names", [])
+    try:
+        runtime = runtime_for(core)
+        if fragment_path and os.path.exists(fragment_path):
+            console.print(f"Stopping containers for agent [bold]{name}[/bold]...")
+            # remove_orphans=False: this fragment only declares the agent being
+            # removed; True would treat every other plugin's container as an
+            # orphan and kill them.
+            runtime.down(fragment=fragment_path, remove_orphans=False)
+        else:
+            for c in container_names:
+                runtime.force_remove_container(c)
+    except Exception as e:
+        # Don't strand the config entry if teardown hiccups — warn and proceed
+        # so the user isn't left with a half-removed agent they can't retry.
+        console.print(f"[yellow]Warning: could not fully stop containers for '{name}': {e}[/yellow]")
+        console.print(f"[yellow]Check `docker ps` for leftover {core.prefix}-*-{name} containers.[/yellow]")
+
     del conf["external_agents"][name]
     if name == "costaff-agent-coding":
         conf["coding_agent_enabled"] = False
     core.write_config(conf)
     core.regen_external_agents_env()
-    console.print(f"[green]Agent '{name}' removed from core '{core.name}'.[/green]")
-    console.print(f"[yellow]Restart {core.cn('agent-costaff')} to apply.[/yellow]")
+    core.recreate_manager()
+    console.print(f"[green]Agent '{name}' stopped and removed from core '{core.name}'.[/green]")
 
 
 @agent_app.command("enable")

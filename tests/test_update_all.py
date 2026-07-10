@@ -73,3 +73,42 @@ def test_update_all_no_plugins_is_noop(monkeypatch):
         lambda **kw: (_ for _ in ()).throw(AssertionError("should not be called")),
     )
     upd._update_all_plugins(None)  # no plugins → clean no-op
+
+
+# ---------------------------------------------------------------------------
+# _core_images_changed — detect updates that need a rebuild, not a restart
+# ---------------------------------------------------------------------------
+
+def test_core_images_changed_flags_migrations_and_mcp(monkeypatch):
+    def fake_run(cmd, **kw):
+        class R:
+            stdout = (
+                "migrations/versions/0003_x.py\n"
+                "mcp_servers/executors/project_task.py\n"
+                "server/routers/agents.py\n"   # host-side — must be ignored
+                "frontend/js/app.js\n"          # host-side — must be ignored
+            )
+        return R()
+    monkeypatch.setattr(upd.subprocess, "run", fake_run)
+    changed = upd._core_images_changed("aaa", "bbb")
+    assert "migrations/versions/0003_x.py" in changed
+    assert "mcp_servers/executors/project_task.py" in changed
+    assert not any(f.startswith(("server/", "frontend/")) for f in changed)
+
+
+def test_core_images_changed_empty_when_no_core_paths(monkeypatch):
+    def fake_run(cmd, **kw):
+        class R:
+            stdout = "cli/commands/update.py\nfrontend/index.html\n"
+        return R()
+    monkeypatch.setattr(upd.subprocess, "run", fake_run)
+    assert upd._core_images_changed("aaa", "bbb") == []
+
+
+def test_core_images_changed_noop_when_rev_unchanged(monkeypatch):
+    # Same rev (or missing rev) → never shells out to git diff
+    def boom(*a, **k):
+        raise AssertionError("git diff should not run")
+    monkeypatch.setattr(upd.subprocess, "run", boom)
+    assert upd._core_images_changed("aaa", "aaa") == []
+    assert upd._core_images_changed("", "bbb") == []

@@ -12,6 +12,56 @@ from utils.paths import _project_root
 
 console = Console()
 
+# Changes under these paths ship INSIDE the manager-core images (built from
+# _project_root's compose), so `costaff restart` — which recreates without
+# rebuilding — won't pick them up. A new alembic migration also runs only on
+# mcp-costaff startup, i.e. after a rebuild. `cli/`, `server/`, `utils/`,
+# `services/` are host-side (the CLI reinstall above applies them), so they
+# are deliberately NOT here.
+_CORE_IMAGE_PATHS = ("mcp_servers/", "migrations/", "agents/", "requirements.txt", "Dockerfile")
+
+
+def _head_rev() -> str:
+    r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=_project_root,
+                       capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def _core_images_changed(before: str, after: str) -> list[str]:
+    """Paths under _CORE_IMAGE_PATHS that changed between two revs."""
+    if not before or not after or before == after:
+        return []
+    diff = subprocess.run(["git", "diff", "--name-only", before, after],
+                          cwd=_project_root, capture_output=True, text=True)
+    changed = [ln.strip() for ln in diff.stdout.splitlines() if ln.strip()]
+    return [f for f in changed if f.startswith(_CORE_IMAGE_PATHS)]
+
+
+def _guide_core_rebuild(changed: list[str]) -> None:
+    """Tell the user (and, on a TTY, offer to run) the core rebuild that a
+    plain `restart` cannot substitute for."""
+    import questionary
+
+    has_migration = any(f.startswith("migrations/") for f in changed)
+    console.print(Panel.fit(
+        "🧱 [bold yellow]Core image changes detected[/bold yellow]\n"
+        f"{len(changed)} file(s) under "
+        + ", ".join(sorted({f.split('/')[0] for f in changed}))
+        + " ship inside the manager-core images.\n"
+        + ("A new database migration was included — it runs on "
+           "mcp-costaff startup, i.e. after a rebuild.\n" if has_migration else "")
+        + "[dim]`costaff restart` recreates containers but does NOT rebuild "
+          "images, so it will run the old code/schema.[/dim]"
+    ))
+    if sys.stdin.isatty() and questionary.confirm(
+        "Rebuild the manager core now (costaff core-rebuild)?", default=True
+    ).ask():
+        from cli.commands.lifecycle import core_rebuild
+        core_rebuild(no_cache=False)
+    else:
+        console.print("[yellow]Run [bold]costaff core-rebuild[/bold] to apply "
+                      "(a plain restart is not enough).[/yellow]")
+
 
 def update(
     tag: Optional[str] = typer.Option(None, "--tag", "--ref", help="Pin CoStaff core to a release tag, branch, or commit (e.g. v0.1.0-alpha-1). Without this flag the command fast-forwards to whatever main currently points at."),
@@ -23,6 +73,11 @@ def update(
     else:
         console.print(Panel.fit("🔄 [bold blue]CoStaff Update[/bold blue]"))
     console.print(f"Pulling latest changes in [bold]{_project_root}[/bold]...")
+
+    # Snapshot HEAD so we can tell afterwards whether the update touched code
+    # that lives inside the manager-core images (needs a rebuild, not a plain
+    # restart).
+    rev_before = _head_rev()
 
     # Check for local modifications
     status = subprocess.run(["git", "status", "--porcelain"], cwd=_project_root, capture_output=True, text=True)
@@ -74,6 +129,12 @@ def update(
     console.print("Re-installing CLI dependencies...")
     subprocess.run([pip, "install", "-e", _project_root, "-q"], check=False)
     console.print("[green]Done.[/green]")
+
+    # If the update changed code/migrations baked into the core images, a
+    # plain `restart` silently runs the old image — guide the rebuild.
+    changed = _core_images_changed(rev_before, _head_rev())
+    if changed:
+        _guide_core_rebuild(changed)
 
     if all_plugins:
         _update_all_plugins(tag)
