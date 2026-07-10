@@ -18,6 +18,10 @@ class OutputVerificationError(Exception):
     """Raised when a sub-agent's RESULT claims output files that are not on disk."""
 
 
+class AgentRunError(Exception):
+    """Raised when the ADK run produced no usable reply after retries."""
+
+
 # Paths the sub-agent claims it wrote, as they appear in its RESULT block.
 # Must match the same shape `core/notifiers/telegram.extract_file_paths` looks
 # for, so the verifier and the notifier agree on what counts as a "declared
@@ -219,6 +223,15 @@ async def execute_project_task(task_id: str):
 
         try:
             result_text = await run_adk_prompt(app_name, task.user_id, task_session_id, spec)
+            if (result_text or "").startswith("⚠️"):
+                # run_adk_prompt's retry-exhausted sentinel (model 404/429/
+                # timeout). Route it through the failure path below — storing
+                # it as a `done` result would record the outage as success
+                # and hand the user a "⚠️ …" string as the deliverable.
+                raise AgentRunError(
+                    result_text.removeprefix("⚠️").strip()
+                    or "agent returned no response after retries"
+                )
 
             # Declared-output verification — DISABLED by default.
             # It repeatedly false-failed successful BA/Coding tasks (a file

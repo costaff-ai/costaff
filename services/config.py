@@ -16,32 +16,45 @@ CORE_PLUGIN_MCP_TOOLS = (
 )
 
 
+class ConfigCorruptError(RuntimeError):
+    """config.json exists but cannot be read/parsed — refuse to continue."""
+
+
 class ConfigManager:
     @staticmethod
     def get_config(config_path: str = None) -> Dict[str, Any]:
         cp = config_path or PATHS["config"]
         if os.path.exists(cp):
+            # A corrupt config must be LOUD. Silently returning the empty
+            # default here meant the very next save_config() overwrote the
+            # file with it, wiping every registered agent/channel/core.
             try:
                 with open(cp, "r") as f:
                     conf = json.load(f)
-                    conf.setdefault("external_mcp", {})
-                    conf.setdefault("gateways_config", {})
-                    conf.setdefault("mcp", ["costaff"])
-                    # Migrate legacy "platforms" key to "channels"
-                    if "platforms" in conf and "channels" not in conf:
-                        conf["channels"] = conf.pop("platforms")
-                    conf.setdefault("channels", [])
-                    conf.setdefault("require_approval", True)
-                    conf.setdefault("coding_agent_enabled", False)
-                    conf.setdefault("external_agents", {})
-                    migrated = ConfigManager._migrate_coding_agent(conf)
-                    migrated |= ConfigManager._migrate_channel_container_names(conf)
-                    if migrated:
-                        ConfigManager.save_config(conf, cp)
-                    ConfigManager._warn_if_invalid(conf)
-                    return conf
-            except Exception:
-                pass
+            except (ValueError, OSError) as e:
+                raise ConfigCorruptError(
+                    f"{cp} is unreadable ({e}). Fix or restore the file "
+                    "(check for a stray comma/quote), or delete it to start "
+                    "from an empty config — refusing to continue, because "
+                    "the next save would overwrite it and drop every "
+                    "registered agent/channel."
+                ) from e
+            conf.setdefault("external_mcp", {})
+            conf.setdefault("gateways_config", {})
+            conf.setdefault("mcp", ["costaff"])
+            # Migrate legacy "platforms" key to "channels"
+            if "platforms" in conf and "channels" not in conf:
+                conf["channels"] = conf.pop("platforms")
+            conf.setdefault("channels", [])
+            conf.setdefault("require_approval", True)
+            conf.setdefault("coding_agent_enabled", False)
+            conf.setdefault("external_agents", {})
+            migrated = ConfigManager._migrate_coding_agent(conf)
+            migrated |= ConfigManager._migrate_channel_container_names(conf)
+            if migrated:
+                ConfigManager.save_config(conf, cp)
+            ConfigManager._warn_if_invalid(conf)
+            return conf
         return {"channels": [], "mcp": ["costaff"], "external_mcp": {}, "gateways_config": {}, "require_approval": True, "coding_agent_enabled": False, "external_agents": {}}
 
     @staticmethod

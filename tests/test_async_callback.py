@@ -317,3 +317,48 @@ async def test_failure_path_uses_failure_callback(db_session, monkeypatch):
     _, _, body, sid = dispatch_calls[0]
     assert body == "Manager's apology about the failed task"
     assert sid == "tg_user_session_fail"
+
+
+@pytest.mark.asyncio
+async def test_retry_exhausted_sentinel_marks_task_failed(db_session, monkeypatch):
+    """Regression for GA audit: run_adk_prompt's retry-exhausted "⚠️ …"
+    sentinel used to be stored as a `done` result — a model 404/429 outage
+    was recorded as success and the user got the ⚠️ string as the
+    deliverable. It must route through the failure path instead."""
+    task = _make_task(db_session, session_id="tg_user_session_sentinel")
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+
+    async def fake_run(app, uid, sid, prompt):
+        if sid.startswith("task_"):
+            return "⚠️ Failed to get a response from the agent."
+        assert "status=failed" in prompt
+        return "Manager explains the outage"
+
+    dispatch_calls = []
+
+    async def fake_dispatch(channel, recipient, body, sid):
+        dispatch_calls.append((channel, recipient, body, sid))
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+    monkeypatch.setattr(executor_mod, "dispatch_notification", fake_dispatch)
+
+    await executor_mod.execute_project_task(task.id)
+    for t in list(asyncio.all_tasks()):
+        if t is not asyncio.current_task():
+            t.cancel()
+
+    # The executor closes the session in its finally-block, detaching `task`
+    # — re-query instead of refresh().
+    row = db_session.query(models.ProjectTask).filter_by(id=task.id).one()
+    assert row.status == "failed"
+    # No `result` comment — only the issue comment from the failure path
+    comments = (
+        db_session.query(models.TaskComment)
+        .filter(models.TaskComment.task_id == task.id)
+        .all()
+    )
+    assert not [c for c in comments if c.type == "result"]
+    assert [c for c in comments if c.type == "issue"]
+    # The user hears about the failure, not a "⚠️ …" success message
+    assert len(dispatch_calls) == 1
+    assert dispatch_calls[0][2] == "Manager explains the outage"

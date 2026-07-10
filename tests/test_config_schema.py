@@ -138,3 +138,23 @@ def test_container_names_must_be_list():
                 }
             }
         })
+
+
+def test_get_config_raises_on_corrupt_json(tmp_path):
+    """Regression for GA audit: a hand-mangled config.json used to be
+    silently swallowed (empty default returned) — and the next save_config
+    overwrote the file, wiping every registered agent/channel/core."""
+    from services.config import ConfigCorruptError, ConfigManager
+
+    bad = tmp_path / "config.json"
+    bad.write_text('{"channels": [,}')
+    with pytest.raises(ConfigCorruptError):
+        ConfigManager.get_config(str(bad))
+
+
+def test_get_config_returns_defaults_when_file_missing(tmp_path):
+    from services.config import ConfigManager
+
+    conf = ConfigManager.get_config(str(tmp_path / "does-not-exist.json"))
+    assert conf["external_agents"] == {}
+    assert conf["mcp"] == ["costaff"]

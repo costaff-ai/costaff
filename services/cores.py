@@ -120,11 +120,18 @@ class CoreContext:
 
     # --- this core's own config.json (external_agents / channels / mcp / filters) ---
     def core_config(self) -> dict:
+        if not os.path.exists(self.config_path):
+            return {}
         try:
             with open(self.config_path) as f:
                 return json.load(f)
-        except Exception:
-            return {}
+        except (ValueError, OSError) as e:
+            # Corrupt config must be loud — a silent {} here gets written
+            # back by the next save and wipes this core's registrations.
+            raise RuntimeError(
+                f"{self.config_path} is unreadable ({e}) — fix or restore "
+                "it before continuing."
+            ) from e
 
     # --- writes (Full / per-core) ---
     def write_config(self, conf: dict):
