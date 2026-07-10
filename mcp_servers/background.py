@@ -259,6 +259,70 @@ async def recover_orphaned_tasks(max_age_minutes: int = ORPHAN_THRESHOLD_MINUTES
     return recovered
 
 
+# Exponential backoff for outbox retries: attempt N waits 2^N minutes,
+# capped, so a flapping channel isn't hammered. 8 attempts spans ~4 hours.
+_OUTBOX_POLL_SECONDS = 30
+_OUTBOX_BACKOFF_CAP_MINUTES = 60
+
+
+async def process_outbox_once() -> int:
+    """Retry due notification_outbox rows. Returns how many were sent.
+
+    Rows whose next_attempt_at has passed are re-sent via the dispatcher
+    (enqueue_on_failure=False so a repeat failure updates THIS row instead
+    of creating a new one). Success → status='sent'. Exhausting
+    max_attempts → status='dead' for ops to inspect.
+    """
+    from core.notifiers.dispatcher import dispatch_notification
+
+    db = SessionLocal()
+    sent = 0
+    try:
+        now = datetime.utcnow()
+        due = db.query(models.NotificationOutbox).filter(
+            models.NotificationOutbox.status == "pending",
+            models.NotificationOutbox.next_attempt_at <= now,
+        ).order_by(models.NotificationOutbox.next_attempt_at.asc()).limit(50).all()
+
+        for row in due:
+            ok = await dispatch_notification(
+                row.channel, row.recipient, row.message,
+                session_id=row.session_id, enqueue_on_failure=False,
+            )
+            row.attempts += 1
+            row.updated_at = datetime.utcnow()
+            if ok:
+                row.status = "sent"
+                sent += 1
+            elif row.attempts >= row.max_attempts:
+                row.status = "dead"
+                logger.error(
+                    "[outbox] notification %s dead after %d attempts "
+                    "(channel=%s)", row.id, row.attempts, row.channel,
+                )
+            else:
+                backoff = min(2 ** row.attempts, _OUTBOX_BACKOFF_CAP_MINUTES)
+                row.next_attempt_at = datetime.utcnow() + timedelta(minutes=backoff)
+            db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("[outbox] process_outbox_once error")
+    finally:
+        db.close()
+    return sent
+
+
+async def outbox_retry_loop():
+    """Drain the notification outbox on a fixed poll; per-row backoff lives
+    in the rows' next_attempt_at, so this loop itself stays simple."""
+    while True:
+        await asyncio.sleep(_OUTBOX_POLL_SECONDS)
+        try:
+            await process_outbox_once()
+        except Exception:
+            logger.exception("outbox_retry_loop error")
+
+
 async def orphan_sweep_loop():
     """Periodic safety net behind the startup recovery.
 

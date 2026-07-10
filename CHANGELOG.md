@@ -6,6 +6,30 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Durable notification outbox.** A channel push that fails (Telegram 5xx,
+  WebChat secret unset, network) is now written to `notification_outbox`
+  and retried by a background loop with exponential backoff, marked `dead`
+  only after 8 attempts. A task result is no longer lost because a single
+  push happened to fail. (migration `0003_notification_outbox`)
+
+### Changed
+
+- **Dashboard passwords use PBKDF2-HMAC-SHA256** (600k iterations) instead
+  of a single SHA-256 round. Existing `auth.json` records upgrade
+  transparently on the next successful login. Token and password
+  comparisons are now constant-time.
+- **`costaff agent remove` stops and removes the agent's containers** (like
+  `channel remove` / `platform remove`) and recreates the manager, instead
+  of leaving an orphaned container holding its host port so the next
+  `agent add` fails to bind.
+- **`costaff update` detects core-image changes** (anything under
+  `mcp_servers/`, `migrations/`, `agents/`, `requirements.txt`,
+  `Dockerfile`) and guides — or, on a TTY, runs — `costaff core-rebuild`,
+  because a plain `restart` recreates containers without rebuilding and
+  would run the old code / skip a new migration.
+
 ### Fixed
 
 - **Task lifecycle — no more stranded tasks.** Startup orphan recovery now

@@ -24,7 +24,7 @@ def test_single_head(monkeypatch):
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory.from_config(_cfg("sqlite://", monkeypatch))
-    assert list(script.get_heads()) == ["0002_regular_work_channels"]
+    assert list(script.get_heads()) == ["0003_notification_outbox"]
 
 
 def test_upgrade_head_creates_core_schema(tmp_path, monkeypatch):
@@ -34,7 +34,8 @@ def test_upgrade_head_creates_core_schema(tmp_path, monkeypatch):
     command.upgrade(_cfg(url, monkeypatch), "head")
 
     tables = set(inspect(create_engine(url)).get_table_names())
-    assert {"identity_maps", "reminders", "project_tasks", "costaff_alembic_version"} <= tables
+    assert {"identity_maps", "reminders", "project_tasks",
+            "notification_outbox", "costaff_alembic_version"} <= tables
 
 
 def test_core_uses_dedicated_version_table(tmp_path, monkeypatch):

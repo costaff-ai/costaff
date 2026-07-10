@@ -17,7 +17,7 @@ from mcp_servers.tools import user, messaging, reminders, regular_works, epics, 
 # Import background task functions
 from mcp_servers.background import (
     sync_database_tasks, poll_queued_tasks, _ensure_default_regular_works,
-    recover_orphaned_tasks, orphan_sweep_loop,
+    recover_orphaned_tasks, orphan_sweep_loop, outbox_retry_loop,
 )
 from mcp_servers.executors.reminder import execute_reminder
 
@@ -71,6 +71,7 @@ async def startup():
     asyncio.create_task(sync_database_tasks())
     asyncio.create_task(poll_queued_tasks())
     asyncio.create_task(orphan_sweep_loop())
+    asyncio.create_task(outbox_retry_loop())
     logger.info("CoStaff Agent Engine online.")
 
 

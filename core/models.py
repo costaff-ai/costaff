@@ -282,3 +282,28 @@ class SkillConfig(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NotificationOutbox(Base):
+    """Durable retry queue for outbound notifications.
+
+    A task result delivered only as a TaskComment is invisible to the user
+    if the channel push fails (Telegram 5xx, WebChat secret unset, etc.).
+    dispatch_notification enqueues a row here whenever the push fails and a
+    background loop retries with exponential backoff until it succeeds or
+    hits max_attempts (then status='dead' for ops to inspect).
+    """
+    __tablename__ = "notification_outbox"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    channel = Column(String, nullable=False)
+    recipient = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    session_id = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", index=True)  # pending | sent | dead
+    attempts = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=8)
+    next_attempt_at = Column(DateTime, default=datetime.utcnow, index=True)
+    last_error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
