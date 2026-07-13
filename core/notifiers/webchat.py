@@ -29,14 +29,24 @@ logger = logging.getLogger(__name__)
 # These resolve at call time, NOT module import, so changing the env on a
 # running container picks up without a rebuild.
 def _push_url() -> str:
-    return os.getenv(
-        "WEBCHAT_ENT_PUSH_URL",
-        "http://costaff-channel-webchat-enterprise:80/api/internal/push",
+    # Async delivery is a shared channel capability (OSS + Enterprise both
+    # speak /api/internal/push). Prefer the generic WEBCHAT_PUSH_URL; keep
+    # WEBCHAT_ENT_PUSH_URL as a fallback so existing Enterprise deployments
+    # are unaffected. Each stack points this at ITS own webchat container.
+    return (
+        os.getenv("WEBCHAT_PUSH_URL")
+        or os.getenv(
+            "WEBCHAT_ENT_PUSH_URL",
+            "http://costaff-channel-webchat-enterprise:80/api/internal/push",
+        )
     )
 
 
 def _shared_secret() -> str:
-    return os.getenv("WEBCHAT_ENT_INTERNAL_SECRET", "")
+    return (
+        os.getenv("WEBCHAT_INTERNAL_SECRET")
+        or os.getenv("WEBCHAT_ENT_INTERNAL_SECRET", "")
+    )
 
 
 # A valid session_id starts with a known channel prefix. Sub-agent LLMs
