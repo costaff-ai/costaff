@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta-2] - 2026-07-13
+
 ### Changed
 
 - **`costaff channel` is multi-core aware.** `add/list/remove/rebuild/tags`
@@ -73,6 +75,36 @@ All notable changes to this project are recorded here. Format follows
 - **`send_message_now` to WebChat actually sends.** The webchat branch
   used to return "Sent." without delivering anything; it now pushes
   through the same channel endpoint the notification dispatcher uses.
+- **`costaff update --all` is no longer a silent no-op.** Called directly
+  (not via Typer), the rebuild helpers received the `--core` OptionInfo
+  sentinel and every plugin failed in core resolution (`Rebuilt 0/N`).
+- **`dispatch_plan` links the chain correctly.** It parsed the task id
+  with a loose regex that a step title containing `ID:` could hijack,
+  stranding the rest of the chain; it now anchors on the full UUID.
+- **Per-agent serialization survives name-spelling drift.** `coding` vs
+  `coding_agent` slipped past the busy-check and ran concurrently (the
+  anyio race); every per-agent comparison now normalizes the name.
+- **Deliveries and failures no longer vanish.** A LINE push with a missing
+  token was recorded as success and skipped the outbox; the license gate
+  failed a task without advancing the queue (stranding dependents); an
+  empty ADK reply was stored as a `done` result. All three are fixed.
+- **The manager keeps its own MCP across add/remove.** `agent add` no
+  longer appends a sub-agent's MCP to the manager (which triggered the
+  anyio cancel-scope race), and `agent remove` tears down the MCP wiring
+  it created so a dead URL isn't fed back to the manager.
+- **Scheduler / delivery correctness.** Poll no longer starves a ready
+  task behind a dependency-blocked one; a finished immediate task isn't
+  re-run; and the WebChat-Enterprise env guess can't override an
+  explicitly-set channel.
+- **Plugin fragments join the core's real network** (a non-default core
+  runs on e.g. `costaff_asst`, not `costaff_default`), so the manager can
+  reach agents/channels deployed with `--core`.
+- **CLI robustness.** A corrupt config on one core no longer aborts port
+  allocation on another; `core use` validates on single-install hosts;
+  `recreate_manager` warns on failure instead of claiming success;
+  `docker up` failures raise a catchable error (no traceback);
+  `costaff restart` runs preflight before stopping; and `agent add` rolls
+  back a source it cloned when the deploy fails.
 
 ### Security
 
@@ -81,6 +113,18 @@ All notable changes to this project are recorded here. Format follows
   env vars; fresh installs generate a random Postgres password; corrupt
   `config.json` aborts loudly instead of being overwritten with defaults;
   retry-exhausted agent runs are recorded as `failed`, not `done`.
+- External-agent `a2a_url` registration now DNS-resolves and rejects
+  hostnames that map to loopback or the cloud-metadata / link-local range
+  (SSRF), while still allowing private-LAN federation nodes.
+- `GET /api/config` no longer returns bot tokens in plaintext — it reports
+  only whether each is configured.
+
+### CI / tooling
+
+- Tests run across the Python 3.10 / 3.11 / 3.12 matrix (the documented
+  floor); wheels package the CLI subpackages; Dependabot keeps pip and
+  Actions patched; a pushed `v*` tag cuts a GitHub Release from the
+  matching CHANGELOG section.
 
 ## [0.1.0-beta-1] - 2026-07-08
 
