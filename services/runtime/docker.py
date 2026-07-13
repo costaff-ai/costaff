@@ -82,7 +82,13 @@ class DockerRuntime(Runtime):
         if remove_orphans:
             cmd.append("--remove-orphans")
         cmd.extend(services)
-        subprocess.run(cmd, check=True, cwd=self.compose_cwd)
+        # Raise RuntimeError (like build()) rather than the raw
+        # CalledProcessError from check=True — every caller catches
+        # RuntimeError, so check=True leaked a traceback on `up` failures
+        # (name conflict, port in use) where build failures were handled.
+        result = subprocess.run(cmd, cwd=self.compose_cwd)
+        if result.returncode != 0:
+            raise RuntimeError(f"docker compose up failed (exit={result.returncode})")
 
     def stop(
         self,

@@ -168,8 +168,13 @@ def stop():
 def restart():
     """Restart CoStaff services with tiered sequence."""
     console.print("Restarting CoStaff services in sequence...")
+    # Preflight BEFORE stop: a fatal .env issue (e.g. a cleared secret) would
+    # otherwise abort start() after everything is already stopped, leaving the
+    # whole stack down. Validate first so a bad config aborts with the stack
+    # still up.
+    _run_preflight()
     stop()
-    start(build=False)
+    start(build=False, preflight=False)  # already validated above
     console.print("[bold green]SUCCESS: CoStaff restarted in correct sequence![/bold green]")
 
 

@@ -143,21 +143,27 @@ class CoreContext:
     def regen_mcp_urls(self):
         ConfigManager.update_mcp_urls(self.config_path, self.env_path, self.prefix)
 
-    def recreate_manager(self):
+    def recreate_manager(self) -> bool:
         """Recreate ONLY the manager container so it reloads regenerated env.
 
         Uses `docker compose up -d --force-recreate --no-deps <service>` scoped to
         this core's compose project. Falls back to a plain restart for the
-        synthetic single-core default (no compose metadata)."""
+        synthetic single-core default (no compose metadata). Returns True on
+        success; a False return lets callers warn instead of printing "Done"
+        over a silent failure (the manager would keep running stale env)."""
         import subprocess
         from services.docker import DockerManager
         if self.compose_file and self.compose_project:
             cmd = (DockerManager.get_cmd()
                    + ["-p", self.compose_project, "-f", self.compose_file,
                       "up", "-d", "--force-recreate", "--no-deps", self.manager_service])
-            subprocess.run(cmd, check=False, cwd=os.path.dirname(self.compose_file))
-        else:
-            DockerManager.run_action(self.cn("agent-costaff"), "restart")
+            res = subprocess.run(cmd, cwd=os.path.dirname(self.compose_file))
+            return res.returncode == 0
+        try:
+            DockerManager.run_action(self.cn("agent-costaff"), "restart")  # raises on failure
+            return True
+        except Exception:
+            return False
 
     def to_public(self, active: bool) -> dict:
         return {
@@ -216,7 +222,16 @@ def all_used_public_ports() -> set:
     cores, _ = _registry()
     used = set()
     for name, data in cores.items():
-        conf = CoreContext(name, data).core_config()
+        try:
+            conf = CoreContext(name, data).core_config()
+        except Exception as e:
+            # One core's corrupt/unreadable config.json must not block port
+            # allocation on a DIFFERENT core. Skip it (its ports simply aren't
+            # reserved — worst case is a collision the operator will see and
+            # fix by repairing that core), rather than crashing every deploy.
+            import warnings
+            warnings.warn(f"skipping core {name!r} for port reservation: {e}", stacklevel=2)
+            continue
         for section in ("external_agents", "dynamic_channels"):
             for entry in conf.get(section, {}).values():
                 if entry.get("public_port"):
@@ -227,8 +242,13 @@ def all_used_public_ports() -> set:
 def set_active(name: str) -> str:
     conf = ConfigManager.get_config()
     cores = conf.get("cores") or {}
-    if cores and name not in cores:
-        raise ValueError(f"unknown core '{name}'")
+    # Validate against the real registry even on single-install hosts (no
+    # `cores` key): there the only valid target is the synthetic "default"
+    # core, so anything else is a typo that would otherwise be silently
+    # written as an invalid active_core.
+    valid = set(cores) if cores else {"default"}
+    if name not in valid:
+        raise ValueError(f"unknown core '{name}' (known: {', '.join(sorted(valid))})")
     conf["active_core"] = name
     ConfigManager.save_config(conf)
     return name

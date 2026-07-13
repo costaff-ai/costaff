@@ -30,6 +30,20 @@ console = Console()
 CORE_OPT = typer.Option(None, "--core", help="Target core (see `costaff core list`). Default: the active core.")
 
 
+def _recreate_or_warn(core) -> None:
+    """Recreate the Manager and warn (don't claim success) if it failed.
+
+    recreate_manager returns False on a failed compose recreate; without this
+    the caller printed a green success while the Manager kept running stale
+    env (env_file is only read at container creation)."""
+    if not core.recreate_manager():
+        console.print(
+            f"[yellow]Warning: could not recreate {core.cn('agent-costaff')} — "
+            f"config was saved but the Manager still has the old env. "
+            f"Run `costaff restart` (or check Docker) to apply.[/yellow]"
+        )
+
+
 def _resolve_core(name):
     """--core resolution shared by every agent command."""
     # When a command function is invoked directly in Python (e.g. the
@@ -148,6 +162,9 @@ def agent_add(
                 k, v = e.split("=", 1)
                 predefined_envs[k.strip()] = v.strip()
 
+    # Track whether WE cloned the source this invocation so a failed deploy
+    # can roll it back (leftover src would otherwise block a clean retry).
+    cloned_src = None
     if github:
         target_src = os.path.join(core.base_dir, "costaff-agent", name, "src")
         if os.path.exists(target_src):
@@ -166,6 +183,7 @@ def agent_add(
             # but `agent rebuild --tag <other>` would then fail.
             Git().clone(github, target_src, ref=tag, depth=0 if tag else 1)
             local = target_src
+            cloned_src = target_src
         except GitError as e:
             console.print(f"[red]Git clone failed: {e}[/red]")
             raise typer.Exit(1)
@@ -177,6 +195,17 @@ def agent_add(
             )
         except Exception as e:
             console.print(f"[red]Deploy failed: {e}[/red]")
+            # Roll back the clone WE created so a retry with the same name
+            # starts clean. Leave a user-supplied --local dir alone. The core
+            # .env may hold this agent's required vars now; they're inert
+            # without a config entry and get overwritten on a successful retry.
+            if cloned_src and os.path.isdir(cloned_src):
+                shutil.rmtree(cloned_src, ignore_errors=True)
+                console.print(f"[dim]Rolled back cloned source at {cloned_src}.[/dim]")
+            console.print(
+                f"[dim]If you retry, run `costaff agent remove {name}` first only "
+                f"if `costaff agent list` shows it (it should not).[/dim]"
+            )
             raise typer.Exit(1)
     else:
         # added_by stamps CRUD ownership: CLI-added agents are only removable
@@ -230,7 +259,7 @@ def agent_add(
 
     console.print(f"[green]Agent '{name}' deployed and registered on core '{core.name}'.[/green]")
     console.print("Recreating the manager so it picks up the new agent...")
-    core.recreate_manager()
+    _recreate_or_warn(core)
     console.print("[green]Done.[/green]")
 
 
@@ -297,7 +326,7 @@ def agent_remove(
     core.write_config(conf)
     core.regen_external_agents_env()
     core.regen_mcp_urls()
-    core.recreate_manager()
+    _recreate_or_warn(core)
     console.print(f"[green]Agent '{name}' stopped and removed from core '{core.name}'.[/green]")
 
 
@@ -314,7 +343,7 @@ def agent_enable(name: str = typer.Argument(...), core_name: Optional[str] = COR
         conf["coding_agent_enabled"] = True
     core.write_config(conf)
     core.regen_external_agents_env()
-    core.recreate_manager()
+    _recreate_or_warn(core)
     console.print(f"[green]Agent '{name}' enabled on core '{core.name}'.[/green]")
 
 
@@ -354,7 +383,7 @@ def agent_transfer(
         entry["transfer"] = False
     core.write_config(conf)
     core.regen_external_agents_env()
-    core.recreate_manager()
+    _recreate_or_warn(core)
     state = "transfer (sub_agents)" if enable else "AgentTool (default)"
     console.print(f"[green]'{name}' is now wired via {state} (Manager recreated).[/green]")
 
@@ -372,5 +401,5 @@ def agent_disable(name: str = typer.Argument(...), core_name: Optional[str] = CO
         conf["coding_agent_enabled"] = False
     core.write_config(conf)
     core.regen_external_agents_env()
-    core.recreate_manager()
+    _recreate_or_warn(core)
     console.print(f"[green]Agent '{name}' disabled on core '{core.name}'.[/green]")

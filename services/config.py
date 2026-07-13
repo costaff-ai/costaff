@@ -5,7 +5,7 @@ import warnings
 from typing import Dict, Any
 from dotenv import load_dotenv, set_key
 
-from utils.paths import PATHS
+from utils.paths import PATHS, _project_root
 
 # The four manager-core MCP tools every plugin agent needs (Agent Protocol
 # v1.x): progress notify / task comment / file hand-off / file listing.
@@ -122,7 +122,14 @@ class ConfigManager:
         for m in conf.get("mcp", []):
             custom_url = None
             if m == "costaff":
-                path = os.path.join("mcp_servers", "server.json")
+                # Resolve relative to THIS core's runtime root (dirname of its
+                # config.json), not the CLI's current working directory — a
+                # relative "mcp_servers/server.json" read the wrong core's file
+                # (or nothing) when the CLI ran from another directory.
+                base = os.path.dirname(cp) if cp else _project_root
+                path = os.path.join(base, "mcp_servers", "server.json")
+                if not os.path.exists(path):
+                    path = os.path.join(_project_root, "mcp_servers", "server.json")
                 if os.path.exists(path):
                     try:
                         with open(path, "r") as f:
