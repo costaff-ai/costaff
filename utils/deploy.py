@@ -203,10 +203,12 @@ def _deploy_local_agent(
                 svc_def["build"]["context"] = os.path.join(source_path, build["context"])
         # Remove original ports (we manage them)
         svc_def.pop("ports", None)
-        # Add to costaff network
+        # Join THIS core's docker network (default core → costaff_default;
+        # asst/twk run on costaff_asst/costaff_twk). Hardcoding costaff_default
+        # would put the container on the wrong network for a non-default core.
         svc_def.setdefault("networks", [])
-        if isinstance(svc_def["networks"], list) and "costaff_default" not in svc_def["networks"]:
-            svc_def["networks"].append("costaff_default")
+        if isinstance(svc_def["networks"], list) and core.network_name not in svc_def["networks"]:
+            svc_def["networks"].append(core.network_name)
         # Inject fixed runtime vars into a2a service
         if svc == a2a_service:
             svc_def.setdefault("environment", [])
@@ -263,7 +265,7 @@ def _deploy_local_agent(
 
     fragment = {
         "services": services_fragment,
-        "networks": {"costaff_default": {"external": True}},
+        "networks": {core.network_name: {"external": True}},
     }
     fragment_path = os.path.join(fragment_dir, "compose-fragment.yaml")
     if os.path.exists(fragment_path):

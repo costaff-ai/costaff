@@ -81,6 +81,27 @@ class CoreContext:
         """True for the synthetic single-install core (no registry entry)."""
         return self.name == "default"
 
+    @property
+    def network_name(self) -> str:
+        """The docker network agents/channels on this core must join.
+
+        Read from the core's base compose `networks.default.name` — a
+        non-default core (e.g. asst → costaff_asst, twk → costaff_twk) runs
+        on its own network, so a plugin fragment hardcoding costaff_default
+        would land the container on the wrong network and the manager could
+        not reach it. Falls back to costaff_default (the single-install
+        network) when the compose can't be read."""
+        try:
+            import yaml
+            with open(self.main_compose) as f:
+                compose = yaml.safe_load(f) or {}
+            name = (compose.get("networks", {}).get("default", {}) or {}).get("name")
+            if name:
+                return name
+        except Exception:
+            pass
+        return "costaff_default"
+
     # --- containers ---
     def cn(self, suffix: str) -> str:
         """Container name for a logical role, e.g. cn('agent-costaff')."""

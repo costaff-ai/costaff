@@ -33,10 +33,11 @@ def test_channel_port_without_reserved_unchanged():
 # ---------------------------------------------------------------------------
 
 class _FakeCore:
-    def __init__(self, prefix, workspace_root, env_path):
+    def __init__(self, prefix, workspace_root, env_path, network_name="costaff_default"):
         self.prefix = prefix
         self.workspace_root = workspace_root
         self.env_path = env_path
+        self.network_name = network_name
 
 
 def _make_source(tmp_path):
@@ -81,7 +82,7 @@ def test_fragment_uses_core_prefix_and_paths(tmp_path):
     ws = tmp_path / "twk-workspace"
     env_path = tmp_path / "twk.env"
     env_path.write_text("X=1\n")
-    core = _FakeCore("twk", str(ws), str(env_path))
+    core = _FakeCore("twk", str(ws), str(env_path), network_name="costaff_twk")
     src = _make_source(tmp_path)
     plugin_env = tmp_path / "plugin" / ".env"
     plugin_env.parent.mkdir()
@@ -91,6 +92,9 @@ def test_fragment_uses_core_prefix_and_paths(tmp_path):
 
     # Container names carry the core's prefix
     assert "twk-channel-telegram" in frag["services"]
+    # The fragment joins the CORE's network, not the hardcoded default
+    assert "costaff_twk" in frag["networks"]
+    assert "costaff_twk" in frag["services"]["twk-channel-telegram"]["networks"]
     assert "twk-channel-telegram-worker" in frag["services"]
     a2a = frag["services"]["twk-channel-telegram"]
     # Published port bound with the core's allocation

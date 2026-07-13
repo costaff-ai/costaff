@@ -78,6 +78,27 @@ def test_recreate_manager_returns_bool_on_compose_core(monkeypatch):
 # runtime.up raises RuntimeError (not CalledProcessError) on failure
 # ---------------------------------------------------------------------------
 
+def test_network_name_read_from_base_compose(tmp_path):
+    compose = tmp_path / "docker-compose.yaml"
+    compose.write_text(
+        "services: {}\nnetworks:\n  default:\n    name: costaff_twk\n    external: true\n"
+    )
+    core = cores.CoreContext("twk", {
+        "container_prefix": "twk",
+        "config_path": str(tmp_path / "config.json"),
+        "compose_file": str(compose),
+    })
+    assert core.network_name == "costaff_twk"
+
+
+def test_network_name_falls_back_to_default(tmp_path):
+    # No compose / no networks section → costaff_default (single-install net)
+    core = cores.CoreContext("default", {
+        "config_path": str(tmp_path / "config.json"),
+    })
+    assert core.network_name == "costaff_default"
+
+
 def test_runtime_up_raises_runtimeerror(monkeypatch):
     rt = DockerRuntime(base_compose="/x/docker-compose.yaml", project="", compose_cwd="/x")
 

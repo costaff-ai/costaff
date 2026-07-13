@@ -3,7 +3,7 @@
 Reads the channel/agent source's `docker-compose.yaml` and rewrites it into a
 compose-fragment.yaml that:
   - Renames each service container so the CLI can manage it by name
-  - Joins the shared `costaff_default` docker network
+  - Joins the core's docker network (default core → `costaff_default`)
   - Strips the source's published ports and assigns one from our channel range
   - Adds a `SHARED_DIR` env var and bind-mounts the shared workspace dir
   - Wires both the core .env and the plugin .env as env_files
@@ -27,6 +27,7 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
     prefix = core.prefix if core else "costaff"
     workspace_root = core.workspace_root if core else _workspace_root
     env_path = core.env_path if core else PATHS["env"]
+    net = core.network_name if core else "costaff_default"
 
     manifest_path = os.path.join(source_path, "costaff.channel.json")
     if not os.path.exists(manifest_path):
@@ -66,8 +67,8 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
 
         svc_def.pop("ports", None)
         svc_def.setdefault("networks", [])
-        if "costaff_default" not in svc_def["networks"]:
-            svc_def["networks"].append("costaff_default")
+        if net not in svc_def["networks"]:
+            svc_def["networks"].append(net)
 
         if svc == a2a_service:
             svc_def.setdefault("environment", [])
@@ -107,7 +108,7 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
 
     fragment = {
         "services": services_fragment,
-        "networks": {"costaff_default": {"external": True}},
+        "networks": {net: {"external": True}},
     }
     fragment_dir = os.path.dirname(plugin_env_path)
     fragment_path = os.path.join(fragment_dir, "compose-fragment.yaml")
