@@ -6,6 +6,18 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta-3] - 2026-07-14
+
+### Added
+
+- **Async task results reach WebChat OSS, not just Enterprise.** Delivering a
+  finished background task ("I'll notify you when it's done") is now a shared
+  channel capability. The core prefers the generic `WEBCHAT_PUSH_URL` /
+  `WEBCHAT_INTERNAL_SECRET` so each stack points at its own webchat container,
+  falling back to `WEBCHAT_ENT_PUSH_URL` / `WEBCHAT_ENT_INTERNAL_SECRET` so
+  existing Enterprise deployments are unaffected. Pairs with WebChat OSS
+  beta-3, which receives these pushes over SSE.
+
 ## [0.1.0-beta-2] - 2026-07-13
 
 ### Changed
