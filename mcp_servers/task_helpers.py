@@ -30,7 +30,7 @@ def normalize_agent_name(name: str) -> str:
     return n
 
 
-def get_user_channel_info(user_id: str, db) -> tuple:
+def get_user_channel_info(user_id: str, db, allow_env_fallback: bool = True) -> tuple:
     """Look up the user's primary notification channel from IdentityMap.
 
     Returns (channel, hashed_id) or (None, None) if no mapping exists.
@@ -43,6 +43,13 @@ def get_user_channel_info(user_id: str, db) -> tuple:
         webent_*           → webchat  (WebChat Enterprise — same notifier path)
     The recipient is always the hashed_id so dispatch_notification can
     resolve it back to a real platform id.
+
+    `allow_env_fallback` (default True) controls the WebChat-Enterprise
+    fallback GUESS returned when there is no local IdentityMap (or an unknown
+    prefix): fine for FILLING a missing channel, but callers deciding whether
+    to OVERRIDE an explicitly-set channel must pass False — otherwise the
+    guess overrides a correct, explicit channel (e.g. a federation node that
+    also runs Telegram would misroute a Telegram task to WebChat).
     """
     mapping = (
         db.query(models.IdentityMap)
@@ -60,7 +67,7 @@ def get_user_channel_info(user_id: str, db) -> tuple:
         # treat the user as a WebChat user: the push lands on the enterprise
         # container, which resolves the hashed_id against ITS own IdentityMap
         # and delivers to the right conversation.
-        if os.getenv("WEBCHAT_ENT_PUSH_URL"):
+        if allow_env_fallback and os.getenv("WEBCHAT_ENT_PUSH_URL"):
             return "webchat", user_id
         return None, None
     sid = mapping.session_id or ""
@@ -78,7 +85,7 @@ def get_user_channel_info(user_id: str, db) -> tuple:
     if sid.startswith("webent_") or sid.startswith("web_"):
         return "webchat", user_id
     # Unknown prefix: same enterprise-federation fallback as no-mapping above.
-    if os.getenv("WEBCHAT_ENT_PUSH_URL"):
+    if allow_env_fallback and os.getenv("WEBCHAT_ENT_PUSH_URL"):
         return "webchat", user_id
     return None, None
 

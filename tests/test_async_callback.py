@@ -437,6 +437,62 @@ async def test_agent_busy_defers_second_task(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_done_immediate_task_not_rerun(db_session, monkeypatch):
+    """A stale/duplicate fire on an already-done immediate task must not
+    re-run it (which would duplicate the result comment + re-deliver)."""
+    task = _make_task(db_session, status="done")
+    task.type = "immediate"
+    db_session.commit()
+    task_id = task.id
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    run_calls = []
+
+    async def fake_run(app, uid, sid, prompt):
+        run_calls.append(sid)
+        return "should not run"
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+    await executor_mod.execute_project_task(task_id)
+    assert run_calls == []  # not re-executed
+
+
+@pytest.mark.asyncio
+async def test_explicit_channel_not_overridden_by_env_guess(db_session, monkeypatch):
+    """A federation node with WEBCHAT_ENT_PUSH_URL set but no IdentityMap for
+    the user must NOT override an explicit task.channel=telegram with the
+    webchat env fallback guess."""
+    task = _make_task(db_session, status="queued")
+    task.channel = "telegram"
+    task.recipient = "12345"
+    task.type = "immediate"
+    db_session.commit()
+    task_id = task.id
+
+    monkeypatch.setattr(executor_mod, "SessionLocal", lambda: db_session)
+    monkeypatch.setenv("WEBCHAT_ENT_PUSH_URL", "http://enterprise/push")
+
+    async def fake_run(app, uid, sid, prompt):
+        return "result text"
+
+    dispatched = []
+
+    async def fake_dispatch(channel, recipient, body, sid):
+        dispatched.append(channel)
+
+    monkeypatch.setattr(executor_mod, "run_adk_prompt", fake_run)
+    monkeypatch.setattr(executor_mod, "dispatch_notification", fake_dispatch)
+
+    await executor_mod.execute_project_task(task_id)
+    for t in list(asyncio.all_tasks()):
+        if t is not asyncio.current_task():
+            t.cancel()
+
+    # Delivery must stay on the explicit telegram channel, not flip to webchat
+    assert dispatched and all(c == "telegram" for c in dispatched)
+
+
+@pytest.mark.asyncio
 async def test_license_block_cascades_to_downstream(db_session, monkeypatch):
     """Regression: a license-gate failure used to `return` without advancing
     the queue, stranding backlog dependents forever. It must now advance so

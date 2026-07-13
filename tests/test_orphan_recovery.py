@@ -175,3 +175,38 @@ async def test_recovers_multiple_orphans(db_session, wired):
         models.ProjectTask.status == "doing"
     ).count()
     assert remaining == 0
+
+
+async def test_poll_skips_dependency_blocked_and_fires_ready(db_session, wired, monkeypatch):
+    """Regression: a queued-but-blocked front task must not occupy the agent
+    slot and starve a READY task behind it in the same agent's queue."""
+    fired = []
+
+    async def fake_exec(tid):
+        fired.append(tid)
+
+    monkeypatch.setattr(background, "execute_project_task", fake_exec)
+
+    # upstream not done → downstream (queue_order 1) is blocked; ready task
+    # (queue_order 2, same agent, no dep) must still fire.
+    upstream = _make_task(db_session, status="queued", age_minutes=1, title="up")
+    blocked = _make_task(db_session, status="queued", age_minutes=1, title="blocked", depends_on=upstream.id)
+    blocked.queue_order = 1
+    ready = _make_task(db_session, status="queued", age_minutes=1, title="ready")
+    ready.queue_order = 2
+    db_session.commit()
+    upstream_id, blocked_id, ready_id = upstream.id, blocked.id, ready.id
+
+    # Let one poll iteration run (and the fired fake_exec tasks execute).
+    import asyncio as _aio
+    poll = _aio.ensure_future(background.poll_queued_tasks())
+    await _aio.sleep(0.05)
+    poll.cancel()
+    try:
+        await poll
+    except _aio.CancelledError:
+        pass
+
+    # blocked must NOT have fired; ready fires despite being behind it
+    assert blocked_id not in fired
+    assert ready_id in fired

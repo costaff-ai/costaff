@@ -129,9 +129,23 @@ async def poll_queued_tasks():
 
             for task in queued:
                 agent = normalize_agent_name(task.assigned_agent or "costaff_agent")
-                if agent not in agents_busy:
-                    agents_busy.add(agent)
-                    asyncio.create_task(execute_project_task(task.id))
+                if agent in agents_busy:
+                    continue
+                # Skip a task still blocked by an unfinished dependency:
+                # firing it only early-returns in execute, but marking the
+                # agent busy would starve a READY task later in the same
+                # agent's queue. A FAILED dependency is NOT skipped — the task
+                # must fire so it cascades to failed (see execute_project_task).
+                if task.depends_on:
+                    dep = (
+                        db.query(models.ProjectTask.status)
+                        .filter(models.ProjectTask.id == task.depends_on)
+                        .first()
+                    )
+                    if dep and dep[0] not in ("done", "failed"):
+                        continue
+                agents_busy.add(agent)
+                asyncio.create_task(execute_project_task(task.id))
 
             db.close()
         except Exception:

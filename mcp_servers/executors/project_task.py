@@ -126,7 +126,14 @@ async def execute_project_task(task_id: str):
     db = SessionLocal()
     try:
         task = db.query(models.ProjectTask).filter(models.ProjectTask.id == task_id).first()
-        if not task or task.status in ("doing",):
+        if not task or task.status == "doing":
+            return
+        # Don't re-run an already-finished IMMEDIATE task (a stale/duplicate
+        # fire, or _advance_agent_queue picking one up) — that would duplicate
+        # the result comment and re-deliver to the user. Scheduled (cron) tasks
+        # legitimately re-run, so guard immediate only.
+        if task.type == "immediate" and task.status in ("done", "failed"):
+            logger.info(f"execute_project_task {task_id}: already {task.status}, skipping")
             return
 
         # Check dependency
@@ -204,9 +211,12 @@ async def execute_project_task(task_id: str):
         # in create_project_task even when the user is on WebChat (observed
         # 2026-05-26, tasks 2a149d6e / 3809fd21). Override: if the user's
         # most recent identity_maps row maps to a channel that disagrees
-        # with task.channel, trust the IdentityMap. The IdentityMap is the
-        # only ground truth for which surface the user is actually on.
-        actual_channel, _ = get_user_channel_info(task.user_id, db)
+        # with task.channel, trust the IdentityMap.
+        # allow_env_fallback=False: only a REAL IdentityMap-derived channel may
+        # override an explicit task.channel. The WebChat-Enterprise env guess
+        # must NOT — on a federation node that also runs Telegram it would
+        # misroute a correctly-set Telegram task to WebChat.
+        actual_channel, _ = get_user_channel_info(task.user_id, db, allow_env_fallback=False)
         if actual_channel and channel and actual_channel != channel:
             logger.warning(
                 f"ProjectTask {task_id}: overriding task.channel={channel!r} "
