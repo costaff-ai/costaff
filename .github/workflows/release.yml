@@ -1,0 +1,47 @@
+name: release
+
+# Cut a GitHub Release when a version tag is pushed. The release body is the
+# matching section extracted from CHANGELOG.md, so `git tag vX.Y.Z && git push
+# --tags` is the whole release flow.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract changelog section for this tag
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          # Pull the block between "## [<version>]" and the next "## [" heading.
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {grab=1; next}
+            grab && /^## \[/ {exit}
+            grab {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "See CHANGELOG.md for details of ${TAG}." > RELEASE_NOTES.md
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          case "${{ steps.notes.outputs.tag }}" in
+            *-alpha*|*-beta*|*-rc*) PRERELEASE="--prerelease" ;;
+          esac
+          gh release create "${{ steps.notes.outputs.tag }}" \
+            --title "${{ steps.notes.outputs.tag }}" \
+            --notes-file RELEASE_NOTES.md \
+            $PRERELEASE

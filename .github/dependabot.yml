@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Python runtime + dev dependencies. Grouped so a routine bump is one PR,
+  # not a dozen; security updates still open individually.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+
+  # GitHub Actions used by the test / release workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
