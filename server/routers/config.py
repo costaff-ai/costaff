@@ -23,10 +23,13 @@ def get_api_config(auth: bool = Depends(AuthManager.verify_token)):
     # Sync environment tokens to the config object for UI
     if "gateways_config" not in conf:
         conf["gateways_config"] = {}
+    # Report only whether a token is configured, never the token itself —
+    # it would otherwise land in the admin's browser in plaintext. The gateway
+    # form renders an empty secret field; save_gateway preserves the existing
+    # token when the field is left blank (only overwrites on a non-empty value).
     tokens = {"tg": "TELEGRAM_BOT_TOKEN", "dc": "DISCORD_BOT_TOKEN", "line": "LINE_CHANNEL_ACCESS_TOKEN"}
     for k, v in tokens.items():
-        if t := os.getenv(v):
-            conf["gateways_config"].setdefault(k, {})["token"] = t
+        conf["gateways_config"].setdefault(k, {})["token_set"] = bool(os.getenv(v))
     return conf
 
 
