@@ -61,7 +61,16 @@ def _ensure_webchat_push_env(core, name: str) -> None:
     existing = dotenv_values(env_path)
     secret = (existing.get("WEBCHAT_INTERNAL_SECRET") or "").strip()
     if not secret:
+        # An Enterprise deployment already carries WEBCHAT_ENT_INTERNAL_SECRET
+        # and its receiver validates against THAT value. Reuse it instead of
+        # minting a fresh secret: the notifier prefers the WEBCHAT_* pair, so
+        # a fresh value here would break Enterprise async push on the next
+        # mcp recreate (sender switches to the new secret, receiver still
+        # checks the old one).
+        secret = (existing.get("WEBCHAT_ENT_INTERNAL_SECRET") or "").strip()
+    if not secret:
         secret = secrets.token_urlsafe(32)
+    if secret != (existing.get("WEBCHAT_INTERNAL_SECRET") or "").strip():
         set_key(env_path, "WEBCHAT_INTERNAL_SECRET", secret, quote_mode="never")
     set_key(env_path, "WEBCHAT_PUSH_URL", push_url, quote_mode="never")
     console.print(

@@ -110,22 +110,25 @@ def test_core_images_changed_flags_migrations_and_mcp(monkeypatch):
 
 
 def test_core_images_changed_flags_core_package(monkeypatch):
-    # core/ is baked into costaff-mcp-costaff (Dockerfile COPY . .), so a change
-    # there needs a rebuild, not just a restart — exactly beta-3's push-sender
-    # case (core/notifiers/webchat.py). services/ and cli/ are host-side (applied
-    # by the CLI reinstall) and must stay ignored.
+    # core/ AND services/ are baked into costaff-mcp-costaff (Dockerfile
+    # COPY . .) and used at container runtime: core/notifiers/webchat.py is
+    # beta-3's push-sender case, services/config.py is imported by
+    # mcp_servers/tools/_shared.py (license usage gate). Changes there need a
+    # rebuild, not just a restart. cli/ is host-side (applied by the CLI
+    # reinstall) and must stay ignored.
     def fake_run(cmd, **kw):
         class R:
             stdout = (
                 "core/notifiers/webchat.py\n"
-                "services/config.py\n"       # host-side — must be ignored
+                "services/config.py\n"       # in-image — must be flagged
                 "cli/commands/channel.py\n"  # host-side — must be ignored
             )
         return R()
     monkeypatch.setattr(upd.subprocess, "run", fake_run)
     changed = upd._core_images_changed("aaa", "bbb")
     assert "core/notifiers/webchat.py" in changed
-    assert not any(f.startswith(("services/", "cli/")) for f in changed)
+    assert "services/config.py" in changed
+    assert not any(f.startswith("cli/") for f in changed)
 
 
 def test_core_images_changed_empty_when_no_core_paths(monkeypatch):

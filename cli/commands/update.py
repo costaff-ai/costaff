@@ -21,7 +21,7 @@ console = Console()
 # startup, i.e. after a rebuild. `cli/`, `server/`, `utils/`, `services/` are
 # host-side (the CLI reinstall above applies them), so they are deliberately
 # NOT here.
-_CORE_IMAGE_PATHS = ("core/", "mcp_servers/", "migrations/", "agents/", "requirements.txt", "Dockerfile")
+_CORE_IMAGE_PATHS = ("core/", "services/", "mcp_servers/", "migrations/", "agents/", "requirements.txt", "Dockerfile")
 
 
 def _head_rev() -> str:

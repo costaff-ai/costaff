@@ -8,6 +8,18 @@ All notable changes to this project are recorded here. Format follows
 
 ### Fixed
 
+- **WebChat async-push auto-wiring no longer breaks Enterprise stacks.**
+  `costaff channel add/rebuild` on a channel whose name contains "webchat"
+  now reuses an existing `WEBCHAT_ENT_INTERNAL_SECRET` as
+  `WEBCHAT_INTERNAL_SECRET` instead of minting a fresh one. The notifier
+  prefers the `WEBCHAT_*` pair, so a fresh secret meant the sender and the
+  Enterprise receiver (which validates against the `_ENT_` value) disagreed
+  after the next mcp recreate — async push silently died.
+- **`costaff update` now flags `services/` changes for a core rebuild.**
+  `services/` is baked into the mcp image and imported at container runtime
+  (`mcp_servers/tools/_shared.py` → `services.config`); it was missing from
+  `_CORE_IMAGE_PATHS`, so a services-only update ran stale code in the
+  containers after a plain restart.
 - **Legacy `coding_agent_enabled` migration no longer fabricates a live
   agent.** Any config read (`get_config`) used to turn the bare legacy flag
   into an ENABLED `costaff-agent-coding` entry pointing at a default

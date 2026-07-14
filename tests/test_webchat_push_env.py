@@ -61,3 +61,17 @@ def test_non_webchat_channel_is_skipped(tmp_path):
     vals = dotenv_values(str(env))
     assert "WEBCHAT_PUSH_URL" not in vals
     assert "WEBCHAT_INTERNAL_SECRET" not in vals
+
+
+def test_enterprise_secret_is_reused_not_rotated(tmp_path):
+    # An Enterprise stack already carries WEBCHAT_ENT_INTERNAL_SECRET and its
+    # receiver validates against that value. The auto-wiring must adopt it —
+    # minting a fresh WEBCHAT_INTERNAL_SECRET would make the notifier (which
+    # prefers the WEBCHAT_* pair) send a secret the receiver rejects.
+    env = tmp_path / ".env"
+    env.write_text("WEBCHAT_ENT_INTERNAL_SECRET=entsecret\n")
+    _ensure_webchat_push_env(_FakeCore(env, prefix="asst"), "webchat-enterprise")
+
+    vals = dotenv_values(str(env))
+    assert vals["WEBCHAT_INTERNAL_SECRET"] == "entsecret"
+    assert vals["WEBCHAT_PUSH_URL"] == "http://asst-channel-webchat-enterprise:80/api/internal/push"
