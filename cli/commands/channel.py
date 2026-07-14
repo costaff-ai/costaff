@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 import shutil
 import threading
 from typing import Optional, List
@@ -7,7 +8,7 @@ from typing import Optional, List
 import httpx
 import questionary
 import typer
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key, dotenv_values
 from rich.console import Console
 from rich.table import Table
 
@@ -32,6 +33,41 @@ OFFICIAL_CHANNELS = {
     # works via redirect, which breaks if the old name is ever reused).
     "webchat": "https://github.com/costaff-ai/costaff-channel-webchat-oss.git",
 }
+
+
+def _ensure_webchat_push_env(core, name: str) -> None:
+    """Auto-wire async "notify you later" delivery for a WebChat channel.
+
+    WebChat receives finished async task results over SSE via
+    /api/internal/push. That needs two env vars the core's notifier (sender)
+    and the webchat container (receiver) must agree on:
+      - WEBCHAT_PUSH_URL: where the core POSTs the result
+      - WEBCHAT_INTERNAL_SECRET: shared auth for that POST
+
+    The webchat container already reads the core .env (its compose fragment
+    mounts it as an env_file), so writing both to the core .env is enough for
+    the two sides to line up — the user does no manual setup. Without this the
+    feature silently never fires (the core has nowhere to send to).
+
+    Scope: only WebChat channels have this receiver, so other channels are
+    skipped. Idempotent: an existing secret is preserved so a rebuild/restart
+    never rotates it and breaks in-flight config.
+    """
+    if "webchat" not in name:
+        return
+    env_path = core.env_path
+    container = core.cn(f"channel-{name}")
+    push_url = f"http://{container}:80/api/internal/push"  # nginx listens on 80
+    existing = dotenv_values(env_path)
+    secret = (existing.get("WEBCHAT_INTERNAL_SECRET") or "").strip()
+    if not secret:
+        secret = secrets.token_urlsafe(32)
+        set_key(env_path, "WEBCHAT_INTERNAL_SECRET", secret, quote_mode="never")
+    set_key(env_path, "WEBCHAT_PUSH_URL", push_url, quote_mode="never")
+    console.print(
+        f"[dim]Async push wired: finished background tasks will be delivered to "
+        f"{container} (/api/internal/push). Run 'costaff restart' to apply to the core.[/dim]"
+    )
 
 
 @channel_app.command("add")
@@ -95,6 +131,9 @@ def channel_add(
 
     if local:
         try:
+            # Write the async-push env BEFORE deploy: _deploy_local_channel
+            # starts the container, which reads these from the core .env at boot.
+            _ensure_webchat_push_env(core, name)
             entry = _deploy_local_channel(name, local, conf, predefined_envs=predefined_envs, core=core)
             if tag:
                 entry["ref"] = tag
@@ -285,6 +324,10 @@ def channel_rebuild(
         console.print(f"Removing any old containers: [dim]{', '.join(container_names)}[/dim]")
         for cname in container_names:
             runtime.force_remove_container(cname)
+
+    # Ensure async-push env exists before the container is recreated below
+    # (the recreated webchat reads WEBCHAT_INTERNAL_SECRET from the core .env).
+    _ensure_webchat_push_env(core, name)
 
     console.print(f"Starting rebuilt channel containers for [bold]{name}[/bold]...")
     try:

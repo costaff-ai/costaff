@@ -17,6 +17,14 @@ All notable changes to this project are recorded here. Format follows
   falling back to `WEBCHAT_ENT_PUSH_URL` / `WEBCHAT_ENT_INTERNAL_SECRET` so
   existing Enterprise deployments are unaffected. Pairs with WebChat OSS
   beta-3, which receives these pushes over SSE.
+- **`costaff channel add/rebuild webchat` auto-wires async push — zero manual
+  setup.** Adding or rebuilding a WebChat channel now generates
+  `WEBCHAT_INTERNAL_SECRET` (once, then preserved) and derives
+  `WEBCHAT_PUSH_URL` from the core's container prefix, writing both to the core
+  `.env`. The webchat container already mounts that `.env`, so the two sides
+  line up automatically — "notify you later" works after a plain rebuild +
+  `costaff restart`, without anyone hand-editing env files. Other channels are
+  left untouched.
 
 ## [0.1.0-beta-2] - 2026-07-13
 
