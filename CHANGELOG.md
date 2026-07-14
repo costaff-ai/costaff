@@ -26,6 +26,18 @@ All notable changes to this project are recorded here. Format follows
   `costaff restart`, without anyone hand-editing env files. Other channels are
   left untouched.
 
+### Fixed
+
+- **`channel add/rebuild` and `agent add` no longer break on a secondary core.**
+  The compose-fragment generator *appended* the core's docker network to
+  whatever the source `docker-compose.yaml` hardcoded (typically
+  `costaff_default`) instead of replacing it. On a non-default core (e.g. `twk`
+  → `costaff_twk`) the service then referenced `costaff_default`, which the
+  fragment doesn't declare, so the build failed with "refers to undefined
+  network costaff_default". The service now references exactly the core's
+  network. No change on the default core (the network already *is*
+  `costaff_default`).
+
 ## [0.1.0-beta-2] - 2026-07-13
 
 ### Changed

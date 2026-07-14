@@ -105,6 +105,58 @@ def test_fragment_uses_core_prefix_and_paths(tmp_path):
     assert any(str(ws) in str(v) for v in a2a["volumes"])
 
 
+def _make_source_with_network(tmp_path, netname="costaff_default"):
+    """A source whose service hardcodes a network — like the real webchat-oss
+    compose that pins `webchat` to `costaff_default`."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "costaff.channel.json").write_text('{"a2a_service": "webchat", "port": 80}')
+    (src / "docker-compose.yaml").write_text(yaml.safe_dump({
+        "services": {
+            "webchat": {"build": ".", "ports": ["18088:80"], "networks": [netname]},
+        },
+        "networks": {netname: {"external": True}},
+    }))
+    return src
+
+
+def test_fragment_replaces_source_hardcoded_network_on_secondary_core(tmp_path):
+    # Regression: a source pinning the service to costaff_default must NOT leave
+    # that reference behind on a non-default core. The fragment only declares the
+    # core's own network, so a stale costaff_default => compose rejects the build
+    # with "refers to undefined network costaff_default".
+    core = _FakeCore("twk", str(tmp_path / "ws"), str(tmp_path / "twk.env"),
+                     network_name="costaff_twk")
+    src = _make_source_with_network(tmp_path, "costaff_default")
+    plugin_env = tmp_path / "plugin" / ".env"
+    plugin_env.parent.mkdir()
+
+    _write_channel_fragment("webchat", str(src), 19095, str(plugin_env), core=core)
+    frag = _read_fragment(str(plugin_env))
+
+    svc = frag["services"]["twk-channel-webchat"]
+    assert svc["networks"] == ["costaff_twk"]  # source's costaff_default replaced
+    # every network the service references must be declared at top level
+    assert set(svc["networks"]).issubset(set(frag["networks"]))
+    assert "costaff_default" not in frag["networks"]
+
+
+def test_fragment_default_core_keeps_costaff_default(tmp_path, monkeypatch):
+    # On the default core the replacement is a no-op: net IS costaff_default.
+    monkeypatch.setattr("utils.compose._workspace_root", str(tmp_path / "ws"))
+    monkeypatch.setattr("utils.compose.PATHS", {"env": str(tmp_path / ".env")})
+    src = _make_source_with_network(tmp_path, "costaff_default")
+    plugin_env = tmp_path / "plugin" / ".env"
+    plugin_env.parent.mkdir()
+
+    _write_channel_fragment("webchat", str(src), 18088, str(plugin_env), core=None)
+    frag = _read_fragment(str(plugin_env))
+
+    svc = frag["services"]["costaff-channel-webchat"]
+    assert svc["networks"] == ["costaff_default"]
+    assert "costaff_default" in frag["networks"]
+
+
 # ---------------------------------------------------------------------------
 # command-layer plumbing — remove resolves and acts on the target core
 # ---------------------------------------------------------------------------

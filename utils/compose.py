@@ -66,9 +66,14 @@ def _write_channel_fragment(name: str, source_path: str, public_port: int, plugi
                 svc_def["build"]["context"] = os.path.join(source_path, build["context"])
 
         svc_def.pop("ports", None)
-        svc_def.setdefault("networks", [])
-        if net not in svc_def["networks"]:
-            svc_def["networks"].append(net)
+        # The fragment declares exactly one network (this core's) at the top
+        # level, so the service must reference exactly that. REPLACE whatever
+        # the source compose hardcoded — keeping a source network like
+        # `costaff_default` that the fragment doesn't declare makes compose
+        # reject the service ("refers to undefined network costaff_default")
+        # on every non-default core. On the default core net IS costaff_default,
+        # so this is a no-op there.
+        svc_def["networks"] = [net]
 
         if svc == a2a_service:
             svc_def.setdefault("environment", [])

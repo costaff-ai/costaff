@@ -204,11 +204,12 @@ def _deploy_local_agent(
         # Remove original ports (we manage them)
         svc_def.pop("ports", None)
         # Join THIS core's docker network (default core → costaff_default;
-        # asst/twk run on costaff_asst/costaff_twk). Hardcoding costaff_default
-        # would put the container on the wrong network for a non-default core.
-        svc_def.setdefault("networks", [])
-        if isinstance(svc_def["networks"], list) and core.network_name not in svc_def["networks"]:
-            svc_def["networks"].append(core.network_name)
+        # asst/twk run on costaff_asst/costaff_twk). The fragment declares only
+        # this core's network at the top level, so the service must reference
+        # exactly it — REPLACE any source-hardcoded network (e.g. costaff_default),
+        # else compose rejects the service ("refers to undefined network
+        # costaff_default") on every non-default core. No-op on the default core.
+        svc_def["networks"] = [core.network_name]
         # Inject fixed runtime vars into a2a service
         if svc == a2a_service:
             svc_def.setdefault("environment", [])
