@@ -6,6 +6,20 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Legacy `coding_agent_enabled` migration no longer fabricates a live
+  agent.** Any config read (`get_config`) used to turn the bare legacy flag
+  into an ENABLED `costaff-agent-coding` entry pointing at a default
+  container name — on hosts where that container never existed, the entry
+  flowed into `EXTERNAL_AGENTS_CONFIG` and the Manager routed coding tasks
+  into a dead endpoint. The migration now only keeps the agent enabled when
+  an explicit `CODING_A2A_URL`/`CODING_A2A_INTERNAL_URL` proves real wiring;
+  a bare flag migrates the entry as DISABLED (visible in `costaff agent
+  list`, never routed) with a warning, and when a modern `coding` entry
+  already exists the stale flag is dropped instead of registering the same
+  agent twice.
+
 ## [0.1.0-beta-3] - 2026-07-14
 
 ### Added

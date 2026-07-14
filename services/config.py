@@ -85,17 +85,42 @@ class ConfigManager:
     @staticmethod
     def _migrate_coding_agent(conf: Dict) -> bool:
         """One-time migration: coding_agent_enabled → external_agents entry. Returns True if migrated."""
-        if "costaff-agent-coding" in conf.get("external_agents", {}):
+        ext = conf.get("external_agents", {})
+        if "costaff-agent-coding" in ext:
             return False  # already migrated
         if not conf.get("coding_agent_enabled"):
             return False  # never enabled, nothing to migrate
+        if "coding" in ext:
+            # The coding agent is already registered the modern way
+            # (`costaff agent add coding`); migrating would register the same
+            # agent under a second name and the Manager would route to both.
+            # Drop the stale flag instead of injecting a duplicate.
+            conf.pop("coding_agent_enabled", None)
+            return True
         load_dotenv(PATHS["env"])
-        a2a_url = os.getenv("CODING_A2A_URL", "").strip() or os.getenv("CODING_A2A_INTERNAL_URL", "http://costaff-agent-coding:8081")
+        a2a_url = (os.getenv("CODING_A2A_URL", "").strip()
+                   or os.getenv("CODING_A2A_INTERNAL_URL", "").strip())
+        # Only an explicit CODING_A2A_* env var proves a coding agent was
+        # actually wired up. The bare legacy flag used to inject an ENABLED
+        # entry pointing at a default container name — on hosts where that
+        # container never existed, the Manager routed coding tasks into a
+        # dead endpoint.
+        enabled = bool(a2a_url)
+        if not a2a_url:
+            a2a_url = "http://costaff-agent-coding:8081"
+            warnings.warn(
+                "config.json has legacy coding_agent_enabled=true but no "
+                "CODING_A2A_URL/CODING_A2A_INTERNAL_URL is set — migrated "
+                "the coding agent entry as DISABLED. If you really run one, "
+                "re-enable it with `costaff agent enable costaff-agent-coding` "
+                "or register it via `costaff agent add coding ...`.",
+                stacklevel=3,
+            )
         conf.setdefault("external_agents", {})["costaff-agent-coding"] = {
             "type": "github",
             "a2a_url": a2a_url,
             "description": "Writes and runs code to solve problems involving computation, data processing, or program logic. Returns execution results and generated file paths.",
-            "enabled": bool(conf.get("coding_agent_enabled", False)),
+            "enabled": enabled,
             "container_names": ["costaff-agent-coding", "costaff-mcp-coding"],
         }
         return True
