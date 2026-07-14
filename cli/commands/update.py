@@ -13,12 +13,15 @@ from utils.paths import _project_root
 console = Console()
 
 # Changes under these paths ship INSIDE the manager-core images (built from
-# _project_root's compose), so `costaff restart` — which recreates without
-# rebuilding — won't pick them up. A new alembic migration also runs only on
-# mcp-costaff startup, i.e. after a rebuild. `cli/`, `server/`, `utils/`,
-# `services/` are host-side (the CLI reinstall above applies them), so they
-# are deliberately NOT here.
-_CORE_IMAGE_PATHS = ("mcp_servers/", "migrations/", "agents/", "requirements.txt", "Dockerfile")
+# _project_root's compose via `COPY . .`), so `costaff restart` — which
+# recreates without rebuilding — won't pick them up. `core/` is here because
+# it is baked into costaff-mcp-costaff (the push sender / dispatcher / models /
+# notifiers all run in that container); a plain restart would keep running the
+# old notifier code. A new alembic migration also runs only on mcp-costaff
+# startup, i.e. after a rebuild. `cli/`, `server/`, `utils/`, `services/` are
+# host-side (the CLI reinstall above applies them), so they are deliberately
+# NOT here.
+_CORE_IMAGE_PATHS = ("core/", "mcp_servers/", "migrations/", "agents/", "requirements.txt", "Dockerfile")
 
 
 def _head_rev() -> str:

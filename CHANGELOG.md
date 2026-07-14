@@ -37,6 +37,13 @@ All notable changes to this project are recorded here. Format follows
   network costaff_default". The service now references exactly the core's
   network. No change on the default core (the network already *is*
   `costaff_default`).
+- **`costaff update` now prompts a core rebuild when `core/` changes.** `core/`
+  (notifiers, dispatcher, models, license) is baked into `costaff-mcp-costaff`
+  via `COPY . .`, but it was missing from the update command's "needs a
+  rebuild" path list — so an update whose only image-relevant change was under
+  `core/` (e.g. this release's async-push sender) would be silently left
+  running the old code after a plain `restart`. `core/` is now in that list, so
+  the update offers `costaff core-rebuild` like it does for `mcp_servers/` etc.
 
 ## [0.1.0-beta-2] - 2026-07-13
 
