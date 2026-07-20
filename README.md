@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/lockup-vertical-dark.png" />
+    <img src="assets/logo/lockup-vertical.png" alt="CoStaff" width="300" />
+  </picture>
+</p>
+
 # CoStaff
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
