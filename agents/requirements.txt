@@ -10,24 +10,24 @@
 # verified-good set below. Verified on a fresh GCE build 2026-05-30 (E2E pass).
 
 # Google ADK 2.1.0 with A2A + extensions — the Manager Agent runtime.
-google-adk[a2a,extensions]==2.1.0
+google-adk[a2a,extensions]==2.5.0
 
 # GCS — shared workspace artifact upload by some skills.
-google-cloud-storage==2.18.2
+google-cloud-storage==3.13.0
 
 # Multipart upload support (file attachments in chat).
-python-multipart==0.0.27
+python-multipart==0.0.32
 
 # Model Context Protocol — manager agent consumes MCP tools.
 # google-adk[extensions] requires mcp>=1.16.0; its mcp_tool/__init__.py imports
 # StreamableHTTPConnectionParams etc. inside a try/except, so anything below
 # 1.16.0 (e.g. 1.9.4) makes that import fail silently → McpToolset is never
 # re-exported → the Manager fails to load. 1.27.1 = the version prod-test runs.
-mcp==1.27.1
+mcp==1.28.1
 
 # LiteLLM — pluggable non-Google LLM backend.
-# google-adk[extensions]==2.1.0 requires litellm>=1.83.7,<=1.83.14; pin the top.
-litellm==1.83.14
+# google-adk[extensions]==2.5.0 requires litellm>=1.83.7,<=1.83.14; pin the top.
+litellm==1.93.0
 
 # HTTP + DB drivers.
 python-dotenv==1.2.2
@@ -36,5 +36,5 @@ python-dotenv==1.2.2
 # (pip ResolutionImpossible).
 httpx==0.28.1
 # Session-service drivers for ADK_SESSION_SERVICE_URI (sqlite / postgres).
-aiosqlite==0.21.0
-asyncpg==0.30.0
+aiosqlite==0.22.1
+asyncpg==0.31.0
