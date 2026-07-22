@@ -2,16 +2,16 @@
 
 # Test runner — pytest-asyncio 0.24.x has known event-loop teardown
 # bugs with newer pytest. 1.x release line is what we run locally.
-pytest>=8.3.3
-pytest-asyncio>=1.3.0
-pytest-cov>=6.0.0
+pytest>=9.1.1
+pytest-asyncio>=1.4.0
+pytest-cov>=7.1.0
 
 # Strict-mode manifest validation (services.agent_protocol uses jsonschema
 # when --strict is passed; lenient mode doesn't need it).
-jsonschema==4.23.0
+jsonschema==4.26.0
 
 # `tests/test_remote_agent_tools.py` imports `agents/costaff_agent/sub_agents/`,
 # which depends on the same ADK that the Manager Agent container runs.
 # Keeping the test version pinned in lockstep with `agents/requirements.txt`
 # means `python -m pytest` works without a separate container build.
-google-adk[a2a,extensions]==2.1.0
+google-adk[a2a,extensions]==2.5.0

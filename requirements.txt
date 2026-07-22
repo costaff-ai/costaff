@@ -8,38 +8,38 @@
 # vulnerable range matters more than range flexibility.
 
 # Web framework + ASGI server
-fastapi>=0.124.1,<1
-uvicorn[standard]>=0.30.6
-python-multipart==0.0.27
-starlette>=0.38
+fastapi>=0.139.2,<1
+uvicorn[standard]>=0.51.0
+python-multipart==0.0.32
+starlette>=1.3.1
 
 # Persistence — SQLAlchemy + lazy drivers per ADK_SESSION_SERVICE_URI scheme
-sqlalchemy>=2.0.32,<3
-alembic>=1.13,<2
-aiosqlite>=0.21.0
-asyncpg>=0.30.0
-psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.51,<3
+alembic>=1.18.5,<2
+aiosqlite>=0.22.1
+asyncpg>=0.31.0
+psycopg2-binary>=2.9.12
 
 # HTTP + protocols
 httpx>=0.27.2,<1
-pydantic>=2.9.2,<3
+pydantic>=2.13.4,<3
 
 # Background jobs (reminder / regular work scheduling)
-apscheduler>=3.10.4
-pytz>=2024.1
+apscheduler>=3.11.3
+pytz>=2026.2
 
 # MCP runtime — pin to a known-tested release line
-mcp>=1.9.4
+mcp>=1.28.1
 
 # License verification (Ed25519) + Fernet header encryption
-cryptography>=43.0.1
+cryptography>=49.0.0
 
 # Config + secrets (pinned strictly — CVE-prone history)
 python-dotenv==1.2.2
-pyyaml>=6.0.2
+pyyaml>=6.0.3
 
 # CLI
-typer>=0.12.5
-rich>=13.8.1
-questionary>=2.0.1
-psutil>=6.0.0
+typer>=0.27.0
+rich>=15.0.0
+questionary>=2.1.1
+psutil>=7.2.2
