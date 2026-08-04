@@ -6,8 +6,23 @@ All notable changes to this project are recorded here. Format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-04
+
+First stable release. The whole ecosystem is aligned on this version: the core
+CLI, the shared chatbot library, and every tagged agent / channel plugin now
+carry `v0.1.0`, so `costaff update --all --tag v0.1.0` pins a known-good set.
+Functionally this is beta-3 plus the fixes below; plugins that were still on
+`v0.1.0-alpha-2` are re-tagged without code changes.
+
 ### Fixed
 
+- **Fresh installs no longer break on mcp 2.0.** `requirements.txt` asked for
+  `mcp>=1.9.4` with no upper bound, so any install done after mcp 2.0 shipped
+  resolved to 2.0.x — which removed `mcp.server.fastmcp`, the import that
+  `mcp_servers/setup.py` is built on. Every `mcp_servers` module failed to
+  import, taking the mcp container image and the test suite down with it. The
+  bound is now `mcp>=1.9.4,<2`, matching the release line
+  `agents/requirements.txt` already pinned.
 - **WebChat async-push auto-wiring no longer breaks Enterprise stacks.**
   `costaff channel add/rebuild` on a channel whose name contains "webchat"
   now reuses an existing `WEBCHAT_ENT_INTERNAL_SECRET` as

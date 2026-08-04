@@ -294,7 +294,7 @@ costaff license                  # Manage your CoStaff license
 
 ```bash
 costaff update                       # Fast-forward the core to the latest release
-costaff update --tag v0.1.0-alpha-2  # Pin the core to a specific release (or roll back)
+costaff update --tag v0.1.0  # Pin the core to a specific release (or roll back)
 ```
 
 `costaff update` pulls the latest core release and reinstalls the CLI.
@@ -308,11 +308,11 @@ reproducible set of versions instead of tracking each repo's `main`:
 ```bash
 costaff agent tags business-analysis                # Discover which release tags exist
 costaff agent add business-analysis \
-  --github <url> --tag v0.1.0-alpha-2               # Clone pinned to a tag
-costaff agent rebuild business-analysis --tag v0.1.0-alpha-2   # Re-pin + rebuild
+  --github <url> --tag v0.1.0               # Clone pinned to a tag
+costaff agent rebuild business-analysis --tag v0.1.0   # Re-pin + rebuild
 costaff channel tags telegram                       # Same flow for channels
-costaff update --tag v0.1.0-alpha-2                 # Pin the core itself
-costaff update --all --tag v0.1.0-alpha-2           # Align the core + every plugin in one shot
+costaff update --tag v0.1.0                 # Pin the core itself
+costaff update --all --tag v0.1.0           # Align the core + every plugin in one shot
 ```
 
 `agent list` / `channel list` show each plugin's current pinned **Ref**.

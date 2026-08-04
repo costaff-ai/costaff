@@ -184,12 +184,12 @@ python3 -m pytest tests/ -q
 - 只想清掉 stuck container 狀態：用 restart。
 
 **Tag pinning**（v0.1.0-alpha-1 起）：
-- `costaff agent add <name> --github <url> --tag v0.1.0-alpha-1` — clone 時帶 `--branch v0.1.0-alpha-1` + full history（depth=0），ref 寫進 `config.json` entry。
+- `costaff agent add <name> --github <url> --tag v0.1.0` — clone 時帶 `--branch v0.1.0` + full history（depth=0），ref 寫進 `config.json` entry。
 - `costaff agent rebuild <name>` — 若 entry 有 `ref` 就 `git fetch --tags && git checkout <ref>`；沒 ref 就維持原 `git pull --ff-only`。
 - `costaff agent rebuild <name> --tag v0.2.0` — 換 pin，會持久化到 config。
 - `costaff agent rebuild <name> --no-pull` — 完全跳過 git 動作，沿用工作樹現有內容。
 - `costaff channel add/rebuild` 行為一致。
-- `costaff update --tag v0.1.0-alpha-1` — pin core 自己。
+- `costaff update --tag v0.1.0` — pin core 自己。
 - `agent list` / `channel list` 多一個 `Ref` 欄位。
 - 不要在已 ref-pinned 的 agent 上手動 `git pull`，會 detach HEAD 然後跟 `fetch+checkout` 期望狀態漂移。
 

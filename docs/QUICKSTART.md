@@ -118,7 +118,7 @@ Want the assistant to handle Taiwan open-data queries? Pull in the
 **Twinkle Hub** agent:
 
 ```bash
-costaff agent add twinkle-hub --github https://github.com/costaff-ai/costaff-agent-twinkle-hub --tag v0.1.0-alpha-1
+costaff agent add twinkle-hub --github https://github.com/costaff-ai/costaff-agent-twinkle-hub --tag v0.1.0
 ```
 
 The CLI clones the repo at the pinned tag, generates a compose
@@ -132,7 +132,7 @@ costaff agent list
 ```
 
 You should see `twinkle-hub` with a green Health dot and the `Ref`
-column reading `v0.1.0-alpha-1`.
+column reading `v0.1.0`.
 
 Now go back to the chat and ask: *"找一下台北的實價登錄"*. The
 Manager will hand off to the new specialist.
@@ -144,7 +144,7 @@ Manager will hand off to the new specialist.
 Have a Telegram bot token from [@BotFather](https://t.me/BotFather)?
 
 ```bash
-costaff channel add telegram --tag v0.1.0-alpha-1
+costaff channel add telegram --tag v0.1.0
 # (paste your TELEGRAM_BOT_TOKEN when prompted)
 ```
 

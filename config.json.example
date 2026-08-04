@@ -16,7 +16,7 @@
       "a2a_url": "http://costaff-agent-business-analysis:8081",
       "public_port": 18101,
       "description": "Business analysis specialist: PDF reports, PPTX, charts.",
-      "version": "0.1.0-alpha-1",
+      "version": "0.1.0",
       "enabled": true,
       "container_names": [
         "costaff-agent-business-analysis",
@@ -24,7 +24,7 @@
       ],
       "mcp_configurable": true,
       "mcp_env_var": "BUSINESS_ANALYSIS_AGENT_MCP_URLS",
-      "ref": "v0.1.0-alpha-1"
+      "ref": "v0.1.0"
     }
   },
   "agent_mcps": {
@@ -67,7 +67,7 @@
       "container_names": [
         "costaff-channel-telegram"
       ],
-      "ref": "v0.1.0-alpha-1"
+      "ref": "v0.1.0"
     }
   },
   "platforms": {}

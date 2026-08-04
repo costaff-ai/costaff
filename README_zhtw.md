@@ -135,7 +135,7 @@ CoStaff 支援部署和管理透過 **A2A 協議**溝通的外部 Agent。
 costaff agent add my-agent --local /path/to/my-agent
 
 # 從 GitHub clone 並部署（可用 --tag 釘選 release）
-costaff agent add my-agent --github https://github.com/you/my-agent --tag v0.1.0-alpha-2
+costaff agent add my-agent --github https://github.com/you/my-agent --tag v0.1.0
 
 # 新增遠端 URL Agent
 costaff agent add my-agent --url http://my-agent.example.com
