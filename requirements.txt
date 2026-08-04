@@ -28,8 +28,11 @@ pydantic>=2.9.2,<3
 apscheduler>=3.10.4
 pytz>=2024.1
 
-# MCP runtime — pin to a known-tested release line
-mcp>=1.9.4
+# MCP runtime — pin to a known-tested release line.
+# Upper bound is load-bearing: mcp 2.0 dropped `mcp.server.fastmcp`, which
+# `mcp_servers/setup.py` imports. Kept in step with `agents/requirements.txt`,
+# which google-adk[extensions] pins to the same release.
+mcp>=1.9.4,<2
 
 # License verification (Ed25519) + Fernet header encryption
 cryptography>=43.0.1
