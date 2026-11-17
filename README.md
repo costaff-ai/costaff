@@ -1,3 +1,13 @@
+> [!IMPORTANT]
+> **此專案將於 2026 年 11 月 30 日封存，之後不再維護。**
+>
+> 考量目前的使用狀況與後續規劃，CoStaff 將集中資源發展新的方向。這個 repo 會在 2026 年 11 月 30 日封存（唯讀）：程式碼與歷史紀錄都會保留，可以繼續閱讀、fork 或依授權使用，但不會再更新、修正問題或回覆 issue 與 PR。
+>
+> 謝謝每一位使用過、回饋過、貢獻過的朋友。
+>
+> **This repository will be archived on November 30, 2026, and is no longer maintained.**
+> Given its usage and our plans ahead, CoStaff is focusing its effort elsewhere. From November 30, 2026 this repository will be read-only: the code and history stay available to read, fork and use under its license, but it will not receive updates, fixes, or responses to issues and pull requests. Thank you to everyone who used it, gave feedback, or contributed.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/lockup-vertical-dark.png" />
